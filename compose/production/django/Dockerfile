@@ -15,7 +15,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   # dependencies for building Python packages
   build-essential \
   # psycopg2 dependencies
-  libpq-dev
+  libpq-dev \
+  # postgis for geodjango
+  gdal-bin
 
 # Requirements are installed here to ensure they will be cached.
 COPY ./requirements .
@@ -47,6 +49,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libpq-dev \
   # Translations dependencies
   gettext \
+  # postgis for geodjango
+  gdal-bin \
   # cleaning up unused files
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
   && rm -rf /var/lib/apt/lists/*
