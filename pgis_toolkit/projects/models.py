@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.gis.db import models
-from .utils.managers import ActiveManager
 from django.utils.translation import ugettext_lazy as _
+
+from .utils.managers import ActiveManager
 
 GEOMETRY_TYPE_CHOICES=(
                         ("Point",_("Point")),
@@ -57,43 +58,43 @@ class DateTimeStamp(models.Model):
         abstract = True
 
 class OrganizationCategory(IsDeleted,DateTimeStamp):
-    name=models.CharField(max_length=254) 
-    
+    name=models.CharField(max_length=254)
+
     def __str__(self):
         return f'{self.name}'
 
 class Organization(IsDeleted,DateTimeStamp):
     category=models.ForeignKey(OrganizationCategory,on_delete=models.SET_NULL,blank=True,null=True)
-    name=models.CharField(max_length=254)  
+    name=models.CharField(max_length=254)
     email=models.EmailField(blank=True,null=True)
-    address=models.CharField(max_length=254,blank=True,null=True) 
-    contact=models.CharField(max_length=20,blank=True,null=True) 
+    address=models.CharField(max_length=254,blank=True,null=True)
+    contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
-    
+
     def __str__(self):
         return f'{self.name}'
 
 class Project(IsDeleted,DateTimeStamp):
     organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
-    name=models.CharField(max_length=254)   
+    name=models.CharField(max_length=254)
     description=models.TextField(blank=True,null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
-    
+
     def __str__(self):
         return f'{self.name}'
-    
+
 class DefaultTheme(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(blank=True,null=True)
-    
+
     def __str__(self):
         return f'{self.name}'
-    
+
 class LayerTemplate(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
     geometry_type=models.CharField(max_length=50,choices=GEOMETRY_TYPE_CHOICES)
-  
+
     def __str__(self):
         return f'{self.name}'
 

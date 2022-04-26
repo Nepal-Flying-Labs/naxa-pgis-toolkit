@@ -277,4 +277,3 @@ pgis_toolkit/media/
 .envs/*
 !.envs/.local/
 docker-compose.yml
-

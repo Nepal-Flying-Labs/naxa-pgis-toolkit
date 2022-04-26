@@ -9,4 +9,3 @@ admin.site.register(Project)
 admin.site.register(DefaultTheme)
 admin.site.register(LayerTemplate)
 admin.site.register(LayerTemplateAttribute)
-

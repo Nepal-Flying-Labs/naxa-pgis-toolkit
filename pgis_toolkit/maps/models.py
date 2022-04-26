@@ -1,7 +1,7 @@
 from django.db import models
-from pgis_toolkit.projects.models import Project
 from django.utils.translation import ugettext_lazy as _
-from pgis_toolkit.projects.models import IsDeleted, DateTimeStamp
+
+from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Project
 
 LAYER_TYPE_CHOICES=(("Raster",_("Raster")),("Vector",_('Vector')),('WMS',_('WMS')))
 
@@ -10,7 +10,7 @@ class Theme(IsDeleted,DateTimeStamp):
     project=models.ForeignKey(Project,on_delete=models.CASCADE,blank=True,null=True)
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(blank=True,null=True)
-    
+
     def __str__(self):
         return str(self.name)
 
@@ -19,7 +19,7 @@ class Category(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.CASCADE,blank=True,null=True)
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(blank=True,null=True)
-    
+
     def __str__(self):
         return str(self.name)
 
@@ -31,6 +31,6 @@ class Layer(IsDeleted,DateTimeStamp):
     default_load=models.BooleanField(default=False)
     layer_type=models.CharField(max_length=20,choices=LAYER_TYPE_CHOICES)
     is_osm_layer=models.BooleanField(default=False)
-    
+
     def __str__(self):
         return str(self.name)
