@@ -1,8 +1,7 @@
-from django.db import models
 from django.contrib import admin
+from django.db import models
 from django.utils.translation import ugettext_lazy as _
-
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Project
+from projects.models import DateTimeStamp, IsDeleted, Project
 
 LAYER_TYPE_CHOICES=(("Raster",_("Raster")),("Vector",_('Vector')),('WMS',_('WMS')))
 
@@ -14,11 +13,9 @@ class Theme(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return str(self.name)
+    class Meta:
+        app_label = 'maps'
 
-class ThemeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'name', 'project')
-    search_fields = ('id', 'name')
-    list_filter = ('project',)
 
 class Category(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.CASCADE,blank=True,null=True)
@@ -27,11 +24,10 @@ class Category(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return str(self.name)
+    class Meta:
+        app_label = 'maps'
 
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'name', 'theme')
-    search_fields = ('id', 'name')
-    list_filter = ('theme',)
+
 
 class Layer(IsDeleted,DateTimeStamp):
     category=models.ForeignKey(Category,on_delete=models.CASCADE,blank=True,null=True)
@@ -43,8 +39,5 @@ class Layer(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return str(self.name)
-
-class LayerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'name', 'category', 'layer_type', 'is_osm_layer')
-    search_fields = ('id', 'name')
-    list_filter = ('category', 'layer_type', 'default_load', 'is_osm_layer')
+    class Meta:
+        app_label = 'maps'
