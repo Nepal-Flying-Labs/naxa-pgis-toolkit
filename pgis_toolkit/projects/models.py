@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.gis.db import models
+from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
 from .utils.managers import ActiveManager
@@ -74,6 +75,11 @@ class Organization(IsDeleted,DateTimeStamp):
     def __str__(self):
         return f'{self.name}'
 
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'is_deleted', 'category', 'name', 'link')
+    search_fields = ('id', 'name', 'email', 'link')
+    list_filter = ('category',)
+
 class Project(IsDeleted,DateTimeStamp):
     organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
@@ -83,6 +89,11 @@ class Project(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return f'{self.name}'
+
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ('id', 'is_deleted', 'organization', 'name')
+    search_fields = ('id', 'name')
+    list_filter = ('organization', 'start_date', 'end_date')
 
 class DefaultTheme(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
@@ -107,3 +118,8 @@ class LayerTemplateAttribute(models.Model):
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     # choices=ArrayField(models.CharField(max_length=100, blank=True),size=20,blank=True, null=True)
+
+class LayerTemplateAttributeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer_template', 'name', 'alias', 'unit')
+    search_fields = ('id', 'name', 'alias')
+    list_filter = ('layer_template', 'data_type')
