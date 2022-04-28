@@ -1,6 +1,7 @@
 from django.conf import settings
-from django.contrib.gis.db import models
 from django.contrib import admin
+from django.contrib.gis.db import models
+from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from .utils.managers import ActiveManager
@@ -48,6 +49,7 @@ class IsDeleted(models.Model):
     active = ActiveManager()
 
     class Meta:
+        app_label = 'projects'
         abstract = True
 
 class DateTimeStamp(models.Model):
@@ -56,10 +58,14 @@ class DateTimeStamp(models.Model):
     last_updated = models.DateTimeField(auto_now=True, blank=True, null=True)
 
     class Meta:
+        app_label = 'projects'
         abstract = True
 
 class OrganizationCategory(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
+
+    class Meta:
+        app_label = 'projects'
 
     def __str__(self):
         return f'{self.name}'
@@ -72,13 +78,11 @@ class Organization(IsDeleted,DateTimeStamp):
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
 
+    class Meta:
+        app_label = 'projects'
+
     def __str__(self):
         return f'{self.name}'
-
-class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'category', 'name', 'link')
-    search_fields = ('id', 'name', 'email', 'link')
-    list_filter = ('category',)
 
 class Project(IsDeleted,DateTimeStamp):
     organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
@@ -87,13 +91,11 @@ class Project(IsDeleted,DateTimeStamp):
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
 
+    class Meta:
+        app_label = 'projects'
+
     def __str__(self):
         return f'{self.name}'
-
-class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'organization', 'name')
-    search_fields = ('id', 'name')
-    list_filter = ('organization', 'start_date', 'end_date')
 
 class DefaultTheme(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
@@ -102,12 +104,27 @@ class DefaultTheme(IsDeleted,DateTimeStamp):
     def __str__(self):
         return f'{self.name}'
 
+    class Meta:
+        app_label = 'projects'
+
 class LayerTemplate(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
     geometry_type=models.CharField(max_length=50,choices=GEOMETRY_TYPE_CHOICES)
 
     def __str__(self):
         return f'{self.name}'
+
+    class Meta:
+        app_label = 'projects'
+
+    def clean(self):
+        """
+        Make sure template name are unique
+        """
+        if LayerTemplate.active.exclude(id=self.id).filter(name=self.name).exists():
+            raise ValidationError(
+                f'Layer template with name {self.name} already exists')
+
 
 class LayerTemplateAttribute(models.Model):
     layer_template=models.ForeignKey(LayerTemplate,on_delete=models.CASCADE)
@@ -118,8 +135,17 @@ class LayerTemplateAttribute(models.Model):
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     # choices=ArrayField(models.CharField(max_length=100, blank=True),size=20,blank=True, null=True)
+    class Meta:
+        app_label = 'projects'
+        unique_together = (("layer_template", "name"),)
 
-class LayerTemplateAttributeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'layer_template', 'name', 'alias', 'unit')
-    search_fields = ('id', 'name', 'alias')
-    list_filter = ('layer_template', 'data_type')
+    def clean(self):
+        """
+        Make sure proper fields are added
+        """
+        if (self.data_type=="str" or self.data_type=="int") and not self.length:
+            # Raise a Validation error if length is empty when data_type equal to text or integer.
+            raise ValidationError('length is missing')
+        elif self.data_type=="float" and not (self.length or self.precision):
+            # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
+            raise ValidationError('length and precision should not be null')
