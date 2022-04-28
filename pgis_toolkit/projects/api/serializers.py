@@ -5,7 +5,7 @@ from rest_framework import serializers
 class LayerTemplateListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerTemplate
-        exclude=('created_date','updated_date','is_deleted')
+        exclude=('uploaded_date','last_updated','is_deleted')
 
 class LayerTemplateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +15,7 @@ class LayerTemplateSerializer(serializers.ModelSerializer):
 class LayerTemplateAttributeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerTemplateAttribute
-        exclude=('created_date','updated_date')
+        exclude=('uploaded_date','last_updated')
 
 class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
     class Meta:
