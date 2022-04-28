@@ -8,9 +8,15 @@ class LayerTemplateListSerializer(serializers.ModelSerializer):
         exclude=('uploaded_date','last_updated','is_deleted')
 
 class LayerTemplateSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = LayerTemplate
         fields = '__all__'
+
+    def validate(self, data):
+        if LayerTemplate.active.filter(name=data['name']).exists():
+            raise serializers.ValidationError('Layer template name must be unique')
+        return data
 
 class LayerTemplateAttributeListSerializer(serializers.ModelSerializer):
     class Meta:
