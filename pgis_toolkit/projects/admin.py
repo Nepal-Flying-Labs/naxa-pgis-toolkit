@@ -14,7 +14,7 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ('organization', 'start_date', 'end_date')
 
 class LayerTemplateAttributeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'layer_template', 'name', 'alias', 'unit')
+    list_display = ('id', 'layer_template', 'name', 'data_type','length','precision','alias', 'unit')
     search_fields = ('id', 'name', 'alias')
     list_filter = ('layer_template', 'data_type')
 
