@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import zipfile
 
 import fiona
 from django.conf import settings
@@ -100,3 +101,85 @@ def layer_template_download(request):
     except Exception as e:
         clear_dir(dir) #clearing directory
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+class LayerTemplateUploadAPIView(APIView):
+    def post(self, request, format=None):
+        errors=[]
+        try:
+            #creating directory to save uploaded file
+            FILE_UPLOAD_DIR = settings.MEDIA_ROOT + '/template_upload/shapefiles/'
+            os.makedirs(FILE_UPLOAD_DIR, exist_ok=True)
+
+            if not 'file' in request.FILES and request.FILES.get('file') == "":
+                return Response("error: file is missing", status=status.HTTP_400_BAD_REQUEST)
+
+            file = request.data["file"]
+            split_tup = os.path.splitext(str(file))
+            file_name=split_tup[0]
+            file_extension = split_tup[1]
+            if not file_extension == ".zip":
+                return Response("error: only .zip file is valid", status=status.HTTP_400_BAD_REQUEST)
+
+            #saving uploded file in directory
+            fd, zip_file_path = tempfile.mkstemp(prefix=file_name, dir=FILE_UPLOAD_DIR)
+            with open(zip_file_path, 'wb') as dest:
+                shutil.copyfileobj(file, dest)
+
+            #unzipping uploaded zip file
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                zip_ref.extractall(FILE_UPLOAD_DIR)
+
+            #finding file with .shp extension
+            files=os.listdir(FILE_UPLOAD_DIR)
+            shp_file_name=None
+            for file_name in files:
+                file_extension=os.path.splitext(str(file_name))[1]
+                if file_extension==".shp":
+                    shp_file_name=file_name
+            if not shp_file_name:
+                clear_dir(FILE_UPLOAD_DIR)
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "File with extension .shp not found"})
+
+            #reading shapefile
+            c = fiona.open(FILE_UPLOAD_DIR+shp_file_name)
+            schema=c.schema
+
+            #creating layer template instance
+            geometry=schema['geometry']
+            request.data['geometry_type']=geometry
+            serializer=LayerTemplateSerializer(data=request.data)
+            if serializer.is_valid():
+                template_instance=serializer.save()
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                    clear_dir(FILE_UPLOAD_DIR)
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': errors})
+
+            #reading fields properites and saving it into the LayerTemplateAttribute table
+            for data in schema['properties']:
+                properties={'name':str(data)}
+                data_type=schema['properties'][data].split(':')[0]
+                properties['data_type']=data_type
+                if data_type=='str' or data_type=='int':
+                    properties['length']=schema['properties'][data].split(':')[1]
+                elif data_type=="float":
+                    properties['length']=schema['properties'][data].split(':')[1].split('.')[0]
+                    properties['precision']=schema['properties'][data].split(':')[1].split('.')[1]
+                properties['layer_template']=template_instance.id
+                attribute_serializer=LayerTemplateAttributeSerializer(data=properties)
+                if attribute_serializer.is_valid():
+                    attribute_serializer.save()
+                else:
+                    for er in attribute_serializer._errors:
+                        errors.append(
+                            {'errorName': er, 'details': attribute_serializer._errors[er][0]})
+                    template_instance.delete()
+                    clear_dir(FILE_UPLOAD_DIR)
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': errors})
+            clear_dir(FILE_UPLOAD_DIR)
+            return Response(status=200, data={'message': "Data successfully uploaded"})
+        except Exception as e:
+            clear_dir(FILE_UPLOAD_DIR) #clearing directory
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})

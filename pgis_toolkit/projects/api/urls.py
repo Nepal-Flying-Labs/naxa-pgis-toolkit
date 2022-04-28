@@ -18,4 +18,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('layer_template_download/', layer_template_download,
          name='layer_template_download'),
+    path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
 ]

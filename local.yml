@@ -11,7 +11,7 @@ services:
       dockerfile: ./compose/local/django/Dockerfile
     image: pgis_toolkit_local_django
     container_name: pgis_toolkit_local_django
-    platform: linux/x86_64
+    # platform: linux/x86_64
     depends_on:
       - postgres
     volumes:
