@@ -2,6 +2,9 @@ from django.contrib import admin
 
 from .models import *
 
+class OrganizationCategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('id', 'name')
 
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'category', 'name', 'link')
@@ -13,13 +16,22 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('organization', 'start_date', 'end_date')
 
+class DefaultThemeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'order')
+    search_fields = ('id', 'name')
+
+class LayerTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'geometry_type')
+    search_fields = ('id', 'name')
+    list_filter = ('geometry_type',)
+    
 class LayerTemplateAttributeAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer_template', 'name', 'alias', 'unit')
     search_fields = ('id', 'name', 'alias')
     list_filter = ('layer_template', 'data_type')
 
 # Register your models here.
-admin.site.register(OrganizationCategory)
+admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(DefaultTheme)

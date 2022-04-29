@@ -1,4 +1,3 @@
-from django.contrib import admin
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from projects.models import DateTimeStamp, IsDeleted, Project
@@ -26,7 +25,6 @@ class Category(IsDeleted,DateTimeStamp):
         return str(self.name)
     class Meta:
         app_label = 'maps'
-
 
 
 class Layer(IsDeleted,DateTimeStamp):

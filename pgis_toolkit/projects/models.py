@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.contrib import admin
+# from django.contrib import admin
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
@@ -70,6 +70,13 @@ class OrganizationCategory(IsDeleted,DateTimeStamp):
     def __str__(self):
         return f'{self.name}'
 
+    def clean(self):
+        """
+        Make sure Organization Category name are unique
+        """
+        if OrganizationCategory.active.exclude(id=self.id).filter(name=self.name).exists():
+            raise ValidationError(f'Category with name {self.name} already exists.')
+
 class Organization(IsDeleted,DateTimeStamp):
     category=models.ForeignKey(OrganizationCategory,on_delete=models.SET_NULL,blank=True,null=True)
     name=models.CharField(max_length=254)
@@ -84,6 +91,13 @@ class Organization(IsDeleted,DateTimeStamp):
     def __str__(self):
         return f'{self.name}'
 
+    def clean(self):
+        """
+        Make sure Organization name are unique
+        """
+        if Organization.active.exclude(id=self.id).filter(name=self.name).exists():
+            raise ValidationError(f'Organization with name {self.name} already exists.')
+
 class Project(IsDeleted,DateTimeStamp):
     organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
@@ -96,6 +110,13 @@ class Project(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return f'{self.name}'
+
+    def clean(self):
+        """
+        Make sure Project name are unique
+        """
+        if Project.active.exclude(id=self.id).filter(name=self.name).exists():
+            raise ValidationError(f'Project with name {self.name} already exists.')
 
 class DefaultTheme(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
