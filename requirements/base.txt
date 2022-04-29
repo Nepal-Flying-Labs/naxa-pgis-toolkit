@@ -26,3 +26,9 @@ asgiref==3.5.0
 backports.zoneinfo==0.2.1
 django-filter==21.1
 sqlparse==0.4.2
+
+#https://pypi.org/project/Fiona/
+Fiona==1.8.21
+click-plugins==1.1.1
+cligj==0.7.2
+munch==2.5.0

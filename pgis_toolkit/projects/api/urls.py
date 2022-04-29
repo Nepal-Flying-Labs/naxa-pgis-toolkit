@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.projects.api.views import (OrganizationCategoryViewset, OrganizationViewset, ProjectViewset, DefaultThemeViewset, 
     LayerTemplateAttributeViewset,
+    LayerTemplateUploadAPIView,
     LayerTemplateViewset,
+    layer_template_download,
 )
 
 router = DefaultRouter()
@@ -17,4 +19,7 @@ router.register(r'layer_template_attribute', LayerTemplateAttributeViewset, base
 app_name = "projects"
 urlpatterns = [
     path('', include(router.urls)),
+    path('layer_template_download/', layer_template_download,
+         name='layer_template_download'),
+    path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
 ]

@@ -147,7 +147,7 @@ class LayerTemplate(IsDeleted,DateTimeStamp):
                 f'Layer template with name {self.name} already exists')
 
 
-class LayerTemplateAttribute(models.Model):
+class LayerTemplateAttribute(DateTimeStamp):
     layer_template=models.ForeignKey(LayerTemplate,on_delete=models.CASCADE)
     name=models.CharField(max_length=254)
     alias=models.CharField(max_length=254,blank=True,null=True)
