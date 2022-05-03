@@ -19,9 +19,14 @@ class OrganizationCategorySerializer(serializers.ModelSerializer):
         return data
 
 class OrganizationListSerializer(serializers.ModelSerializer):
+    projects = serializers.SerializerMethodField()
+
     class Meta:
         model = Organization
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        exclude = ('address', 'contact', 'link', 'category', 'uploaded_date', 'last_updated', 'is_deleted')
+
+    def get_projects(self, instance):
+        return Project.active.select_related('ProjectOrganization').filter(organization__id=instance.id).count()
 
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:

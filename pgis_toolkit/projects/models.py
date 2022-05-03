@@ -136,7 +136,7 @@ class State(models.Model):
 
 class Project(IsDeleted,DateTimeStamp):
 
-    organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
+    organization=models.ForeignKey(Organization, related_name='ProjectOrganization', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
     description=models.TextField(blank=True,null=True)
     start_date=models.DateField(blank=True,null=True)
