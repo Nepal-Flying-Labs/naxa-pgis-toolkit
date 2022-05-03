@@ -16,6 +16,11 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('organization', 'start_date', 'end_date')
 
+class ProjectLocationFeatureCollectionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'is_deleted', 'project', 'attributes')
+    search_fields = ('id', )
+    list_filter = ('project',)
+
 class DefaultThemeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'order')
     search_fields = ('id', 'name')
@@ -37,3 +42,7 @@ admin.site.register(Project, ProjectAdmin)
 admin.site.register(DefaultTheme)
 admin.site.register(LayerTemplate)
 admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)
+admin.site.register(Country)
+admin.site.register(State)
+admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
+

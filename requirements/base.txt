@@ -32,3 +32,5 @@ Fiona==1.8.21
 click-plugins==1.1.1
 cligj==0.7.2
 munch==2.5.0
+
+geopandas==0.10.2 #https://geopandas.org/

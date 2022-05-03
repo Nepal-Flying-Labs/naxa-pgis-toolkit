@@ -27,6 +27,16 @@ UNIT_CHOICES=(
                 ("sqm",_('Square Meter')),
                 ('km',_('Kilometer'))
             )
+
+LOCATION_TYPE_CHOICES = (
+    ('Custom Draw', _('Custom Draw')),
+    ('File Upload', _('File Upload'))
+)
+
+FILE_TYPE_CHOICES = (
+    ('Shapefile', _('Shapefile')),
+    ('GeoJSON', _('GeoJSON')),
+)
 # class Organization(models.Model):
 #     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
@@ -98,12 +108,46 @@ class Organization(IsDeleted,DateTimeStamp):
         if Organization.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Organization with name {self.name} already exists.')
 
+class Country(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    code = models.CharField(max_length=3, blank=True, null=True)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.name}, {self.code}'
+
+    class Meta:
+        app_label = 'projects'
+
+class State(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    code = models.CharField(max_length=10, blank=True, null=True)
+    country = models.ForeignKey(Country,on_delete=models.SET_NULL, null=True)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.name}, {self.code}, {self.country}'
+
+    class Meta:
+        app_label = 'projects'
+
+
 class Project(IsDeleted,DateTimeStamp):
+
     organization=models.ForeignKey(Organization,on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
     description=models.TextField(blank=True,null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True)
+    state = models.ForeignKey(State, on_delete=models.SET_NULL, null=True)
+    location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, default='Custom Draw')
+    file = models.FileField(upload_to='site/',blank=True, null=True)
+    geometry_type = models.CharField(max_length=50, blank=True, null=True)
+    file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, default='Shapefile')
+    bbox = models.JSONField(blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -117,6 +161,18 @@ class Project(IsDeleted,DateTimeStamp):
         """
         if Project.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Project with name {self.name} already exists.')
+
+class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
+    project = models.ForeignKey(
+        Project, on_delete=models.SET_NULL, null=True, related_name='project_location')
+    attributes = models.JSONField(blank=True, null=True)
+    geometry = models.GeometryField(srid=4326, blank=True, null=True)
+
+    def __str__(self):
+        return str(self.id)
+
+    class Meta:
+        app_label = 'projects'
 
 class DefaultTheme(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)

@@ -37,12 +37,12 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
 class ProjectListSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Organization
+        model = Project
         exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Organization
+        model = Project
         fields = '__all__'
 
     def validate(self, data):

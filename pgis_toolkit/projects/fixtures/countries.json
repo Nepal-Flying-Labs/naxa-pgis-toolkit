@@ -1,0 +1,2752 @@
+[
+    {
+        "model": "projects.country",
+        "pk": 1,
+        "fields": {
+            "id": 1,
+            "name": "Afghanistan",
+            "code": "AFG",
+            "latitude": 33.0,
+            "longitude": 65.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 2,
+        "fields": {
+            "id": 2,
+            "name": "Aland Islands",
+            "code": "ALA",
+            "latitude": 60.116667,
+            "longitude": 19.9
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 3,
+        "fields": {
+            "id": 3,
+            "name": "Albania",
+            "code": "ALB",
+            "latitude": 41.0,
+            "longitude": 20.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 4,
+        "fields": {
+            "id": 4,
+            "name": "Algeria",
+            "code": "DZA",
+            "latitude": 28.0,
+            "longitude": 3.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 5,
+        "fields": {
+            "id": 5,
+            "name": "American Samoa",
+            "code": "ASM",
+            "latitude": -14.33333333,
+            "longitude": -170.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 6,
+        "fields": {
+            "id": 6,
+            "name": "Andorra",
+            "code": "AND",
+            "latitude": 42.5,
+            "longitude": 1.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 7,
+        "fields": {
+            "id": 7,
+            "name": "Angola",
+            "code": "AGO",
+            "latitude": -12.5,
+            "longitude": 18.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 8,
+        "fields": {
+            "id": 8,
+            "name": "Anguilla",
+            "code": "AIA",
+            "latitude": 18.25,
+            "longitude": -63.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 9,
+        "fields": {
+            "id": 9,
+            "name": "Antarctica",
+            "code": "ATA",
+            "latitude": -74.65,
+            "longitude": 4.48
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 10,
+        "fields": {
+            "id": 10,
+            "name": "Antigua And Barbuda",
+            "code": "ATG",
+            "latitude": 17.05,
+            "longitude": -61.8
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 11,
+        "fields": {
+            "id": 11,
+            "name": "Argentina",
+            "code": "ARG",
+            "latitude": -34.0,
+            "longitude": -64.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 12,
+        "fields": {
+            "id": 12,
+            "name": "Armenia",
+            "code": "ARM",
+            "latitude": 40.0,
+            "longitude": 45.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 13,
+        "fields": {
+            "id": 13,
+            "name": "Aruba",
+            "code": "ABW",
+            "latitude": 12.5,
+            "longitude": -69.96666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 14,
+        "fields": {
+            "id": 14,
+            "name": "Australia",
+            "code": "AUS",
+            "latitude": -27.0,
+            "longitude": 133.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 15,
+        "fields": {
+            "id": 15,
+            "name": "Austria",
+            "code": "AUT",
+            "latitude": 47.33333333,
+            "longitude": 13.33333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 16,
+        "fields": {
+            "id": 16,
+            "name": "Azerbaijan",
+            "code": "AZE",
+            "latitude": 40.5,
+            "longitude": 47.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 17,
+        "fields": {
+            "id": 17,
+            "name": "Bahrain",
+            "code": "BHR",
+            "latitude": 26.0,
+            "longitude": 50.55
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 18,
+        "fields": {
+            "id": 18,
+            "name": "Bangladesh",
+            "code": "BGD",
+            "latitude": 24.0,
+            "longitude": 90.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 19,
+        "fields": {
+            "id": 19,
+            "name": "Barbados",
+            "code": "BRB",
+            "latitude": 13.16666666,
+            "longitude": -59.53333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 20,
+        "fields": {
+            "id": 20,
+            "name": "Belarus",
+            "code": "BLR",
+            "latitude": 53.0,
+            "longitude": 28.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 21,
+        "fields": {
+            "id": 21,
+            "name": "Belgium",
+            "code": "BEL",
+            "latitude": 50.83333333,
+            "longitude": 4.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 22,
+        "fields": {
+            "id": 22,
+            "name": "Belize",
+            "code": "BLZ",
+            "latitude": 17.25,
+            "longitude": -88.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 23,
+        "fields": {
+            "id": 23,
+            "name": "Benin",
+            "code": "BEN",
+            "latitude": 9.5,
+            "longitude": 2.25
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 24,
+        "fields": {
+            "id": 24,
+            "name": "Bermuda",
+            "code": "BMU",
+            "latitude": 32.33333333,
+            "longitude": -64.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 25,
+        "fields": {
+            "id": 25,
+            "name": "Bhutan",
+            "code": "BTN",
+            "latitude": 27.5,
+            "longitude": 90.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 26,
+        "fields": {
+            "id": 26,
+            "name": "Bolivia",
+            "code": "BOL",
+            "latitude": -17.0,
+            "longitude": -65.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 27,
+        "fields": {
+            "id": 27,
+            "name": "Bonaire, Sint Eustatius and Saba",
+            "code": "BES",
+            "latitude": 12.15,
+            "longitude": -68.266667
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 28,
+        "fields": {
+            "id": 28,
+            "name": "Bosnia and Herzegovina",
+            "code": "BIH",
+            "latitude": 44.0,
+            "longitude": 18.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 29,
+        "fields": {
+            "id": 29,
+            "name": "Botswana",
+            "code": "BWA",
+            "latitude": -22.0,
+            "longitude": 24.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 30,
+        "fields": {
+            "id": 30,
+            "name": "Bouvet Island",
+            "code": "BVT",
+            "latitude": -54.43333333,
+            "longitude": 3.4
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 31,
+        "fields": {
+            "id": 31,
+            "name": "Brazil",
+            "code": "BRA",
+            "latitude": -10.0,
+            "longitude": -55.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 32,
+        "fields": {
+            "id": 32,
+            "name": "British Indian Ocean Territory",
+            "code": "IOT",
+            "latitude": -6.0,
+            "longitude": 71.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 33,
+        "fields": {
+            "id": 33,
+            "name": "Brunei",
+            "code": "BRN",
+            "latitude": 4.5,
+            "longitude": 114.66666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 34,
+        "fields": {
+            "id": 34,
+            "name": "Bulgaria",
+            "code": "BGR",
+            "latitude": 43.0,
+            "longitude": 25.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 35,
+        "fields": {
+            "id": 35,
+            "name": "Burkina Faso",
+            "code": "BFA",
+            "latitude": 13.0,
+            "longitude": -2.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 36,
+        "fields": {
+            "id": 36,
+            "name": "Burundi",
+            "code": "BDI",
+            "latitude": -3.5,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 37,
+        "fields": {
+            "id": 37,
+            "name": "Cambodia",
+            "code": "KHM",
+            "latitude": 13.0,
+            "longitude": 105.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 38,
+        "fields": {
+            "id": 38,
+            "name": "Cameroon",
+            "code": "CMR",
+            "latitude": 6.0,
+            "longitude": 12.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 39,
+        "fields": {
+            "id": 39,
+            "name": "Canada",
+            "code": "CAN",
+            "latitude": 60.0,
+            "longitude": -95.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 40,
+        "fields": {
+            "id": 40,
+            "name": "Cape Verde",
+            "code": "CPV",
+            "latitude": 16.0,
+            "longitude": -24.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 41,
+        "fields": {
+            "id": 41,
+            "name": "Cayman Islands",
+            "code": "CYM",
+            "latitude": 19.5,
+            "longitude": -80.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 42,
+        "fields": {
+            "id": 42,
+            "name": "Central African Republic",
+            "code": "CAF",
+            "latitude": 7.0,
+            "longitude": 21.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 43,
+        "fields": {
+            "id": 43,
+            "name": "Chad",
+            "code": "TCD",
+            "latitude": 15.0,
+            "longitude": 19.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 44,
+        "fields": {
+            "id": 44,
+            "name": "Chile",
+            "code": "CHL",
+            "latitude": -30.0,
+            "longitude": -71.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 45,
+        "fields": {
+            "id": 45,
+            "name": "China",
+            "code": "CHN",
+            "latitude": 35.0,
+            "longitude": 105.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 46,
+        "fields": {
+            "id": 46,
+            "name": "Christmas Island",
+            "code": "CXR",
+            "latitude": -10.5,
+            "longitude": 105.66666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 47,
+        "fields": {
+            "id": 47,
+            "name": "Cocos (Keeling) Islands",
+            "code": "CCK",
+            "latitude": -12.5,
+            "longitude": 96.83333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 48,
+        "fields": {
+            "id": 48,
+            "name": "Colombia",
+            "code": "COL",
+            "latitude": 4.0,
+            "longitude": -72.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 49,
+        "fields": {
+            "id": 49,
+            "name": "Comoros",
+            "code": "COM",
+            "latitude": -12.16666666,
+            "longitude": 44.25
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 50,
+        "fields": {
+            "id": 50,
+            "name": "Congo",
+            "code": "COG",
+            "latitude": -1.0,
+            "longitude": 15.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 51,
+        "fields": {
+            "id": 51,
+            "name": "Cook Islands",
+            "code": "COK",
+            "latitude": -21.23333333,
+            "longitude": -159.76666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 52,
+        "fields": {
+            "id": 52,
+            "name": "Costa Rica",
+            "code": "CRI",
+            "latitude": 10.0,
+            "longitude": -84.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 53,
+        "fields": {
+            "id": 53,
+            "name": "Cote D'Ivoire (Ivory Coast)",
+            "code": "CIV",
+            "latitude": 8.0,
+            "longitude": -5.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 54,
+        "fields": {
+            "id": 54,
+            "name": "Croatia",
+            "code": "HRV",
+            "latitude": 45.16666666,
+            "longitude": 15.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 55,
+        "fields": {
+            "id": 55,
+            "name": "Cuba",
+            "code": "CUB",
+            "latitude": 21.5,
+            "longitude": -80.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 56,
+        "fields": {
+            "id": 56,
+            "name": "Cura\u00e7ao",
+            "code": "CUW",
+            "latitude": 12.116667,
+            "longitude": -68.933333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 57,
+        "fields": {
+            "id": 57,
+            "name": "Cyprus",
+            "code": "CYP",
+            "latitude": 35.0,
+            "longitude": 33.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 58,
+        "fields": {
+            "id": 58,
+            "name": "Czech Republic",
+            "code": "CZE",
+            "latitude": 49.75,
+            "longitude": 15.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 59,
+        "fields": {
+            "id": 59,
+            "name": "Democratic Republic of the Congo",
+            "code": "COD",
+            "latitude": 0.0,
+            "longitude": 25.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 60,
+        "fields": {
+            "id": 60,
+            "name": "Denmark",
+            "code": "DNK",
+            "latitude": 56.0,
+            "longitude": 10.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 61,
+        "fields": {
+            "id": 61,
+            "name": "Djibouti",
+            "code": "DJI",
+            "latitude": 11.5,
+            "longitude": 43.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 62,
+        "fields": {
+            "id": 62,
+            "name": "Dominica",
+            "code": "DMA",
+            "latitude": 15.41666666,
+            "longitude": -61.33333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 63,
+        "fields": {
+            "id": 63,
+            "name": "Dominican Republic",
+            "code": "DOM",
+            "latitude": 19.0,
+            "longitude": -70.66666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 64,
+        "fields": {
+            "id": 64,
+            "name": "East Timor",
+            "code": "TLS",
+            "latitude": -8.83333333,
+            "longitude": 125.91666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 65,
+        "fields": {
+            "id": 65,
+            "name": "Ecuador",
+            "code": "ECU",
+            "latitude": -2.0,
+            "longitude": -77.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 66,
+        "fields": {
+            "id": 66,
+            "name": "Egypt",
+            "code": "EGY",
+            "latitude": 27.0,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 67,
+        "fields": {
+            "id": 67,
+            "name": "El Salvador",
+            "code": "SLV",
+            "latitude": 13.83333333,
+            "longitude": -88.91666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 68,
+        "fields": {
+            "id": 68,
+            "name": "Equatorial Guinea",
+            "code": "GNQ",
+            "latitude": 2.0,
+            "longitude": 10.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 69,
+        "fields": {
+            "id": 69,
+            "name": "Eritrea",
+            "code": "ERI",
+            "latitude": 15.0,
+            "longitude": 39.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 70,
+        "fields": {
+            "id": 70,
+            "name": "Estonia",
+            "code": "EST",
+            "latitude": 59.0,
+            "longitude": 26.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 71,
+        "fields": {
+            "id": 71,
+            "name": "Ethiopia",
+            "code": "ETH",
+            "latitude": 8.0,
+            "longitude": 38.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 72,
+        "fields": {
+            "id": 72,
+            "name": "Falkland Islands",
+            "code": "FLK",
+            "latitude": -51.75,
+            "longitude": -59.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 73,
+        "fields": {
+            "id": 73,
+            "name": "Faroe Islands",
+            "code": "FRO",
+            "latitude": 62.0,
+            "longitude": -7.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 74,
+        "fields": {
+            "id": 74,
+            "name": "Fiji Islands",
+            "code": "FJI",
+            "latitude": -18.0,
+            "longitude": 175.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 75,
+        "fields": {
+            "id": 75,
+            "name": "Finland",
+            "code": "FIN",
+            "latitude": 64.0,
+            "longitude": 26.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 76,
+        "fields": {
+            "id": 76,
+            "name": "France",
+            "code": "FRA",
+            "latitude": 46.0,
+            "longitude": 2.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 77,
+        "fields": {
+            "id": 77,
+            "name": "French Guiana",
+            "code": "GUF",
+            "latitude": 4.0,
+            "longitude": -53.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 78,
+        "fields": {
+            "id": 78,
+            "name": "French Polynesia",
+            "code": "PYF",
+            "latitude": -15.0,
+            "longitude": -140.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 79,
+        "fields": {
+            "id": 79,
+            "name": "French Southern Territories",
+            "code": "ATF",
+            "latitude": -49.25,
+            "longitude": 69.167
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 80,
+        "fields": {
+            "id": 80,
+            "name": "Gabon",
+            "code": "GAB",
+            "latitude": -1.0,
+            "longitude": 11.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 81,
+        "fields": {
+            "id": 81,
+            "name": "Gambia The",
+            "code": "GMB",
+            "latitude": 13.46666666,
+            "longitude": -16.56666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 82,
+        "fields": {
+            "id": 82,
+            "name": "Georgia",
+            "code": "GEO",
+            "latitude": 42.0,
+            "longitude": 43.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 83,
+        "fields": {
+            "id": 83,
+            "name": "Germany",
+            "code": "DEU",
+            "latitude": 51.0,
+            "longitude": 9.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 84,
+        "fields": {
+            "id": 84,
+            "name": "Ghana",
+            "code": "GHA",
+            "latitude": 8.0,
+            "longitude": -2.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 85,
+        "fields": {
+            "id": 85,
+            "name": "Gibraltar",
+            "code": "GIB",
+            "latitude": 36.13333333,
+            "longitude": -5.35
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 86,
+        "fields": {
+            "id": 86,
+            "name": "Greece",
+            "code": "GRC",
+            "latitude": 39.0,
+            "longitude": 22.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 87,
+        "fields": {
+            "id": 87,
+            "name": "Greenland",
+            "code": "GRL",
+            "latitude": 72.0,
+            "longitude": -40.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 88,
+        "fields": {
+            "id": 88,
+            "name": "Grenada",
+            "code": "GRD",
+            "latitude": 12.11666666,
+            "longitude": -61.66666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 89,
+        "fields": {
+            "id": 89,
+            "name": "Guadeloupe",
+            "code": "GLP",
+            "latitude": 16.25,
+            "longitude": -61.583333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 90,
+        "fields": {
+            "id": 90,
+            "name": "Guam",
+            "code": "GUM",
+            "latitude": 13.46666666,
+            "longitude": 144.78333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 91,
+        "fields": {
+            "id": 91,
+            "name": "Guatemala",
+            "code": "GTM",
+            "latitude": 15.5,
+            "longitude": -90.25
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 92,
+        "fields": {
+            "id": 92,
+            "name": "Guernsey and Alderney",
+            "code": "GGY",
+            "latitude": 49.46666666,
+            "longitude": -2.58333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 93,
+        "fields": {
+            "id": 93,
+            "name": "Guinea",
+            "code": "GIN",
+            "latitude": 11.0,
+            "longitude": -10.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 94,
+        "fields": {
+            "id": 94,
+            "name": "Guinea-Bissau",
+            "code": "GNB",
+            "latitude": 12.0,
+            "longitude": -15.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 95,
+        "fields": {
+            "id": 95,
+            "name": "Guyana",
+            "code": "GUY",
+            "latitude": 5.0,
+            "longitude": -59.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 96,
+        "fields": {
+            "id": 96,
+            "name": "Haiti",
+            "code": "HTI",
+            "latitude": 19.0,
+            "longitude": -72.41666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 97,
+        "fields": {
+            "id": 97,
+            "name": "Heard Island and McDonald Islands",
+            "code": "HMD",
+            "latitude": -53.1,
+            "longitude": 72.51666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 98,
+        "fields": {
+            "id": 98,
+            "name": "Honduras",
+            "code": "HND",
+            "latitude": 15.0,
+            "longitude": -86.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 99,
+        "fields": {
+            "id": 99,
+            "name": "Hong Kong S.A.R.",
+            "code": "HKG",
+            "latitude": 22.25,
+            "longitude": 114.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 100,
+        "fields": {
+            "id": 100,
+            "name": "Hungary",
+            "code": "HUN",
+            "latitude": 47.0,
+            "longitude": 20.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 101,
+        "fields": {
+            "id": 101,
+            "name": "Iceland",
+            "code": "ISL",
+            "latitude": 65.0,
+            "longitude": -18.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 102,
+        "fields": {
+            "id": 102,
+            "name": "India",
+            "code": "IND",
+            "latitude": 20.0,
+            "longitude": 77.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 103,
+        "fields": {
+            "id": 103,
+            "name": "Indonesia",
+            "code": "IDN",
+            "latitude": -5.0,
+            "longitude": 120.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 104,
+        "fields": {
+            "id": 104,
+            "name": "Iran",
+            "code": "IRN",
+            "latitude": 32.0,
+            "longitude": 53.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 105,
+        "fields": {
+            "id": 105,
+            "name": "Iraq",
+            "code": "IRQ",
+            "latitude": 33.0,
+            "longitude": 44.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 106,
+        "fields": {
+            "id": 106,
+            "name": "Ireland",
+            "code": "IRL",
+            "latitude": 53.0,
+            "longitude": -8.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 107,
+        "fields": {
+            "id": 107,
+            "name": "Israel",
+            "code": "ISR",
+            "latitude": 31.5,
+            "longitude": 34.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 108,
+        "fields": {
+            "id": 108,
+            "name": "Italy",
+            "code": "ITA",
+            "latitude": 42.83333333,
+            "longitude": 12.83333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 109,
+        "fields": {
+            "id": 109,
+            "name": "Jamaica",
+            "code": "JAM",
+            "latitude": 18.25,
+            "longitude": -77.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 110,
+        "fields": {
+            "id": 110,
+            "name": "Japan",
+            "code": "JPN",
+            "latitude": 36.0,
+            "longitude": 138.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 111,
+        "fields": {
+            "id": 111,
+            "name": "Jersey",
+            "code": "JEY",
+            "latitude": 49.25,
+            "longitude": -2.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 112,
+        "fields": {
+            "id": 112,
+            "name": "Jordan",
+            "code": "JOR",
+            "latitude": 31.0,
+            "longitude": 36.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 113,
+        "fields": {
+            "id": 113,
+            "name": "Kazakhstan",
+            "code": "KAZ",
+            "latitude": 48.0,
+            "longitude": 68.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 114,
+        "fields": {
+            "id": 114,
+            "name": "Kenya",
+            "code": "KEN",
+            "latitude": 1.0,
+            "longitude": 38.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 115,
+        "fields": {
+            "id": 115,
+            "name": "Kiribati",
+            "code": "KIR",
+            "latitude": 1.41666666,
+            "longitude": 173.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 116,
+        "fields": {
+            "id": 116,
+            "name": "Kosovo",
+            "code": "XKX",
+            "latitude": 42.5612909,
+            "longitude": 20.3403035
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 117,
+        "fields": {
+            "id": 117,
+            "name": "Kuwait",
+            "code": "KWT",
+            "latitude": 29.5,
+            "longitude": 45.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 118,
+        "fields": {
+            "id": 118,
+            "name": "Kyrgyzstan",
+            "code": "KGZ",
+            "latitude": 41.0,
+            "longitude": 75.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 119,
+        "fields": {
+            "id": 119,
+            "name": "Laos",
+            "code": "LAO",
+            "latitude": 18.0,
+            "longitude": 105.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 120,
+        "fields": {
+            "id": 120,
+            "name": "Latvia",
+            "code": "LVA",
+            "latitude": 57.0,
+            "longitude": 25.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 121,
+        "fields": {
+            "id": 121,
+            "name": "Lebanon",
+            "code": "LBN",
+            "latitude": 33.83333333,
+            "longitude": 35.83333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 122,
+        "fields": {
+            "id": 122,
+            "name": "Lesotho",
+            "code": "LSO",
+            "latitude": -29.5,
+            "longitude": 28.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 123,
+        "fields": {
+            "id": 123,
+            "name": "Liberia",
+            "code": "LBR",
+            "latitude": 6.5,
+            "longitude": -9.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 124,
+        "fields": {
+            "id": 124,
+            "name": "Libya",
+            "code": "LBY",
+            "latitude": 25.0,
+            "longitude": 17.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 125,
+        "fields": {
+            "id": 125,
+            "name": "Liechtenstein",
+            "code": "LIE",
+            "latitude": 47.26666666,
+            "longitude": 9.53333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 126,
+        "fields": {
+            "id": 126,
+            "name": "Lithuania",
+            "code": "LTU",
+            "latitude": 56.0,
+            "longitude": 24.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 127,
+        "fields": {
+            "id": 127,
+            "name": "Luxembourg",
+            "code": "LUX",
+            "latitude": 49.75,
+            "longitude": 6.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 128,
+        "fields": {
+            "id": 128,
+            "name": "Macau S.A.R.",
+            "code": "MAC",
+            "latitude": 22.16666666,
+            "longitude": 113.55
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 129,
+        "fields": {
+            "id": 129,
+            "name": "Macedonia",
+            "code": "MKD",
+            "latitude": 41.83333333,
+            "longitude": 22.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 130,
+        "fields": {
+            "id": 130,
+            "name": "Madagascar",
+            "code": "MDG",
+            "latitude": -20.0,
+            "longitude": 47.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 131,
+        "fields": {
+            "id": 131,
+            "name": "Malawi",
+            "code": "MWI",
+            "latitude": -13.5,
+            "longitude": 34.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 132,
+        "fields": {
+            "id": 132,
+            "name": "Malaysia",
+            "code": "MYS",
+            "latitude": 2.5,
+            "longitude": 112.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 133,
+        "fields": {
+            "id": 133,
+            "name": "Maldives",
+            "code": "MDV",
+            "latitude": 3.25,
+            "longitude": 73.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 134,
+        "fields": {
+            "id": 134,
+            "name": "Mali",
+            "code": "MLI",
+            "latitude": 17.0,
+            "longitude": -4.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 135,
+        "fields": {
+            "id": 135,
+            "name": "Malta",
+            "code": "MLT",
+            "latitude": 35.83333333,
+            "longitude": 14.58333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 136,
+        "fields": {
+            "id": 136,
+            "name": "Man (Isle of)",
+            "code": "IMN",
+            "latitude": 54.25,
+            "longitude": -4.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 137,
+        "fields": {
+            "id": 137,
+            "name": "Marshall Islands",
+            "code": "MHL",
+            "latitude": 9.0,
+            "longitude": 168.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 138,
+        "fields": {
+            "id": 138,
+            "name": "Martinique",
+            "code": "MTQ",
+            "latitude": 14.666667,
+            "longitude": -61.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 139,
+        "fields": {
+            "id": 139,
+            "name": "Mauritania",
+            "code": "MRT",
+            "latitude": 20.0,
+            "longitude": -12.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 140,
+        "fields": {
+            "id": 140,
+            "name": "Mauritius",
+            "code": "MUS",
+            "latitude": -20.28333333,
+            "longitude": 57.55
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 141,
+        "fields": {
+            "id": 141,
+            "name": "Mayotte",
+            "code": "MYT",
+            "latitude": -12.83333333,
+            "longitude": 45.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 142,
+        "fields": {
+            "id": 142,
+            "name": "Mexico",
+            "code": "MEX",
+            "latitude": 23.0,
+            "longitude": -102.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 143,
+        "fields": {
+            "id": 143,
+            "name": "Micronesia",
+            "code": "FSM",
+            "latitude": 6.91666666,
+            "longitude": 158.25
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 144,
+        "fields": {
+            "id": 144,
+            "name": "Moldova",
+            "code": "MDA",
+            "latitude": 47.0,
+            "longitude": 29.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 145,
+        "fields": {
+            "id": 145,
+            "name": "Monaco",
+            "code": "MCO",
+            "latitude": 43.73333333,
+            "longitude": 7.4
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 146,
+        "fields": {
+            "id": 146,
+            "name": "Mongolia",
+            "code": "MNG",
+            "latitude": 46.0,
+            "longitude": 105.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 147,
+        "fields": {
+            "id": 147,
+            "name": "Montenegro",
+            "code": "MNE",
+            "latitude": 42.5,
+            "longitude": 19.3
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 148,
+        "fields": {
+            "id": 148,
+            "name": "Montserrat",
+            "code": "MSR",
+            "latitude": 16.75,
+            "longitude": -62.2
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 149,
+        "fields": {
+            "id": 149,
+            "name": "Morocco",
+            "code": "MAR",
+            "latitude": 32.0,
+            "longitude": -5.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 150,
+        "fields": {
+            "id": 150,
+            "name": "Mozambique",
+            "code": "MOZ",
+            "latitude": -18.25,
+            "longitude": 35.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 151,
+        "fields": {
+            "id": 151,
+            "name": "Myanmar",
+            "code": "MMR",
+            "latitude": 22.0,
+            "longitude": 98.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 152,
+        "fields": {
+            "id": 152,
+            "name": "Namibia",
+            "code": "NAM",
+            "latitude": -22.0,
+            "longitude": 17.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 153,
+        "fields": {
+            "id": 153,
+            "name": "Nauru",
+            "code": "NRU",
+            "latitude": -0.53333333,
+            "longitude": 166.91666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 154,
+        "fields": {
+            "id": 154,
+            "name": "Nepal",
+            "code": "NPL",
+            "latitude": 28.0,
+            "longitude": 84.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 155,
+        "fields": {
+            "id": 155,
+            "name": "Netherlands",
+            "code": "NLD",
+            "latitude": 52.5,
+            "longitude": 5.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 156,
+        "fields": {
+            "id": 156,
+            "name": "New Caledonia",
+            "code": "NCL",
+            "latitude": -21.5,
+            "longitude": 165.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 157,
+        "fields": {
+            "id": 157,
+            "name": "New Zealand",
+            "code": "NZL",
+            "latitude": -41.0,
+            "longitude": 174.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 158,
+        "fields": {
+            "id": 158,
+            "name": "Nicaragua",
+            "code": "NIC",
+            "latitude": 13.0,
+            "longitude": -85.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 159,
+        "fields": {
+            "id": 159,
+            "name": "Niger",
+            "code": "NER",
+            "latitude": 16.0,
+            "longitude": 8.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 160,
+        "fields": {
+            "id": 160,
+            "name": "Nigeria",
+            "code": "NGA",
+            "latitude": 10.0,
+            "longitude": 8.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 161,
+        "fields": {
+            "id": 161,
+            "name": "Niue",
+            "code": "NIU",
+            "latitude": -19.03333333,
+            "longitude": -169.86666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 162,
+        "fields": {
+            "id": 162,
+            "name": "Norfolk Island",
+            "code": "NFK",
+            "latitude": -29.03333333,
+            "longitude": 167.95
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 163,
+        "fields": {
+            "id": 163,
+            "name": "North Korea",
+            "code": "PRK",
+            "latitude": 40.0,
+            "longitude": 127.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 164,
+        "fields": {
+            "id": 164,
+            "name": "Northern Mariana Islands",
+            "code": "MNP",
+            "latitude": 15.2,
+            "longitude": 145.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 165,
+        "fields": {
+            "id": 165,
+            "name": "Norway",
+            "code": "NOR",
+            "latitude": 62.0,
+            "longitude": 10.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 166,
+        "fields": {
+            "id": 166,
+            "name": "Oman",
+            "code": "OMN",
+            "latitude": 21.0,
+            "longitude": 57.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 167,
+        "fields": {
+            "id": 167,
+            "name": "Pakistan",
+            "code": "PAK",
+            "latitude": 30.0,
+            "longitude": 70.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 168,
+        "fields": {
+            "id": 168,
+            "name": "Palau",
+            "code": "PLW",
+            "latitude": 7.5,
+            "longitude": 134.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 169,
+        "fields": {
+            "id": 169,
+            "name": "Palestinian Territory Occupied",
+            "code": "PSE",
+            "latitude": 31.9,
+            "longitude": 35.2
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 170,
+        "fields": {
+            "id": 170,
+            "name": "Panama",
+            "code": "PAN",
+            "latitude": 9.0,
+            "longitude": -80.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 171,
+        "fields": {
+            "id": 171,
+            "name": "Papua new Guinea",
+            "code": "PNG",
+            "latitude": -6.0,
+            "longitude": 147.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 172,
+        "fields": {
+            "id": 172,
+            "name": "Paraguay",
+            "code": "PRY",
+            "latitude": -23.0,
+            "longitude": -58.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 173,
+        "fields": {
+            "id": 173,
+            "name": "Peru",
+            "code": "PER",
+            "latitude": -10.0,
+            "longitude": -76.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 174,
+        "fields": {
+            "id": 174,
+            "name": "Philippines",
+            "code": "PHL",
+            "latitude": 13.0,
+            "longitude": 122.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 175,
+        "fields": {
+            "id": 175,
+            "name": "Pitcairn Island",
+            "code": "PCN",
+            "latitude": -25.06666666,
+            "longitude": -130.1
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 176,
+        "fields": {
+            "id": 176,
+            "name": "Poland",
+            "code": "POL",
+            "latitude": 52.0,
+            "longitude": 20.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 177,
+        "fields": {
+            "id": 177,
+            "name": "Portugal",
+            "code": "PRT",
+            "latitude": 39.5,
+            "longitude": -8.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 178,
+        "fields": {
+            "id": 178,
+            "name": "Puerto Rico",
+            "code": "PRI",
+            "latitude": 18.25,
+            "longitude": -66.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 179,
+        "fields": {
+            "id": 179,
+            "name": "Qatar",
+            "code": "QAT",
+            "latitude": 25.5,
+            "longitude": 51.25
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 180,
+        "fields": {
+            "id": 180,
+            "name": "Reunion",
+            "code": "REU",
+            "latitude": -21.15,
+            "longitude": 55.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 181,
+        "fields": {
+            "id": 181,
+            "name": "Romania",
+            "code": "ROU",
+            "latitude": 46.0,
+            "longitude": 25.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 182,
+        "fields": {
+            "id": 182,
+            "name": "Russia",
+            "code": "RUS",
+            "latitude": 60.0,
+            "longitude": 100.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 183,
+        "fields": {
+            "id": 183,
+            "name": "Rwanda",
+            "code": "RWA",
+            "latitude": -2.0,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 184,
+        "fields": {
+            "id": 184,
+            "name": "Saint Helena",
+            "code": "SHN",
+            "latitude": -15.95,
+            "longitude": -5.7
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 185,
+        "fields": {
+            "id": 185,
+            "name": "Saint Kitts And Nevis",
+            "code": "KNA",
+            "latitude": 17.33333333,
+            "longitude": -62.75
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 186,
+        "fields": {
+            "id": 186,
+            "name": "Saint Lucia",
+            "code": "LCA",
+            "latitude": 13.88333333,
+            "longitude": -60.96666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 187,
+        "fields": {
+            "id": 187,
+            "name": "Saint Pierre and Miquelon",
+            "code": "SPM",
+            "latitude": 46.83333333,
+            "longitude": -56.33333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 188,
+        "fields": {
+            "id": 188,
+            "name": "Saint Vincent And The Grenadines",
+            "code": "VCT",
+            "latitude": 13.25,
+            "longitude": -61.2
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 189,
+        "fields": {
+            "id": 189,
+            "name": "Saint-Barthelemy",
+            "code": "BLM",
+            "latitude": 18.5,
+            "longitude": -63.41666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 190,
+        "fields": {
+            "id": 190,
+            "name": "Saint-Martin (French part)",
+            "code": "MAF",
+            "latitude": 18.08333333,
+            "longitude": -63.95
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 191,
+        "fields": {
+            "id": 191,
+            "name": "Samoa",
+            "code": "WSM",
+            "latitude": -13.58333333,
+            "longitude": -172.33333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 192,
+        "fields": {
+            "id": 192,
+            "name": "San Marino",
+            "code": "SMR",
+            "latitude": 43.76666666,
+            "longitude": 12.41666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 193,
+        "fields": {
+            "id": 193,
+            "name": "Sao Tome and Principe",
+            "code": "STP",
+            "latitude": 1.0,
+            "longitude": 7.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 194,
+        "fields": {
+            "id": 194,
+            "name": "Saudi Arabia",
+            "code": "SAU",
+            "latitude": 25.0,
+            "longitude": 45.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 195,
+        "fields": {
+            "id": 195,
+            "name": "Senegal",
+            "code": "SEN",
+            "latitude": 14.0,
+            "longitude": -14.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 196,
+        "fields": {
+            "id": 196,
+            "name": "Serbia",
+            "code": "SRB",
+            "latitude": 44.0,
+            "longitude": 21.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 197,
+        "fields": {
+            "id": 197,
+            "name": "Seychelles",
+            "code": "SYC",
+            "latitude": -4.58333333,
+            "longitude": 55.66666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 198,
+        "fields": {
+            "id": 198,
+            "name": "Sierra Leone",
+            "code": "SLE",
+            "latitude": 8.5,
+            "longitude": -11.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 199,
+        "fields": {
+            "id": 199,
+            "name": "Singapore",
+            "code": "SGP",
+            "latitude": 1.36666666,
+            "longitude": 103.8
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 200,
+        "fields": {
+            "id": 200,
+            "name": "Sint Maarten (Dutch part)",
+            "code": "SXM",
+            "latitude": 18.033333,
+            "longitude": -63.05
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 201,
+        "fields": {
+            "id": 201,
+            "name": "Slovakia",
+            "code": "SVK",
+            "latitude": 48.66666666,
+            "longitude": 19.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 202,
+        "fields": {
+            "id": 202,
+            "name": "Slovenia",
+            "code": "SVN",
+            "latitude": 46.11666666,
+            "longitude": 14.81666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 203,
+        "fields": {
+            "id": 203,
+            "name": "Solomon Islands",
+            "code": "SLB",
+            "latitude": -8.0,
+            "longitude": 159.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 204,
+        "fields": {
+            "id": 204,
+            "name": "Somalia",
+            "code": "SOM",
+            "latitude": 10.0,
+            "longitude": 49.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 205,
+        "fields": {
+            "id": 205,
+            "name": "South Africa",
+            "code": "ZAF",
+            "latitude": -29.0,
+            "longitude": 24.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 206,
+        "fields": {
+            "id": 206,
+            "name": "South Georgia",
+            "code": "SGS",
+            "latitude": -54.5,
+            "longitude": -37.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 207,
+        "fields": {
+            "id": 207,
+            "name": "South Korea",
+            "code": "KOR",
+            "latitude": 37.0,
+            "longitude": 127.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 208,
+        "fields": {
+            "id": 208,
+            "name": "South Sudan",
+            "code": "SSD",
+            "latitude": 7.0,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 209,
+        "fields": {
+            "id": 209,
+            "name": "Spain",
+            "code": "ESP",
+            "latitude": 40.0,
+            "longitude": -4.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 210,
+        "fields": {
+            "id": 210,
+            "name": "Sri Lanka",
+            "code": "LKA",
+            "latitude": 7.0,
+            "longitude": 81.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 211,
+        "fields": {
+            "id": 211,
+            "name": "Sudan",
+            "code": "SDN",
+            "latitude": 15.0,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 212,
+        "fields": {
+            "id": 212,
+            "name": "Suriname",
+            "code": "SUR",
+            "latitude": 4.0,
+            "longitude": -56.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 213,
+        "fields": {
+            "id": 213,
+            "name": "Svalbard And Jan Mayen Islands",
+            "code": "SJM",
+            "latitude": 78.0,
+            "longitude": 20.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 214,
+        "fields": {
+            "id": 214,
+            "name": "Swaziland",
+            "code": "SWZ",
+            "latitude": -26.5,
+            "longitude": 31.5
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 215,
+        "fields": {
+            "id": 215,
+            "name": "Sweden",
+            "code": "SWE",
+            "latitude": 62.0,
+            "longitude": 15.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 216,
+        "fields": {
+            "id": 216,
+            "name": "Switzerland",
+            "code": "CHE",
+            "latitude": 47.0,
+            "longitude": 8.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 217,
+        "fields": {
+            "id": 217,
+            "name": "Syria",
+            "code": "SYR",
+            "latitude": 35.0,
+            "longitude": 38.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 218,
+        "fields": {
+            "id": 218,
+            "name": "Taiwan",
+            "code": "TWN",
+            "latitude": 23.5,
+            "longitude": 121.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 219,
+        "fields": {
+            "id": 219,
+            "name": "Tajikistan",
+            "code": "TJK",
+            "latitude": 39.0,
+            "longitude": 71.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 220,
+        "fields": {
+            "id": 220,
+            "name": "Tanzania",
+            "code": "TZA",
+            "latitude": -6.0,
+            "longitude": 35.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 221,
+        "fields": {
+            "id": 221,
+            "name": "Thailand",
+            "code": "THA",
+            "latitude": 15.0,
+            "longitude": 100.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 222,
+        "fields": {
+            "id": 222,
+            "name": "The Bahamas",
+            "code": "BHS",
+            "latitude": 24.25,
+            "longitude": -76.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 223,
+        "fields": {
+            "id": 223,
+            "name": "Togo",
+            "code": "TGO",
+            "latitude": 8.0,
+            "longitude": 1.16666666
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 224,
+        "fields": {
+            "id": 224,
+            "name": "Tokelau",
+            "code": "TKL",
+            "latitude": -9.0,
+            "longitude": -172.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 225,
+        "fields": {
+            "id": 225,
+            "name": "Tonga",
+            "code": "TON",
+            "latitude": -20.0,
+            "longitude": -175.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 226,
+        "fields": {
+            "id": 226,
+            "name": "Trinidad And Tobago",
+            "code": "TTO",
+            "latitude": 11.0,
+            "longitude": -61.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 227,
+        "fields": {
+            "id": 227,
+            "name": "Tunisia",
+            "code": "TUN",
+            "latitude": 34.0,
+            "longitude": 9.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 228,
+        "fields": {
+            "id": 228,
+            "name": "Turkey",
+            "code": "TUR",
+            "latitude": 39.0,
+            "longitude": 35.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 229,
+        "fields": {
+            "id": 229,
+            "name": "Turkmenistan",
+            "code": "TKM",
+            "latitude": 40.0,
+            "longitude": 60.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 230,
+        "fields": {
+            "id": 230,
+            "name": "Turks And Caicos Islands",
+            "code": "TCA",
+            "latitude": 21.75,
+            "longitude": -71.58333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 231,
+        "fields": {
+            "id": 231,
+            "name": "Tuvalu",
+            "code": "TUV",
+            "latitude": -8.0,
+            "longitude": 178.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 232,
+        "fields": {
+            "id": 232,
+            "name": "Uganda",
+            "code": "UGA",
+            "latitude": 1.0,
+            "longitude": 32.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 233,
+        "fields": {
+            "id": 233,
+            "name": "Ukraine",
+            "code": "UKR",
+            "latitude": 49.0,
+            "longitude": 32.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 234,
+        "fields": {
+            "id": 234,
+            "name": "United Arab Emirates",
+            "code": "ARE",
+            "latitude": 24.0,
+            "longitude": 54.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 235,
+        "fields": {
+            "id": 235,
+            "name": "United Kingdom",
+            "code": "GBR",
+            "latitude": 54.0,
+            "longitude": -2.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 236,
+        "fields": {
+            "id": 236,
+            "name": "United States",
+            "code": "USA",
+            "latitude": 38.0,
+            "longitude": -97.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 237,
+        "fields": {
+            "id": 237,
+            "name": "United States Minor Outlying Islands",
+            "code": "UMI",
+            "latitude": 0.0,
+            "longitude": 0.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 238,
+        "fields": {
+            "id": 238,
+            "name": "Uruguay",
+            "code": "URY",
+            "latitude": -33.0,
+            "longitude": -56.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 239,
+        "fields": {
+            "id": 239,
+            "name": "Uzbekistan",
+            "code": "UZB",
+            "latitude": 41.0,
+            "longitude": 64.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 240,
+        "fields": {
+            "id": 240,
+            "name": "Vanuatu",
+            "code": "VUT",
+            "latitude": -16.0,
+            "longitude": 167.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 241,
+        "fields": {
+            "id": 241,
+            "name": "Vatican City State (Holy See)",
+            "code": "VAT",
+            "latitude": 41.9,
+            "longitude": 12.45
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 242,
+        "fields": {
+            "id": 242,
+            "name": "Venezuela",
+            "code": "VEN",
+            "latitude": 8.0,
+            "longitude": -66.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 243,
+        "fields": {
+            "id": 243,
+            "name": "Vietnam",
+            "code": "VNM",
+            "latitude": 16.16666666,
+            "longitude": 107.83333333
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 244,
+        "fields": {
+            "id": 244,
+            "name": "Virgin Islands (British)",
+            "code": "VGB",
+            "latitude": 18.431383,
+            "longitude": -64.62305
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 245,
+        "fields": {
+            "id": 245,
+            "name": "Virgin Islands (US)",
+            "code": "VIR",
+            "latitude": 18.34,
+            "longitude": -64.93
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 246,
+        "fields": {
+            "id": 246,
+            "name": "Wallis And Futuna Islands",
+            "code": "WLF",
+            "latitude": -13.3,
+            "longitude": -176.2
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 247,
+        "fields": {
+            "id": 247,
+            "name": "Western Sahara",
+            "code": "ESH",
+            "latitude": 24.5,
+            "longitude": -13.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 248,
+        "fields": {
+            "id": 248,
+            "name": "Yemen",
+            "code": "YEM",
+            "latitude": 15.0,
+            "longitude": 48.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 249,
+        "fields": {
+            "id": 249,
+            "name": "Zambia",
+            "code": "ZMB",
+            "latitude": -15.0,
+            "longitude": 30.0
+        }
+    },
+    {
+        "model": "projects.country",
+        "pk": 250,
+        "fields": {
+            "id": 250,
+            "name": "Zimbabwe",
+            "code": "ZWE",
+            "latitude": -20.0,
+            "longitude": 30.0
+        }
+    }
+]
