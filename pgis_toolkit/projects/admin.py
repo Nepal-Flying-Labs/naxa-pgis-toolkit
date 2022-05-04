@@ -35,6 +35,13 @@ class LayerTemplateAttributeAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name', 'alias')
     list_filter = ('layer_template', 'data_type')
 
+class CountryAdmin (admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
+    search_fields = ('id', 'name', 'code')
+
+class StateAdmin (admin.ModelAdmin):
+    list_display = ('id', 'name', 'code')
+    search_fields = ('id', 'name', 'code')
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
@@ -42,7 +49,7 @@ admin.site.register(Project, ProjectAdmin)
 admin.site.register(DefaultTheme)
 admin.site.register(LayerTemplate)
 admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)
-admin.site.register(Country)
-admin.site.register(State)
+admin.site.register(Country, CountryAdmin)
+admin.site.register(State, StateAdmin)
 admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
 

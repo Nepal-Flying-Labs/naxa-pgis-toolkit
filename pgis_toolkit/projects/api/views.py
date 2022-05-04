@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 import zipfile
+import json
 
 import fiona
 import geopandas as gpd
@@ -57,13 +58,23 @@ class ProjectViewset(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         errors = []
         try:
-            # request.data._mutable = True
+            request.data._mutable = True
             request_dict = request.data
             request_keys = request_dict.keys()
+            '''retrieveing country'''
+            country = request_dict['country']
+            request_dict.pop('country')
+            '''retrieving state'''
+            state = request_dict['state']
+            request_dict.pop('state')
+
             serializer = ProjectSerializer(data=request_dict)
             if serializer.is_valid():
                 created_object = serializer.save()
-
+                ''''handle country and state'''
+                created_object.country.set(json.loads(country))
+                created_object.state.set(json.loads(state))
+                created_object.save()
                 '''check location file'''
                 file_input = False            
                 if request_dict['location_type'] == 'File Upload':
