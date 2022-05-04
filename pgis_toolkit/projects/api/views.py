@@ -10,6 +10,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from projects.api.serializers import *
+from projects.utils.vectortile import *
 from projects.models import OrganizationCategory, Organization, Project, ProjectLocationFeatureCollection, DefaultTheme, LayerTemplate, LayerTemplateAttribute
 from projects.utils.handleProjectLocation import handleProjectGeoJSON, handleProjectShapeFile
 from rest_framework import filters, status, viewsets
@@ -378,3 +379,30 @@ class LayerTemplateUploadAPIView(APIView):
         except Exception as e:
             clear_dir(FILE_UPLOAD_DIR) #clearing directory
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+
+'''VextorTile Generation for ProjectLocationFeatureCollection'''
+class ProjectLocationVectorTileQuerySet(LayerMVTView, DetailView):
+    'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=995'
+
+    vector_tile_layer_name = 'Project Location'
+    vector_tile_fields = ('pk', 'geometry', 'attributes')
+
+    def get(self, request, *args, **kwargs):
+        if not request.GET.keys():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        request_keys = request.GET.keys()
+        if 'organization_id' not in request_keys or request.GET['organization_id'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        organization_id = request.GET['organization_id']
+        if not Organization.active.filter(id=organization_id).exists():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        organization = Organization.active.get(id=layer_id)
+        if organization_id:
+            organization_project_list = Project.active.select_related("ProjectOrganization").filter(organization__id=organization_id).values_list('id', flat=True)
+            project_location_qs = ProjectLocationFeatureCollection.active.select_related("ProjectLocation").filter(project__id__in=organization_project_list)
+        result_dataset = project_location_qs if project_location_qs else None
+        if result_dataset is None:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = result_dataset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))

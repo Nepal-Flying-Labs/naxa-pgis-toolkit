@@ -6,6 +6,7 @@ from pgis_toolkit.projects.api.views import (OrganizationCategoryViewset, Organi
     LayerTemplateUploadAPIView,
     LayerTemplateViewset,
     layer_template_download,
+    ProjectLocationVectorTileQuerySet
 )
 
 router = DefaultRouter()
@@ -22,4 +23,5 @@ urlpatterns = [
     path('layer_template_download/', layer_template_download,
          name='layer_template_download'),
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
+    path('project_location_vectortile/{z}/{x}/{y}/', ProjectLocationVectorTileQuerySet, name='project_location_vectortile')
 ]
