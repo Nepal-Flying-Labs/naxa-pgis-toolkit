@@ -257,8 +257,8 @@ class PostgisBaseVectorTile(BaseVectorTileMixin):
             return row.tobytes() if row else b''
 
 
-class MetricLayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
-    pass
+# class MetricLayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+#     pass
 
 
 '''
@@ -275,7 +275,7 @@ class PostGISFeatureViewWithManualVectorTileQuerySet(MVTView, DetailView):
 # added later
 
 
-class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
     pass
 
 # # added later
