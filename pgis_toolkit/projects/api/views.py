@@ -21,6 +21,7 @@ from projects.models import (
     Project,
     ProjectLocationFeatureCollection,
 )
+from maps.models import (Theme, DefaultTheme)
 from projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -54,8 +55,16 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
+'''delets a project object'''
 def delete_project(project_id):
-    Project.objects.filter(id=project_id).delete()
+    Project.active.filter(id=project_id).delete()
+
+'''create theme objects from default theme objects for each new project object created'''
+def create_theme(project_id):
+    project = Project.active.get(id=project_id)
+    default_themes = DefaultTheme.objects.all()
+    for theme in default_themes:
+        Theme.objects.create(project=project, name=theme.name, order=theme.order)
 
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.active.all()
@@ -107,6 +116,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                             response = handleProjectShapeFile(
                                 created_object.id)
                             if response == "successful":
+                                create_theme(created_object.id)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 delete_project(created_object.id)
@@ -121,7 +131,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                         if file_extension == ".geojson":
                             response = handleProjectGeoJSON(created_object.id)
                             if response == "successful":
-
+                                create_theme(created_object.id)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 delete_project(created_object.id)
@@ -141,9 +151,9 @@ class ProjectViewset(viewsets.ModelViewSet):
 
                     wkt_list = json.loads(request.data['location_wkt'])
                     for geom in wkt_list:
-                        # data=wkt.loads(geom)
                         ProjectLocationFeatureCollection.objects.create(project=created_object,
                                                                         geometry=GEOSGeometry(geom))
+                    create_theme(created_object.id)                    
                     return Response(status=200, data={'Message': 'Object Successfully Created', 'data': serializer.data,
                                                         'object_id': created_object.id})
             else:
@@ -161,6 +171,8 @@ class ProjectViewset(viewsets.ModelViewSet):
         request.data._mutable = True
         request_dict = request.data
         request_keys = request_dict.keys()
+        country = None
+        state = None
         '''retrieveing country'''
         if 'country' in request_keys:
             country = request_dict['country']
@@ -170,13 +182,13 @@ class ProjectViewset(viewsets.ModelViewSet):
             state = request_dict['state']
             request_dict.pop('state')
         serializer = ProjectSerializer(
-            project, data=request.data, partial=True)
+            project, data=request_dict, partial=True)
         if serializer.is_valid():
             created_object = serializer.save()
             ''''handle country and state'''
-            if country:
+            if country != None:
                 created_object.country.set(json.loads(country))
-            if state:
+            if state != None:
                 created_object.state.set(json.loads(state))
             created_object.save()
             project_id = project.id
@@ -189,7 +201,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
                     return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
                 file_type = request_dict['file_type']
-                file = str(request.data["location_file"])
+                file = str(request_dict["file"])
                 split_tup = os.path.splitext(file)
                 file_extension = split_tup[1]
 
@@ -228,10 +240,10 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if 'location_wkt' in request_keys:
                     ProjectLocationFeatureCollection.active.filter(project=project_id).update(
                         is_deleted=True)  # Archive existing features
-                    project.location_file.delete(save=True)
+                    project.file.delete(save=True)
+                    wkt_name = request_dict['location_wkt']
                     wkt_list = json.loads(request_dict['location_wkt'])
                     for geom in wkt_list:
-                        # data=wkt.loads(geom)
                         ProjectLocationFeatureCollection.active.create(project=project,
                                                                         geometry=GEOSGeometry(geom))
             serializer = ProjectSerializer(
