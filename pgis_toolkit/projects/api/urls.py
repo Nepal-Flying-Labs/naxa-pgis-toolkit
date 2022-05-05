@@ -1,12 +1,16 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from pgis_toolkit.projects.api.views import (OrganizationCategoryViewset, OrganizationViewset, ProjectViewset, DefaultThemeViewset, 
+from pgis_toolkit.projects.api.views import (
+    DefaultThemeViewset,
     LayerTemplateAttributeViewset,
     LayerTemplateUploadAPIView,
     LayerTemplateViewset,
+    OrganizationCategoryViewset,
+    OrganizationViewset,
+    ProjectLocationVectorTileQuerySet,
+    ProjectViewset,
     layer_template_download,
-    ProjectLocationVectorTileQuerySet
 )
 
 router = DefaultRouter()

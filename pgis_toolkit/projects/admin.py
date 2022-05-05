@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import *
 
+
 class OrganizationCategoryAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('id', 'name')
@@ -29,7 +30,7 @@ class LayerTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'geometry_type')
     search_fields = ('id', 'name')
     list_filter = ('geometry_type',)
-    
+
 class LayerTemplateAttributeAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer_template', 'name', 'data_type','length','precision','alias', 'unit')
     search_fields = ('id', 'name', 'alias')
@@ -52,4 +53,3 @@ admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)
 admin.site.register(Country, CountryAdmin)
 admin.site.register(State, StateAdmin)
 admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
-

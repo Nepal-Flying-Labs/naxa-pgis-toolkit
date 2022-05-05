@@ -1,24 +1,36 @@
+import json
 import os
 import shutil
 import tempfile
 import zipfile
-import json
 
 import fiona
 import geopandas as gpd
-from django.contrib.gis.geos import GEOSGeometry
-from django.views.generic import DetailView, ListView
 from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry
 from django.http import HttpResponse
+from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from projects.api.serializers import *
+from projects.models import (
+    DefaultTheme,
+    LayerTemplate,
+    LayerTemplateAttribute,
+    Organization,
+    OrganizationCategory,
+    Project,
+    ProjectLocationFeatureCollection,
+)
+from projects.utils.handleProjectLocation import (
+    handleProjectGeoJSON,
+    handleProjectShapeFile,
+)
 from projects.utils.vectortile import *
-from projects.models import OrganizationCategory, Organization, Project, ProjectLocationFeatureCollection, DefaultTheme, LayerTemplate, LayerTemplateAttribute
-from projects.utils.handleProjectLocation import handleProjectGeoJSON, handleProjectShapeFile
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
@@ -55,7 +67,7 @@ class ProjectViewset(viewsets.ModelViewSet):
     }
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def create(self, request, *args, **kwargs):
         errors = []
         try:
@@ -77,13 +89,13 @@ class ProjectViewset(viewsets.ModelViewSet):
                 created_object.state.set(json.loads(state))
                 created_object.save()
                 '''check location file'''
-                file_input = False            
+                file_input = False
                 if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
                     file_input = True
                     file_type_list = ['Shapefile', 'GeoJSON']
                     if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
                         return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
-                
+
                 '''Location file as Shapfile'''
                 if file_input == True:
                     file_type = request_dict['file_type']
@@ -126,7 +138,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                     if 'location_wkt' not in request_keys or request_dict['location_wkt'] == "":
                         delete_project(created_object.id)
                         return Response(data={'message': 'No wkt of project location'}, status=status.HTTP_400_BAD_REQUEST)
- 
+
                     wkt_list = json.loads(request.data['location_wkt'])
                     for geom in wkt_list:
                         # data=wkt.loads(geom)
@@ -149,9 +161,9 @@ class ProjectViewset(viewsets.ModelViewSet):
         request.data._mutable = True
         request_dict = request.data
         request_keys = request_dict.keys()
-        '''retrieveing country'''        
+        '''retrieveing country'''
         if 'country' in request_keys:
-            country = request_dict['country'] 
+            country = request_dict['country']
             request_dict.pop('country')
         '''retrieving state'''
         if 'state' in request_keys:
@@ -170,13 +182,13 @@ class ProjectViewset(viewsets.ModelViewSet):
             project_id = project.id
 
             '''check location file'''
-            file_input = False            
+            file_input = False
             if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
                 file_input = True
                 file_type_list = ['Shapefile', 'GeoJSON']
                 if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
                     return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
-                file_type = request_dict['file_type']                
+                file_type = request_dict['file_type']
                 file = str(request.data["location_file"])
                 split_tup = os.path.splitext(file)
                 file_extension = split_tup[1]
@@ -226,7 +238,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                 project, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
-            
+
 
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
@@ -433,7 +445,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
             print(organization_project_list, "is organization project list")
             project_location_qs = ProjectLocationFeatureCollection.active.select_related("ProjectLocation").filter(project__id__in=organization_project_list)
             print(project_location_qs, "is organization project list")
-            # self.vector_tile_layer_name = 'Project Location'            
+            # self.vector_tile_layer_name = 'Project Location'
             # self.vector_tile_fields = ('pk', 'geometry', 'attributes')
 
         result_dataset = project_location_qs if project_location_qs else None

@@ -11,7 +11,6 @@ from django.views import View
 from django.views.generic import DetailView, ListView
 from rest_framework import status, viewsets
 
-
 # from core.models import LayerDataCollection, ProjectLocationFeatureCollection
 
 
