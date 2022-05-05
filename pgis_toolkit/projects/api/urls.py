@@ -1,10 +1,15 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from pgis_toolkit.projects.api.views import (OrganizationCategoryViewset, OrganizationViewset, ProjectViewset, DefaultThemeViewset, 
+from pgis_toolkit.projects.api.views import (
+    DefaultThemeViewset,
     LayerTemplateAttributeViewset,
     LayerTemplateUploadAPIView,
     LayerTemplateViewset,
+    OrganizationCategoryViewset,
+    OrganizationViewset,
+    ProjectLocationVectorTileQuerySet,
+    ProjectViewset,
     layer_template_download,
 )
 
@@ -22,4 +27,5 @@ urlpatterns = [
     path('layer_template_download/', layer_template_download,
          name='layer_template_download'),
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
+    path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet, name='project_location_vectortile')
 ]

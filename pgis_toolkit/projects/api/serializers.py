@@ -1,5 +1,13 @@
-from projects.models import OrganizationCategory, Organization, Project, DefaultTheme, LayerTemplate, LayerTemplateAttribute
+from projects.models import (
+    DefaultTheme,
+    LayerTemplate,
+    LayerTemplateAttribute,
+    Organization,
+    OrganizationCategory,
+    Project,
+)
 from rest_framework import serializers
+
 
 class OrganizationCategoryListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -73,7 +81,7 @@ class DefaultThemeSerializer(serializers.ModelSerializer):
         elif DefaultTheme.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Default Theme name must be unique')
         return data
-        
+
 class LayerTemplateListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerTemplate

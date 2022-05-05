@@ -1,5 +1,8 @@
-import geopandas as gpd
+import glob
 import zipfile
+
+import geopandas as gpd
+from django.contrib.gis.geos import GEOSGeometry
 from projects.models import Project, ProjectLocationFeatureCollection
 
 
@@ -42,6 +45,7 @@ def handleProjectShapeFile(project_id):
             r'{}/**/*.shp'.format(str(my_file)), recursive=True)[0]
         gdf = gpd.read_file(shape)
         geometry_type = gdf['geometry'].iloc[0].geom_type
+
         total_bounds = gdf.total_bounds
         bound_dict = {"total_bounds": total_bounds.tolist()}
         project_obj.geometry_type = geometry_type

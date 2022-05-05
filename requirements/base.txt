@@ -34,3 +34,4 @@ cligj==0.7.2
 munch==2.5.0
 
 geopandas==0.10.2 #https://geopandas.org/
+mercantile==1.2.1 #https://pypi.org/project/mercantile/

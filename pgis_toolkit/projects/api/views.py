@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import tempfile
@@ -5,17 +6,31 @@ import zipfile
 
 import fiona
 import geopandas as gpd
-from django.contrib.gis.geos import GEOSGeometry
 from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry
 from django.http import HttpResponse
+from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from projects.api.serializers import *
-from projects.models import OrganizationCategory, Organization, Project, ProjectLocationFeatureCollection, DefaultTheme, LayerTemplate, LayerTemplateAttribute
-from projects.utils.handleProjectLocation import handleProjectGeoJSON, handleProjectShapeFile
+from projects.models import (
+    DefaultTheme,
+    LayerTemplate,
+    LayerTemplateAttribute,
+    Organization,
+    OrganizationCategory,
+    Project,
+    ProjectLocationFeatureCollection,
+)
+from projects.utils.handleProjectLocation import (
+    handleProjectGeoJSON,
+    handleProjectShapeFile,
+)
+from projects.utils.vectortile import *
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
@@ -52,25 +67,35 @@ class ProjectViewset(viewsets.ModelViewSet):
     }
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def create(self, request, *args, **kwargs):
         errors = []
         try:
-            # request.data._mutable = True
+            request.data._mutable = True
             request_dict = request.data
             request_keys = request_dict.keys()
+            '''retrieveing country'''
+            country = request_dict['country']
+            request_dict.pop('country')
+            '''retrieving state'''
+            state = request_dict['state']
+            request_dict.pop('state')
+
             serializer = ProjectSerializer(data=request_dict)
             if serializer.is_valid():
                 created_object = serializer.save()
-
+                ''''handle country and state'''
+                created_object.country.set(json.loads(country))
+                created_object.state.set(json.loads(state))
+                created_object.save()
                 '''check location file'''
-                file_input = False            
-                if request_dict['location_type'] == 'File Upload':
+                file_input = False
+                if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
                     file_input = True
                     file_type_list = ['Shapefile', 'GeoJSON']
                     if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
                         return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
-                
+
                 '''Location file as Shapfile'''
                 if file_input == True:
                     file_type = request_dict['file_type']
@@ -113,7 +138,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                     if 'location_wkt' not in request_keys or request_dict['location_wkt'] == "":
                         delete_project(created_object.id)
                         return Response(data={'message': 'No wkt of project location'}, status=status.HTTP_400_BAD_REQUEST)
- 
+
                     wkt_list = json.loads(request.data['location_wkt'])
                     for geom in wkt_list:
                         # data=wkt.loads(geom)
@@ -133,70 +158,87 @@ class ProjectViewset(viewsets.ModelViewSet):
 
     def partial_update(self, request, pk=None):
         project = Project.active.get(pk=pk)
+        request.data._mutable = True
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        '''retrieveing country'''
+        if 'country' in request_keys:
+            country = request_dict['country']
+            request_dict.pop('country')
+        '''retrieving state'''
+        if 'state' in request_keys:
+            state = request_dict['state']
+            request_dict.pop('state')
         serializer = ProjectSerializer(
             project, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            created_object = serializer.save()
+            ''''handle country and state'''
+            if country:
+                created_object.country.set(json.loads(country))
+            if state:
+                created_object.state.set(json.loads(state))
+            created_object.save()
             project_id = project.id
 
             '''check location file'''
-            file_input = False            
-            if request_dict['location_type'] == 'File Upload':
+            file_input = False
+            if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
                 file_input = True
                 file_type_list = ['Shapefile', 'GeoJSON']
                 if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
                     return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
-                file_type = request_dict['file_type']                
+                file_type = request_dict['file_type']
                 file = str(request.data["location_file"])
                 split_tup = os.path.splitext(file)
                 file_extension = split_tup[1]
 
-                '''Location file as Shapfile'''
-                if file_input == True:
-                    if file_type == "Shapefile":
-                        if file_extension == ".zip":
-                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                                is_deleted=True)  # Archive existing features
-                            response = handleProjectShapeFile(project_id)
-                            if response == "successful":
-                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                            else:
-                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            return Response({'message': "Please provide commpressed .zip file"},
-                                            status=status.HTTP_400_BAD_REQUEST)
-
-                        '''Location file as Shapfile'''
-                    elif file_type == "GeoJSON":
-                        if file_extension == ".geojson":
-                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                                is_deleted=True)  # Archive existing features
-                            response = handleProjectGeoJSON(project_id)
-                            if response == "successful":
-                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                            else:
-                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            return Response({'message': "Please provide valid .geojson file"},
-                                            status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    '''Location as wkt from Custom Draw on map'''
-                    if 'location_wkt' in request.data.keys():
+            '''Location file as Shapfile'''
+            if file_input == True:
+                if file_type == "Shapefile":
+                    if file_extension == ".zip":
                         ProjectLocationFeatureCollection.active.filter(project=project_id).update(
                             is_deleted=True)  # Archive existing features
-                        project.location_file.delete(save=True)
-                        wkt_list = json.loads(request.data['location_wkt'])
-                        for geom in wkt_list:
-                            # data=wkt.loads(geom)
-                            ProjectLocationFeatureCollection.active.create(project=project,
-                                                                            geometry=GEOSGeometry(geom))
+                        response = handleProjectShapeFile(project_id)
+                        if response == "successful":
+                            return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                        else:
+                            return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        return Response({'message': "Please provide commpressed .zip file"},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    '''Location file as Shapfile'''
+                elif file_type == "GeoJSON":
+                    if file_extension == ".geojson":
+                        ProjectLocationFeatureCollection.active.filter(project=project_id).update(
+                            is_deleted=True)  # Archive existing features
+                        response = handleProjectGeoJSON(project_id)
+                        if response == "successful":
+                            return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                        else:
+                            return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        return Response({'message': "Please provide valid .geojson file"},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                '''Location as wkt from Custom Draw on map'''
+                if 'location_wkt' in request_keys:
+                    ProjectLocationFeatureCollection.active.filter(project=project_id).update(
+                        is_deleted=True)  # Archive existing features
+                    project.location_file.delete(save=True)
+                    wkt_list = json.loads(request_dict['location_wkt'])
+                    for geom in wkt_list:
+                        # data=wkt.loads(geom)
+                        ProjectLocationFeatureCollection.active.create(project=project,
+                                                                        geometry=GEOSGeometry(geom))
             serializer = ProjectSerializer(
                 project, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
-            
+
 
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
@@ -378,3 +420,36 @@ class LayerTemplateUploadAPIView(APIView):
         except Exception as e:
             clear_dir(FILE_UPLOAD_DIR) #clearing directory
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+
+'''VextorTile Generation for ProjectLocationFeatureCollection'''
+class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
+    'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'
+
+    vector_tile_layer_name = 'Project Location'
+    vector_tile_fields = ('pk', 'geometry', 'attributes')
+
+    def get(self, request, *args, **kwargs):
+        print("here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        if not request.GET.keys():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        request_keys = request.GET.keys()
+        if 'organization_id' not in request_keys or request.GET['organization_id'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        organization_id = request.GET['organization_id']
+        if not Organization.active.filter(id=organization_id).exists():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        organization = Organization.active.get(id=organization_id)
+        if organization_id:
+            organization_project_list = Project.active.select_related("ProjectOrganization").filter(organization__id=organization_id).values_list('id', flat=True)
+            print(organization_project_list, "is organization project list")
+            project_location_qs = ProjectLocationFeatureCollection.active.select_related("ProjectLocation").filter(project__id__in=organization_project_list)
+            print(project_location_qs, "is organization project list")
+            # self.vector_tile_layer_name = 'Project Location'
+            # self.vector_tile_fields = ('pk', 'geometry', 'attributes')
+
+        result_dataset = project_location_qs if project_location_qs else None
+        if result_dataset is None:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = result_dataset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))

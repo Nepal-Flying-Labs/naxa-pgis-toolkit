@@ -141,12 +141,12 @@ class Project(IsDeleted,DateTimeStamp):
     description=models.TextField(blank=True,null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
-    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True)
-    state = models.ForeignKey(State, on_delete=models.SET_NULL, null=True)
-    location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, default='Custom Draw')
+    country = models.ManyToManyField(Country, blank=True)
+    state = models.ManyToManyField(State, blank=True)
+    location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, blank=True, null=True)
     file = models.FileField(upload_to='site/',blank=True, null=True)
     geometry_type = models.CharField(max_length=50, blank=True, null=True)
-    file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, default='Shapefile')
+    file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
 
     class Meta:
@@ -164,7 +164,7 @@ class Project(IsDeleted,DateTimeStamp):
 
 class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     project = models.ForeignKey(
-        Project, on_delete=models.SET_NULL, null=True, related_name='project_location')
+        Project, on_delete=models.SET_NULL, null=True, related_name='ProjectLocation')
     attributes = models.JSONField(blank=True, null=True)
     geometry = models.GeometryField(srid=4326, blank=True, null=True)
 
