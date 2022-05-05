@@ -59,8 +59,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        if self.partial and Project.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
-            raise serializers.ValidationError('Project name must be unique')
+        if self.partial:
+            if 'name' in data.keys() and Project.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+                raise serializers.ValidationError('Project name must be unique')
+            return data
         elif Project.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Project name must be unique')
         return data
