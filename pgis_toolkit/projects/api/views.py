@@ -436,7 +436,7 @@ class LayerTemplateUploadAPIView(APIView):
 
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-    'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'
+    '''http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'''
 
     vector_tile_layer_name = 'Project Location'
     vector_tile_fields = ('pk', 'geometry', 'attributes')
