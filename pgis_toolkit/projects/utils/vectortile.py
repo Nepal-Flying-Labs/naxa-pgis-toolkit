@@ -9,9 +9,9 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import DetailView, ListView
+# from core.agriculture.agromap_models import FeatureCollection
+from projects.models import ProjectLocationFeatureCollection
 from rest_framework import status, viewsets
-
-# from core.models import LayerDataCollection, ProjectLocationFeatureCollection
 
 
 class BaseVectorTileMixin:
@@ -22,7 +22,7 @@ class BaseVectorTileMixin:
     vector_tile_queryset = None
     vector_tile_queryset_limit = None
     vector_tile_layer_name = None
-    vector_tile_geom_name = 'geom'
+    vector_tile_geom_name = 'geometry'
     vector_tile_fields = None
     vector_tile_generation = None
     vector_tile_extent = 4096
@@ -54,7 +54,7 @@ class BaseVectorTileMixin:
         """
         Get feature limit by tile dynamically
         """
-        return self.vector_tile_queryset_limit
+        return self.vector_tile_layer_name
 
     def get_vector_tile_layer_name(self):
         """
@@ -206,7 +206,6 @@ class MakeEnvelope(Func):
     def __init__(self, *expressions, output_field=None, **extra):
         super().__init__(*expressions, output_field=None, **extra)
         self.output_field = GeometryField(srid=expressions[4])
-        # self.output_field = GeometryField(srid=4326)
 
 
 class AsMVTGeom(GeoFunc):
@@ -256,8 +255,15 @@ class PostgisBaseVectorTile(BaseVectorTileMixin):
             return row.tobytes() if row else b''
 
 
-# class MetricLayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+# class MVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
 #     pass
+
+
+# class PostGISFeatureView(MVTView, ListView):
+#     model = FeatureCollection
+#     # model = LayerDataCollection
+#     vector_tile_layer_name = "file_data"
+#     vector_tile_fields = ("geometry", "attributes", "layer",)
 
 
 '''
@@ -274,10 +280,10 @@ class PostGISFeatureViewWithManualVectorTileQuerySet(MVTView, DetailView):
 # added later
 
 
-class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
-    pass
+# class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+#     pass
 
-# # added later
+# added later
 
 
 # class PostGISFeatureView(LayerMVTView, ListView):
@@ -286,13 +292,13 @@ class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
 #     vector_tile_fields = ("geometry", "attributes")
 
 
-# class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
-#     pass
+class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+    pass
 
-# # added later
+# added later
 
 
-# class PostGISFeatureView(ProjectLocationMVTView, ListView):
-#     model = ProjectLocationFeatureCollection
-#     # vector_tile_layer_name = "file_data"
-#     vector_tile_fields = ("geometry", "attributes")
+class PostGISFeatureView(ProjectLocationMVTView, ListView):
+    model = ProjectLocationFeatureCollection
+    # vector_tile_layer_name = "file_data"
+    vector_tile_fields = ("geometry", "attributes")

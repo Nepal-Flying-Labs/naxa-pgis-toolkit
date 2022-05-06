@@ -11,6 +11,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
+from maps.models import Theme
 from projects.api.serializers import *
 from projects.models import (
     DefaultTheme,
@@ -21,7 +22,6 @@ from projects.models import (
     Project,
     ProjectLocationFeatureCollection,
 )
-from maps.models import (Theme)
 from projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -153,7 +153,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                     for geom in wkt_list:
                         ProjectLocationFeatureCollection.objects.create(project=created_object,
                                                                         geometry=GEOSGeometry(geom))
-                    create_theme(created_object.id)                    
+                    create_theme(created_object.id)
                     return Response(status=200, data={'Message': 'Object Successfully Created', 'data': serializer.data,
                                                         'object_id': created_object.id})
             else:
@@ -434,15 +434,43 @@ class LayerTemplateUploadAPIView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 
-'''VextorTile Generation for ProjectLocationFeatureCollection'''
-class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-    '''http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'''
+# '''VextorTile Generation for ProjectLocationFeatureCollection'''
+# class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
+#     # vector_tile_layer_name = "file_data"
+#     vector_tile_fields = ("attributes",)
 
-    vector_tile_layer_name = 'Project Location'
+#     def get(self, request, *args, **kwargs):
+#         self.vector_tile_queryset = ProjectLocationFeatureCollection.objects.all()
+#         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+# class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
+#     '''
+#     "http://0.0.0.0:8000/api/v1/project_location_tile/{z}/{x}/{y}/?project=1",
+#     '''
+#     vector_tile_fields = ("attributes",)
+
+#     def get(self, request, *args, **kwargs):
+#         # request_dict = request.GET
+#         # request_keys = request_dict.keys()
+#         queryset = ProjectLocationFeatureCollection.active.all()
+#         # if "project" in request_keys:
+#         #     project_id = request.GET["project"]
+#         #     if project_id:
+#         #         queryset = queryset.filter(
+#         #             project=project_id)
+#         self.vector_tile_queryset = queryset.distinct()
+
+#         # print(self.vector_tile_queryset,"self.vector_tile_queryset")
+#         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+
+class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
+    # 'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'
+
+    vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'geometry', 'attributes')
 
     def get(self, request, *args, **kwargs):
-        print("here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
@@ -451,17 +479,8 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         organization_id = request.GET['organization_id']
         if not Organization.active.filter(id=organization_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        organization = Organization.active.get(id=organization_id)
         if organization_id:
-            organization_project_list = Project.active.select_related("ProjectOrganization").filter(organization__id=organization_id).values_list('id', flat=True)
-            print(organization_project_list, "is organization project list")
-            project_location_qs = ProjectLocationFeatureCollection.active.select_related("ProjectLocation").filter(project__id__in=organization_project_list)
-            print(project_location_qs, "is organization project list")
-            # self.vector_tile_layer_name = 'Project Location'
-            # self.vector_tile_fields = ('pk', 'geometry', 'attributes')
-
-        result_dataset = project_location_qs if project_location_qs else None
-        if result_dataset is None:
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        self.vector_tile_queryset = result_dataset.distinct()
+            organization_project_list = Project.active.select_related("organization").filter(organization__id=organization_id).values_list('id', flat=True)
+            project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
+        self.vector_tile_queryset = project_location_qs.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
