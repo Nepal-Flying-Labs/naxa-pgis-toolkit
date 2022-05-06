@@ -12,6 +12,10 @@ class OrganizationAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name', 'email', 'link')
     list_filter = ('category',)
 
+class DefaultThemeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'order')
+    search_fields = ('id', 'name')
+    
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'organization', 'name')
     search_fields = ('id', 'name')
@@ -42,6 +46,7 @@ class StateAdmin (admin.ModelAdmin):
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
+admin.site.register(DefaultTheme, DefaultThemeAdmin)
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(LayerTemplate)
 admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)

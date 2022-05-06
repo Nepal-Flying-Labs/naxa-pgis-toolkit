@@ -15,14 +15,14 @@ class Theme(IsDeleted,DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
-class DefaultTheme(models.Model):
-    name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+# class DefaultTheme(models.Model):
+#     name=models.CharField(max_length=254)
+#     order=models.PositiveIntegerField(blank=True,null=True)
 
-    def __str__(self):
-        return str(self.name)
-    class Meta:
-        app_label = 'maps'
+#     def __str__(self):
+#         return str(self.name)
+#     class Meta:
+#         app_label = 'maps'
 
 class Category(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.CASCADE,blank=True,null=True)
