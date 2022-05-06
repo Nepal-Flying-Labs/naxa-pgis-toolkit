@@ -4,39 +4,17 @@ from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
+from pgis_toolkit.utils.constants import (
+    DATA_TYPE_CHOICES,
+    FILE_TYPE_CHOICES,
+    GEOMETRY_TYPE_CHOICES,
+    LAYER_TYPE_CHOICES,
+    LOCATION_TYPE_CHOICES,
+    UNIT_CHOICES,
+)
+
 from .utils.managers import ActiveManager
 
-GEOMETRY_TYPE_CHOICES=(
-                        ("Point",_("Point")),
-                        ("MultiPoint",_('MultiPoint')),
-                        ('LineString',_('LineString')),
-                        ("MultiLineString",_("MultiLineString")),
-                        ("Polygon",_('Polygon')),
-                        ('MultiPolygon',_('MultiPolygon'))
-                    )
-
-DATA_TYPE_CHOICES=(
-                    ("int",_("Integer")),
-                    ("float",_('Decimal')),
-                    ('str',_('Text')),
-                    ('date',_('Date'))
-                )
-
-UNIT_CHOICES=(
-                ("m",_("Meter")),
-                ("sqm",_('Square Meter')),
-                ('km',_('Kilometer'))
-            )
-
-LOCATION_TYPE_CHOICES = (
-    ('Custom Draw', _('Custom Draw')),
-    ('File Upload', _('File Upload'))
-)
-
-FILE_TYPE_CHOICES = (
-    ('Shapefile', _('Shapefile')),
-    ('GeoJSON', _('GeoJSON')),
-)
 # class Organization(models.Model):
 #     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 

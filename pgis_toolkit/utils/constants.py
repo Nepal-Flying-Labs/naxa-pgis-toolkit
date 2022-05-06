@@ -1,0 +1,33 @@
+from django.utils.translation import ugettext_lazy as _
+
+LAYER_TYPE_CHOICES=(("Raster",_("Raster")),("Vector",_('Vector')),('WMS',_('WMS')))
+GEOMETRY_TYPE_CHOICES=(
+                        ("Point",_("Point")),
+                        ("MultiPoint",_('MultiPoint')),
+                        ('LineString',_('LineString')),
+                        ("MultiLineString",_("MultiLineString")),
+                        ("Polygon",_('Polygon')),
+                        ('MultiPolygon',_('MultiPolygon'))
+                    )
+DATA_TYPE_CHOICES=(
+                    ("int",_("Integer")),
+                    ("float",_('Decimal')),
+                    ('str',_('Text')),
+                    ('date',_('Date'))
+                )
+
+UNIT_CHOICES=(
+                ("m",_("Meter")),
+                ("sqm",_('Square Meter')),
+                ('km',_('Kilometer'))
+            )
+
+LOCATION_TYPE_CHOICES = (
+    ('Custom Draw', _('Custom Draw')),
+    ('File Upload', _('File Upload'))
+)
+
+FILE_TYPE_CHOICES = (
+    ('Shapefile', _('Shapefile')),
+    ('GeoJSON', _('GeoJSON')),
+)
