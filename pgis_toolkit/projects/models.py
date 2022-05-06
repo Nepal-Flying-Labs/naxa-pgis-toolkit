@@ -182,16 +182,6 @@ class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     class Meta:
         app_label = 'projects'
 
-class DefaultTheme(IsDeleted,DateTimeStamp):
-    name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
-
-    def __str__(self):
-        return f'{self.name}'
-
-    class Meta:
-        app_label = 'projects'
-
 class LayerTemplate(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
     geometry_type=models.CharField(max_length=50,choices=GEOMETRY_TYPE_CHOICES)
