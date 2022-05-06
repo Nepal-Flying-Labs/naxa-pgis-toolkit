@@ -133,6 +133,14 @@ class State(models.Model):
     class Meta:
         app_label = 'projects'
 
+class DefaultTheme(models.Model):
+    name=models.CharField(max_length=254)
+    order=models.PositiveIntegerField(blank=True,null=True)
+
+    def __str__(self):
+        return str(self.name)
+    class Meta:
+        app_label = 'projects'
 
 class Project(IsDeleted,DateTimeStamp):
 

@@ -21,7 +21,7 @@ from projects.models import (
     Project,
     ProjectLocationFeatureCollection,
 )
-from maps.models import (Theme, DefaultTheme)
+from maps.models import (Theme)
 from projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
