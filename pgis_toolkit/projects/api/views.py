@@ -434,35 +434,7 @@ class LayerTemplateUploadAPIView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 
-# '''VextorTile Generation for ProjectLocationFeatureCollection'''
-# class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-#     # vector_tile_layer_name = "file_data"
-#     vector_tile_fields = ("attributes",)
-
-#     def get(self, request, *args, **kwargs):
-#         self.vector_tile_queryset = ProjectLocationFeatureCollection.objects.all()
-#         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
-
-# class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-#     '''
-#     "http://0.0.0.0:8000/api/v1/project_location_tile/{z}/{x}/{y}/?project=1",
-#     '''
-#     vector_tile_fields = ("attributes",)
-
-#     def get(self, request, *args, **kwargs):
-#         # request_dict = request.GET
-#         # request_keys = request_dict.keys()
-#         queryset = ProjectLocationFeatureCollection.active.all()
-#         # if "project" in request_keys:
-#         #     project_id = request.GET["project"]
-#         #     if project_id:
-#         #         queryset = queryset.filter(
-#         #             project=project_id)
-#         self.vector_tile_queryset = queryset.distinct()
-
-#         # print(self.vector_tile_queryset,"self.vector_tile_queryset")
-#         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
-
+'''VextorTile Generation for ProjectLocationFeatureCollection'''
 
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
     # 'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'
