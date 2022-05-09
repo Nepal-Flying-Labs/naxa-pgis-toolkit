@@ -55,6 +55,12 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
+    def list(self, request, *args, **kwargs):
+        search_key = request.query_params.get('search_key', None)
+        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key!= "" else self.queryset
+        serializer = OrganizationCategoryListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
 '''delets a project object'''
 def delete_project(project_id):
     Project.active.filter(id=project_id).delete()
