@@ -24,8 +24,8 @@ from projects.models import (
 )
 from projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
-    handleProjectShapeFile,
-)
+    handleProjectShapeFile)
+from projects.utils.pagination import CustomPageNumberPagination
 from projects.utils.vectortile import *
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
@@ -41,6 +41,8 @@ class OrganizationCategoryViewset(viewsets.ModelViewSet):
         'list': OrganizationCategoryListSerializer,
         'retrieve': OrganizationCategorySerializer
     }
+    pagination_class = CustomPageNumberPagination
+
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
@@ -52,8 +54,19 @@ class OrganizationViewset(viewsets.ModelViewSet):
         'list': OrganizationListSerializer,
         'retrieve': OrganizationSerializer
     }
+    pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
+        search_key = request.query_params.get('search_key', None)
+        order_by = request.query_params.get('order_by', None)
+        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key != "" else self.queryset
+        queryset = queryset.order_by(order_by) if order_by and order_by != "" else queryset
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True, context={})
+        return paginator.get_paginated_response(data=serializer.data)
 
 '''delets a project object'''
 def delete_project(project_id):
@@ -74,6 +87,8 @@ class ProjectViewset(viewsets.ModelViewSet):
         'list': ProjectListSerializer,
         'retrieve': ProjectSerializer
     }
+    pagination_class = CustomPageNumberPagination
+
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
@@ -261,6 +276,7 @@ class DefaultThemeViewset(viewsets.ModelViewSet):
         'list': DefaultThemeListSerializer,
         'retrieve': DefaultThemeSerializer
     }
+    pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
