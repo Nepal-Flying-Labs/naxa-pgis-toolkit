@@ -17,4 +17,6 @@ app_name = "api"
 urlpatterns = [
     path('', include(router.urls)),
     path("projects/", include("projects.api.urls", namespace='projects')),
+    path("maps/", include("maps.api.urls", namespace='maps')),
+
 ]

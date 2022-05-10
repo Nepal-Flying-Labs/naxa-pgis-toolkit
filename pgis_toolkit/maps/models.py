@@ -36,7 +36,8 @@ class LayerGroup(IsDeleted,DateTimeStamp):
         unique_together = (("theme", "name"),)
 
 class Layer(IsDeleted,DateTimeStamp):
-    group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True)
+    theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
+    group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_group')
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(blank=True,null=True)
     default_load=models.BooleanField(default=False)
@@ -94,7 +95,7 @@ class Vectorlayer(DateTimeStamp):
         max_length=250, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.name};id-self.id'
+        return f'{self.layer};id-{self.id}'
     class Meta:
         app_label = 'maps'
 
