@@ -13,7 +13,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+# import environ
+# env = environ.Env()
+# environ.Env.read_env()
 # Create your views here.
+from config.settings.base import env
+
 
 @api_view(['GET'])
 def project_layers(request,id):
@@ -37,7 +42,7 @@ def project_layers(request,id):
                         layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
                     if layer.layer_type=="WMS":
                         layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
-                    icon_url=layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                    icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
                     layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type,'icon':icon_url,'icon_size':layer_detail_instance.icon_size,'style':layer_detail_instance.style}
                     group_layer_list.append(layer_item)
                 group_item={"id":group.id,"name":group.name,'layer':group_layer_list}
