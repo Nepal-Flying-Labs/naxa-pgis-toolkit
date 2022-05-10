@@ -136,7 +136,7 @@ class LayerAttribute(DateTimeStamp):
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     class Meta:
-        app_label = 'projects'
+        app_label = 'maps'
         unique_together = (("layer", "name"),)
 
     def clean(self):
