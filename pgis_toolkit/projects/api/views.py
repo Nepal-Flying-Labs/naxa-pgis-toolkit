@@ -61,7 +61,9 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         paginator = CustomPageNumberPagination()
         search_key = request.query_params.get('search_key', None)
-        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key!= "" else self.queryset
+        order_by = request.query_params.get('order_by', None)
+        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key != "" else self.queryset
+        queryset = queryset.order_by(order_by) if order_by and order_by != "" else queryset
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True, context={})
         return paginator.get_paginated_response(data=serializer.data)
