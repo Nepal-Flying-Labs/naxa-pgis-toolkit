@@ -294,6 +294,10 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if qs['geometry'].within(polygon):
                     project_ids.append(qs['project'])
             queryset = queryset.filter(id__in=project_ids)
+        '''search_by'''
+        search_key = request.query_params.get('search_key', None)
+        if search_key and search_key != "":
+            queryset = queryset.filter(name__icontains=search_key)
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True)
         return paginator.get_paginated_response(data=serializer.data)
@@ -499,6 +503,10 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         if not Organization.active.filter(id=organization_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
+        '''search_key'''
+        if 'search_key' in request_keys and request.GET['search_key'] != "":
+            search_key = request.GET['search_key']
+            organization_project_qs = organization_project_qs.filter(name__icontains=search_key)
         '''filter by state'''
         if 'state' in request_keys and request.GET['state'] != "":
             state = request.GET['state']

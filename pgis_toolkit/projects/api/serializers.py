@@ -49,9 +49,24 @@ class OrganizationSerializer(serializers.ModelSerializer):
         return data
 
 class ProjectListSerializer(serializers.ModelSerializer):
+    # organization = serializers.SerializerMethodField()
+    # state = serializers.SerializerMethodField()
+    # country = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        fields = ('id', 'name', 'state', 'country')
+        # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
+        # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+    # def get_organization(self, instance):
+    #     return instance.organization.name
+
+    # def get_state(self, instance):
+    #     return instance.state.all().values_list('name', flat=True)
+
+    # def get_country(self, instance):
+    #     return instance.country.all().values_list('name', flat=True)
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
