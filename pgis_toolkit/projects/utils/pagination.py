@@ -10,12 +10,7 @@ class CustomPageNumberPagination(PageNumberPagination):
     def get_paginated_response(self, data):
         limit_value = int(self.request.query_params.get('limit', 10))
         current_page = int(self.request.query_params.get('page', 1))
-        print(current_page, "is current page")
-
         next_page_link = self.get_next_link()
-        print(self.get_next_link(), "is next page")
-        print(self.get_previous_link(), "is previous page")
-
         return Response({
             'next': self.get_next_link(),
             'previous': self.get_previous_link(),

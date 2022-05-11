@@ -267,6 +267,7 @@ class ProjectViewset(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
     def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
         organization_id = request.query_params.get('organization_id', None)
         queryset = self.queryset
         '''filter by organization id'''
@@ -293,8 +294,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if qs['geometry'].within(polygon):
                     project_ids.append(qs['project'])
             queryset = queryset.filter(id__in=project_ids)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(data=serializer.data)
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
