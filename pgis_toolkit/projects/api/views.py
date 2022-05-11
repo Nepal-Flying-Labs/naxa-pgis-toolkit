@@ -266,7 +266,37 @@ class ProjectViewset(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
+    def list(self, request, *args, **kwargs):
+        organization_id = request.query_params.get('organization_id', None)
+        queryset = self.queryset
+        '''filter by organization id'''
+        if organization_id and organization_id != "":
+            if not Organization.active.filter(id=organization_id).exists():
+                return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = queryset.select_related("organization").filter(organization__id=organization_id)
+        '''filter by state'''
+        state = request.query_params.get('state', None)
+        country = request.query_params.get('country', None)
+        polygon_wkt = request.query_params.get('polygon_wkt', None)
+        print(polygon_wkt, "is polygon wkt")       
 
+        if state and state != "":
+            queryset = queryset.filter(state__id=state)
+            '''filter by country or polygon wkt'''
+        elif country and country != "":
+            queryset = queryset.filter(country__id=country)
+            '''filter by polygon wkt'''
+        elif polygon_wkt and polygon_wkt != "":     
+            polygon = GEOSGeometry(polygon_wkt) 
+            organization_project_list = queryset.values_list('id', flat=True)              
+            project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
+            project_ids = []
+            for qs in project_location_qs:
+                if qs['geometry'].within(polygon):
+                    project_ids.append(qs['project'])
+            queryset = queryset.filter(id__in=project_ids)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
