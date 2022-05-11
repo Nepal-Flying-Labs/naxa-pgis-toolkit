@@ -274,12 +274,10 @@ class ProjectViewset(viewsets.ModelViewSet):
             if not Organization.active.filter(id=organization_id).exists():
                 return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
             queryset = queryset.select_related("organization").filter(organization__id=organization_id)
-        '''filter by state'''
         state = request.query_params.get('state', None)
         country = request.query_params.get('country', None)
         polygon_wkt = request.query_params.get('polygon_wkt', None)
-        print(polygon_wkt, "is polygon wkt")       
-
+        '''filter by state'''
         if state and state != "":
             queryset = queryset.filter(state__id=state)
             '''filter by country or polygon wkt'''
@@ -483,7 +481,7 @@ class LayerTemplateUploadAPIView(APIView):
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-    # 'http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1'
+    # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
 
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'geometry', 'attributes')
@@ -492,13 +490,31 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
+        '''filter by organization'''
         if 'organization_id' not in request_keys or request.GET['organization_id'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         organization_id = request.GET['organization_id']
         if not Organization.active.filter(id=organization_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        if organization_id:
-            organization_project_list = Project.active.select_related("organization").filter(organization__id=organization_id).values_list('id', flat=True)
-            project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
-        self.vector_tile_queryset = project_location_qs.distinct()
+        organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
+        '''filter by state'''
+        if 'state' in request_keys and request.GET['state'] != "":
+            state = request.GET['state']
+            organization_project_qs = organization_project_qs.filter(state__id=state)
+            '''filter by state'''
+        elif 'country' in request_keys and request.GET['country'] != "":
+            country = request.GET['country']
+            organization_project_qs = organization_project_qs.filter(country__id=country)
+        organization_project_list = organization_project_qs.values_list('id', flat=True)
+        queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
+        '''filter by polygon_wkt'''
+        if 'polygon_wkt' in request_keys and request.GET['polygon_wkt'] != "":
+            polygon_wkt = request.GET['polygon_wkt']
+            polygon = GEOSGeometry(polygon_wkt)
+            project_location_ids = []
+            for qs in queryset:
+                if (qs.geometry).within(polygon):
+                    project_location_ids.append(qs.id)
+            queryset = queryset.filter(id__in=project_location_ids)
+        self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
