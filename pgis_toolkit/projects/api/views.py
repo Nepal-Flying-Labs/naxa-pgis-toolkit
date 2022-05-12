@@ -1,8 +1,10 @@
 import json
 import os
+import operator
 import shutil
 import tempfile
 import zipfile
+from functools import reduce
 
 import fiona
 import geopandas as gpd
@@ -11,6 +13,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
 from maps.models import Theme
 from projects.api.serializers import *
 from projects.models import (
@@ -267,6 +270,7 @@ class ProjectViewset(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
     def list(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
         paginator = CustomPageNumberPagination()
         organization_id = request.query_params.get('organization_id', None)
         queryset = self.queryset
@@ -294,10 +298,18 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if qs['geometry'].within(polygon):
                     project_ids.append(qs['project'])
             queryset = queryset.filter(id__in=project_ids)
-        '''search_by'''
+        '''search by a key'''
         search_key = request.query_params.get('search_key', None)
         if search_key and search_key != "":
-            queryset = queryset.filter(name__icontains=search_key)
+            search_fields = ['name', 'state__name', 'country__name']
+            filter_kwargs = {}
+            for field in search_fields:
+                filter_kwargs[field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            queryset = queryset.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else queryset
+        '''paginate queryset'''
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True)
         return paginator.get_paginated_response(data=serializer.data)
@@ -506,7 +518,14 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         '''search_key'''
         if 'search_key' in request_keys and request.GET['search_key'] != "":
             search_key = request.GET['search_key']
-            organization_project_qs = organization_project_qs.filter(name__icontains=search_key)
+            search_fields = ['name', 'state__name', 'country__name']
+            filter_kwargs = {}
+            for field in search_fields:
+                filter_kwargs[field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            organization_project_qs = organization_project_qs.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else organization_project_qs
         '''filter by state'''
         if 'state' in request_keys and request.GET['state'] != "":
             state = request.GET['state']
