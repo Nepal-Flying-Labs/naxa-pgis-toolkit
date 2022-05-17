@@ -8,6 +8,8 @@ from maps.models import (
     Vectorlayer,
     WMSLayer,
 )
+from maps.tasks import UploadVectorLayer, UploadRasterLayer, UploadWMSLayer
+from .serializers import LayerSerializer
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -79,3 +81,28 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+
+class LayerAPIView(APIView):
+    def post(self, request, format=None):
+        name = request.data.get('name', None)
+        if Layer.active.filter(name=name).exists():
+            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = LayerSerializer(data=request.data)
+        if serializer.is_valid():
+            created_object = serializer.save()
+            layer_type = created_object.layer_type
+            '''handle Vector layer upload'''
+            if layer_type == "Vector":
+                UploadVectorLayer(created_object.id)
+                '''handle Vector layer upload'''
+            elif layer_type == "Raster":
+                UploadRasterLayer(created_object.id)
+                '''handle Vector layer upload'''
+            elif layer_type == "WMS":
+                UploadWMSLayer(created_object.id)
+            else:
+                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
+            created_object.save()
+        return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+
