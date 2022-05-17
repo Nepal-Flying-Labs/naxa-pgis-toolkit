@@ -270,6 +270,8 @@ tags
 
 ### Project template
 pgis_toolkit/media/
+#Geoserver data
+geoserver-data
 
 .pytest_cache/
 .ipython/

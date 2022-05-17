@@ -1,0 +1,9 @@
+# Name this file to .geoserver
+GEOSERVER_DATA_DIR=/opt/geoserver/data_dir
+GEOWEBCACHE_CACHE_DIR=/opt/geoserver/data_dir/gwc
+SAMPLE_DATA=false
+TOMCAT_EXTRAS=false
+GEOSERVER_ADMIN_USER=admin
+GEOSERVER_ADMIN_PASSWORD=geoserver
+INITIAL_MEMORY=1G
+MAXIMUM_MEMORY=2G

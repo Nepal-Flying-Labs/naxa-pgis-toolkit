@@ -34,3 +34,15 @@ services:
       - pgis_toolkit_local_postgres_data_backups:/backups:z
     env_file:
       - ./.envs/.local/.postgres
+
+  geoserver:
+      image: kartoza/geoserver:2.19.0
+      volumes:
+        - ./geoserver-data:/opt/geoserver/data_dir
+      env_file:
+        - ./.envs/.local/.geoserver
+      ports:
+        - 8080:8080
+      restart: on-failure
+      # networks:
+      #   - changu_nw_prod
