@@ -111,6 +111,9 @@ class RasterLayer(DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
+
+
+
 class WMSLayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="wms_layer")
     url=models.URLField()
