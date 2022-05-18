@@ -34,3 +34,39 @@ services:
       - pgis_toolkit_local_postgres_data_backups:/backups:z
     env_file:
       - ./.envs/.local/.postgres
+
+  redis:
+    container_name: pgis_toolkit_local_redis
+    image: redis:alpine
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - 6379:6379
+    volumes:
+      - ./_redis_data:/var/lib/redis
+      - ./redis/rc.local:/etc/rc.local
+
+  worker:
+    container_name: pgis_toolkit_worker_django
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+    restart: always
+    # command : "celery -A project worker -f /logs/worker.log -l DEBUG"
+    entrypoint : "celery -A pgis_toolkit worker -l DEBUG -Q default --pool=solo"
+    depends_on:
+      - django
+    volumes:
+      - .:/app:z
+      - ./logs/:/logs/
+    env_file:
+      - .envs/.local/.django
+
+  pgadmin:
+    image: dpage/pgadmin4
+    env_file: ./.envs/.local/.pgadmin
+    ports:
+      - "5051:80"
+    restart: always
+    depends_on:
+      - postgres
