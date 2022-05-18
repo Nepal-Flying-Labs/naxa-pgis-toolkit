@@ -8,6 +8,7 @@ FROM python as python-build-stage
 
 ARG BUILD_ENVIRONMENT=local
 
+
 # Install apt packages
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # dependencies for building Python packages
@@ -15,7 +16,15 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   # psycopg2 dependencies
   libpq-dev \
   # postgis for geodjango
-  gdal-bin
+  gdal-bin \
+  libgdal-dev
+
+
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# RUN pip install GDAL==$(gdal-config --version | awk -F'[.]' '{print $1"."$2}') --global-option=build_ext --global-option="-I/usr/include/gdal"
+
 
 # Requirements are installed here to ensure they will be cached.
 COPY ./requirements .
