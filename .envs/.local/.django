@@ -3,3 +3,4 @@
 USE_DOCKER=yes
 IPYTHONDIR=/app/.ipython
 URL=http://0.0.0.0:8000
+CELERY_BROKER_URL=redis://redis//
