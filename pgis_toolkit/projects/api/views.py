@@ -1,6 +1,6 @@
 import json
-import os
 import operator
+import os
 import shutil
 import tempfile
 import zipfile
@@ -10,13 +10,18 @@ import fiona
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
+from django.db.models import Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
-from maps.models import Theme
-from projects.api.serializers import *
-from projects.models import (
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from pgis_toolkit.maps.models import Theme
+from pgis_toolkit.projects.api.serializers import *
+from pgis_toolkit.projects.models import (
     DefaultTheme,
     LayerTemplate,
     LayerTemplateAttribute,
@@ -25,15 +30,12 @@ from projects.models import (
     Project,
     ProjectLocationFeatureCollection,
 )
-from projects.utils.handleProjectLocation import (
+from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
-    handleProjectShapeFile)
-from projects.utils.pagination import CustomPageNumberPagination
-from projects.utils.vectortile import *
-from rest_framework import filters, status, viewsets
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework.views import APIView
+    handleProjectShapeFile,
+)
+from pgis_toolkit.projects.utils.pagination import CustomPageNumberPagination
+from pgis_toolkit.projects.utils.vectortile import *
 
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
@@ -289,9 +291,9 @@ class ProjectViewset(viewsets.ModelViewSet):
         elif country and country != "":
             queryset = queryset.filter(country__id=country)
             '''filter by polygon wkt'''
-        elif polygon_wkt and polygon_wkt != "":     
-            polygon = GEOSGeometry(polygon_wkt) 
-            organization_project_list = queryset.values_list('id', flat=True)              
+        elif polygon_wkt and polygon_wkt != "":
+            polygon = GEOSGeometry(polygon_wkt)
+            organization_project_list = queryset.values_list('id', flat=True)
             project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
             project_ids = []
             for qs in project_location_qs:

@@ -1,7 +1,8 @@
-from rest_framework.response import Response
 from rest_framework import filters, status, viewsets
+from rest_framework.response import Response
 
-from maps.models import Layer, WMSLayer
+from pgis_toolkit.maps.models import Layer, WMSLayer
+
 
 def UploadVectorLayer(layer_id, request_dict):
     pass

@@ -16,7 +16,7 @@ app_name = "api"
 # urlpatterns = router.urls
 urlpatterns = [
     path('', include(router.urls)),
-    path("projects/", include("projects.api.urls", namespace='projects')),
-    path("maps/", include("maps.api.urls", namespace='maps')),
+    path("projects/", include("pgis_toolkit.projects.api.urls", namespace='projects')),
+    path("maps/", include("pgis_toolkit.maps.api.urls", namespace='maps')),
 
 ]

@@ -9,9 +9,10 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import DetailView, ListView
-# from core.agriculture.agromap_models import FeatureCollection
-from projects.models import ProjectLocationFeatureCollection
 from rest_framework import status, viewsets
+
+# from core.agriculture.agromap_models import FeatureCollection
+from pgis_toolkit.projects.models import ProjectLocationFeatureCollection
 
 
 class BaseVectorTileMixin:

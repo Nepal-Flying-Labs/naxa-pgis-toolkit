@@ -1,15 +1,4 @@
 from django.shortcuts import render
-from maps.models import (
-    Layer,
-    LayerGroup,
-    RasterLayer,
-    SubLayer,
-    Theme,
-    Vectorlayer,
-    WMSLayer,
-)
-from maps.tasks import UploadVectorLayer, UploadRasterLayer, UploadWMSLayer
-from .serializers import LayerSerializer
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -20,6 +9,18 @@ from rest_framework.views import APIView
 # environ.Env.read_env()
 # Create your views here.
 from config.settings.base import env
+from pgis_toolkit.maps.models import (
+    Layer,
+    LayerGroup,
+    RasterLayer,
+    SubLayer,
+    Theme,
+    Vectorlayer,
+    WMSLayer,
+)
+from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
+
+from .serializers import LayerSerializer
 
 
 @api_view(['GET'])
@@ -138,4 +139,3 @@ class LayerAPIView(APIView):
                 return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
             created_object.save()
         return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
-

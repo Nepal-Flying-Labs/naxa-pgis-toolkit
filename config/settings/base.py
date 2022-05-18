@@ -91,6 +91,9 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "drf_spectacular",
     # "ordered_model",
+    'celery',
+    # 'django_celery_beat',
+    # 'django_celery_results'
 ]
 
 LOCAL_APPS = [

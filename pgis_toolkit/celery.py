@@ -4,9 +4,10 @@ import os
 
 from celery import Celery, shared_task
 
+from config.settings.base import env
+
 # set the default Django settings module for the 'celery' program.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.base')
-# os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', f'config.settings.{env("BUILD_ENV")}')
 
 
 app = Celery('pgis_toolkit')

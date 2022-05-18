@@ -1,8 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from maps.models import Layer, RasterLayer, Vectorlayer, WMSLayer
 from rest_framework import status
 from rest_framework.response import Response
+
+from pgis_toolkit.maps.models import Layer, RasterLayer, Vectorlayer, WMSLayer
 
 
 @receiver(post_save, sender=Layer)
