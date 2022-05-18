@@ -18,6 +18,11 @@ class LayerAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('layer_type', 'default_load', 'is_osm_layer')
 
+class WMSLayerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer', 'url')
+    search_fields = ('id', 'url')
+    list_filter = ('layer',)
+
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(LayerGroup, LayerGroupAdmin)
@@ -25,5 +30,5 @@ admin.site.register(Layer, LayerAdmin)
 admin.site.register(SubLayer)
 admin.site.register(Vectorlayer)
 admin.site.register(RasterLayer)
-admin.site.register(WMSLayer)
+admin.site.register(WMSLayer, WMSLayerAdmin)
 admin.site.register(LayerAttribute)

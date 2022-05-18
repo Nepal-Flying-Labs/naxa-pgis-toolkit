@@ -9,6 +9,6 @@ app_name = "projects"
 urlpatterns = [
     path('', include(router.urls)),
     path('project_layers/<int:id>/', project_layers, name='project_layers'),
-    path('layer/', LayerAPIView.as_view(), name='layer')
-
+    path('layer/', LayerAPIView.as_view(), name='layer'),
+    path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update')
 ]
