@@ -3,8 +3,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
-from projects.models import DateTimeStamp, IsDeleted, Project
 
+from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Project
 from pgis_toolkit.utils.constants import (
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,

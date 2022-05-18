@@ -1,13 +1,4 @@
 from django.shortcuts import render
-from maps.models import (
-    Layer,
-    LayerGroup,
-    RasterLayer,
-    SubLayer,
-    Theme,
-    Vectorlayer,
-    WMSLayer,
-)
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -18,6 +9,15 @@ from rest_framework.views import APIView
 # environ.Env.read_env()
 # Create your views here.
 from config.settings.base import env
+from pgis_toolkit.maps.models import (
+    Layer,
+    LayerGroup,
+    RasterLayer,
+    SubLayer,
+    Theme,
+    Vectorlayer,
+    WMSLayer,
+)
 
 
 @api_view(['GET'])

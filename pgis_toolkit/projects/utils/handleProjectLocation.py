@@ -1,11 +1,13 @@
-import os
 import glob
-import zipfile
+import os
 import shutil
+import zipfile
+
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
-from projects.models import Project, ProjectLocationFeatureCollection
+
+from pgis_toolkit.projects.models import Project, ProjectLocationFeatureCollection
 
 
 def clear_dir(dir):

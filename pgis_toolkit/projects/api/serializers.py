@@ -1,4 +1,6 @@
-from projects.models import (
+from rest_framework import serializers
+
+from pgis_toolkit.projects.models import (
     DefaultTheme,
     LayerTemplate,
     LayerTemplateAttribute,
@@ -6,7 +8,6 @@ from projects.models import (
     OrganizationCategory,
     Project,
 )
-from rest_framework import serializers
 
 
 class OrganizationCategoryListSerializer(serializers.ModelSerializer):
