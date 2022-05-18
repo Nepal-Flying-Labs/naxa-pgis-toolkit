@@ -35,17 +35,6 @@ services:
     env_file:
       - ./.envs/.local/.postgres
 
-  redis:
-    container_name: pgis_toolkit_local_redis
-    image: redis:alpine
-    restart: always
-    command: redis-server --appendonly yes
-    ports:
-      - 6379:6379
-    volumes:
-      - ./_redis_data:/var/lib/redis
-      - ./redis/rc.local:/etc/rc.local
-
   worker:
     container_name: pgis_toolkit_worker_django
     build:
@@ -62,6 +51,16 @@ services:
     env_file:
       - .envs/.local/.django
 
+  redis:
+    container_name: pgis_toolkit_local_redis
+    image: redis:alpine
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - 6379:6379
+    volumes:
+      - ./_redis_data:/var/lib/redis
+      - ./redis/rc.local:/etc/rc.local
   pgadmin:
     image: dpage/pgadmin4
     env_file: ./.envs/.local/.pgadmin
@@ -70,3 +69,15 @@ services:
     restart: always
     depends_on:
       - postgres
+
+  geoserver:
+      image: kartoza/geoserver:2.19.0
+      volumes:
+        - ./geoserver-data:/opt/geoserver/data_dir
+      env_file:
+        - ./.envs/.local/.geoserver
+      ports:
+        - 8080:8080
+      restart: on-failure
+      # networks:
+      #   - changu_nw_prod
