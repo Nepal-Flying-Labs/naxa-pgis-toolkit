@@ -18,6 +18,9 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
+from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
+
+from .serializers import LayerSerializer
 
 
 @api_view(['GET'])
@@ -79,3 +82,60 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+
+class LayerAPIView(APIView):
+    def post(self, request, format=None):
+        request_dict = request.data
+        name = request_dict['name'] if 'name' in request_dict.keys() else None
+        if Layer.active.filter(name=name).exists():
+            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = LayerSerializer(data=request_dict)
+        if serializer.is_valid():
+            created_object = serializer.save()
+            layer_type = created_object.layer_type
+            '''handle Vector layer upload'''
+            if layer_type == "Vector":
+                UploadVectorLayer(created_object.id, request_dict)
+                '''handle Vector layer upload'''
+            elif layer_type == "Raster":
+                UploadRasterLayer(created_object.id, request_dict)
+                '''handle Vector layer upload'''
+            elif layer_type == "WMS":
+                UploadWMSLayer(created_object.id, request_dict)
+            else:
+                Layer.objects.get(id=created_object.id).delete()
+                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
+            created_object.save()
+        return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, pk=None):
+        request.data._mutable=True
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        if 'layer_type' in request_keys:
+            request_dict.pop('layer_type')
+        name = request_dict['name'] if 'name' in request_keys else None
+        if Layer.active.exclude(pk=pk).filter(name=name).exists():
+            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+        layer_instance = Layer.active.get(pk=pk)
+        serializer = LayerSerializer(layer_instance, data=request_dict, partial=True)
+        if serializer.is_valid():
+            created_object = serializer.save()
+            layer_type = Layer.active.get(pk=pk).layer_type
+            '''handle Vector layer update'''
+            if layer_type == "Vector":
+                pass
+                '''handle Vector layer update'''
+            elif layer_type == "Raster":
+                pass
+                '''handle Vector layer upload'''
+            elif layer_type == "WMS":
+                if 'url' in request_keys and request_dict['url'] != "":
+                    wms_instance = WMSLayer.objects.get(layer__id=pk)
+                    wms_instance.url = request_dict['url']
+                    wms_instance.save()
+            else:
+                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
+            created_object.save()
+        return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
