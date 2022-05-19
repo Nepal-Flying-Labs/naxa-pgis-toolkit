@@ -35,6 +35,7 @@ class LayerGroup(IsDeleted,DateTimeStamp):
         app_label = 'maps'
         unique_together = (("theme", "name"),)
 
+
 class Layer(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
     group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_group')
@@ -49,6 +50,14 @@ class Layer(IsDeleted,DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
+class LayerFile(DateTimeStamp):
+    file = models.FileField(upload_to='shapefiles/%Y/%m/%d')
+    layer=models.OneToOneField(Layer,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_file')
+
+    def __str__(self):
+        return str(self.id)
+    class Meta:
+        app_label = 'maps'
 
 class SubLayer(IsDeleted,DateTimeStamp):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')

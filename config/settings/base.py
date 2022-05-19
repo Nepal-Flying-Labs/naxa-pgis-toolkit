@@ -93,7 +93,7 @@ THIRD_PARTY_APPS = [
     # "ordered_model",
     'celery',
     # 'django_celery_beat',
-    # 'django_celery_results'
+    'django_celery_results'
 ]
 
 LOCAL_APPS = [
