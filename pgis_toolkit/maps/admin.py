@@ -18,6 +18,9 @@ class LayerAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('layer_type', 'default_load', 'is_osm_layer')
 
+class LayerFileAdmin(admin.ModelAdmin):
+    list_display=('id','file','layer')
+
 class LayerAttributeAdmin(admin.ModelAdmin):
     list_display = ('id','layer', 'name', 'alias','data_type', 'length','precision','unit')
     search_fields = ('id','layer__id','name','alias','data_type',)
@@ -59,3 +62,4 @@ admin.site.register(Vectorlayer,VectorLayerAdmin)
 admin.site.register(RasterLayer,RasterLayerAdmin)
 admin.site.register(WMSLayer,WMSLayerAdmin)
 admin.site.register(LayerAttribute,LayerAttributeAdmin)
+admin.site.register(LayerFile,LayerFileAdmin)
