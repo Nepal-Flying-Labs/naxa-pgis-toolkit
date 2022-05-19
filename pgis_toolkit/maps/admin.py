@@ -53,6 +53,9 @@ class WMSLayerAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+class FeatureCollectionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer')
+
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(LayerGroup, LayerGroupAdmin)
@@ -63,3 +66,4 @@ admin.site.register(RasterLayer,RasterLayerAdmin)
 admin.site.register(WMSLayer,WMSLayerAdmin)
 admin.site.register(LayerAttribute,LayerAttributeAdmin)
 admin.site.register(LayerFile,LayerFileAdmin)
+admin.site.register(FeatureCollection,FeatureCollectionAdmin)

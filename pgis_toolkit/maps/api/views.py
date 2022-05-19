@@ -1,16 +1,14 @@
-from django.shortcuts import render
-from rest_framework import filters, status, viewsets
+from celery.result import AsyncResult
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-# import environ
-# env = environ.Env()
-# environ.Env.read_env()
-# Create your views here.
 from config.settings.base import env
+from pgis_toolkit.celery_app import app
 from pgis_toolkit.maps.models import (
     Layer,
+    LayerFile,
     LayerGroup,
     RasterLayer,
     SubLayer,
@@ -86,28 +84,45 @@ def project_layers(request,id):
 
 class LayerAPIView(APIView):
     def post(self, request, format=None):
-        request_dict = request.data
-        name = request_dict['name'] if 'name' in request_dict.keys() else None
-        if Layer.active.filter(name=name).exists():
-            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = LayerSerializer(data=request_dict)
-        if serializer.is_valid():
-            created_object = serializer.save()
-            layer_type = created_object.layer_type
-            '''handle Vector layer upload'''
-            if layer_type == "Vector":
-                UploadVectorLayer(created_object.id, request_dict)
-                '''handle Vector layer upload'''
-            elif layer_type == "Raster":
-                UploadRasterLayer(created_object.id, request_dict)
-                '''handle Vector layer upload'''
-            elif layer_type == "WMS":
-                UploadWMSLayer(created_object.id, request_dict)
+        errors=[]
+        try:
+            request_dict = request.data
+            name = request_dict['name'] if 'name' in request_dict.keys() else None
+            if Layer.active.filter(name=name).exists():
+                return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = LayerSerializer(data=request_dict)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                layer_type = created_object.layer_type
+                if layer_type == "Vector":
+                    '''handle Vector layer upload'''
+                    if 'file' in request.FILES and request.FILES.get('file') != "":
+                        layer_file_instance = LayerFile.objects.create(
+                            file=request.FILES['file'],layer=created_object)
+                    else:
+                        Layer.objects.filter(id=layer_id).delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
+                    response=UploadVectorLayer.delay(created_object.id)
+                    return Response(status=200,
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
+                elif layer_type == "Raster":
+                    '''handle Raster layer upload'''
+                    UploadRasterLayer(created_object.id, request_dict)
+                elif layer_type == "WMS":
+                    '''handle WMS layer upload'''
+                    UploadWMSLayer(created_object.id, request_dict)
+                else:
+                    Layer.objects.get(id=created_object.id).delete()
+                    return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
+                return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
-                Layer.objects.get(id=created_object.id).delete()
-                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-            created_object.save()
-        return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def patch(self, request, pk=None):
         request.data._mutable=True
@@ -139,3 +154,18 @@ class LayerAPIView(APIView):
                 return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
             created_object.save()
         return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+def get_layer_upload_task_response(request):
+    task_id = request.query_params.get('task_id', None)
+    result = AsyncResult(task_id, app=app)
+    if result.ready():                     # check task state: true/false
+        try:
+            response, layer_id = result.get()
+            if response == "successful":
+                return Response({"message": response, "layer_id": layer_id}, status=200)
+            else:
+                return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'message': "Please wait result"}, status=200)
