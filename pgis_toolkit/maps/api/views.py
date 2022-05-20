@@ -3,6 +3,9 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import filters, status, viewsets
+from django.db.models import Q
+
 
 from config.settings.base import env
 from pgis_toolkit.celery_app import app
@@ -18,7 +21,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
 
-from .serializers import LayerSerializer, WMSLayerSerializer
+from .serializers import LayerSerializer, WMSLayerSerializer, ThemeSerializer
 
 
 @api_view(['GET'])
@@ -93,7 +96,6 @@ class LayerAPIView(APIView):
             serializer = LayerSerializer(data=request_dict)
             if serializer.is_valid():
                 created_object = serializer.save()
-                print(created_object.id,"idddddddd")
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
                     '''handle Vector layer upload'''
@@ -182,3 +184,52 @@ def get_layer_upload_task_response(request):
         except Exception as e:
             return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
     return Response({'message': "Please wait result"}, status=200)
+
+'''A viewset to create and update Theme objects.'''
+class ThemeViewset(viewsets.ModelViewSet):
+    queryset = Theme.active.all()
+    http_method_names = ['get', 'post', 'patch']
+    serializer_class = ThemeSerializer
+
+    def create(self, request, *args, **kwargs):
+        errors = []
+        try:
+            name = request.data.get('name', None)
+            project = request.data.get('project', None)
+            if Theme.active.filter(Q(project__id=project) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate theme name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        errors = []
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        theme_instance = Theme.active.get(pk=pk)
+        if 'project' in request_keys and request_dict['project'] != "":
+            project = request_dict['project']
+        else:
+            project = theme_instance.project.id
+        if 'name' in request_keys and request_dict['name'] != "":
+            name = request_dict['name']
+            if Theme.active.filter(Q(project__id=project) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate theme name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(theme_instance, request_dict, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            for er in serializer._errors:
+                errors.append(
+                    {'errorName': er, 'details': serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
