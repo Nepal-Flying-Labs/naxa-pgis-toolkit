@@ -5,10 +5,11 @@ from pgis_toolkit.maps.api.views import (
     LayerAPIView,
     LayerVectorTileQuerySet,
     get_layer_upload_task_response,
-    project_layers,
+    project_layers, ThemeViewset
 )
 
 router = DefaultRouter()
+router.register(r'theme', ThemeViewset, basename='theme')
 
 app_name = "projects"
 urlpatterns = [
