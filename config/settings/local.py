@@ -68,4 +68,3 @@ geoserver = Geoserver(env("GEOSERVER_ADDRESS", default='http://localhost:8080/ge
 CELERY_IMPORTS = ['pgis_toolkit.maps.tasks']
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_TIMEZONE = 'Asia/Kathmandu'
-
