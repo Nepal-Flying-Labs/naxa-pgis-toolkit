@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.maps.api.views import (
     LayerAPIView,
+    LayerVectorTileQuerySet,
     get_layer_upload_task_response,
     project_layers, ThemeViewset
 )
@@ -17,4 +18,6 @@ urlpatterns = [
     path('layer/', LayerAPIView.as_view(), name='layer'),
     path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
     path('get_layer_upload_task_response/', get_layer_upload_task_response),
+    path('layer_vectortile/<int:z>/<int:x>/<int:y>/', LayerVectorTileQuerySet.as_view(), name='layer_vectortile')
+
 ]
