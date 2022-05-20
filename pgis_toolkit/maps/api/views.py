@@ -1,4 +1,6 @@
 # from celery.result import AsyncResult
+from django.http import HttpResponse
+from django.views.generic import DetailView, ListView
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -7,6 +9,7 @@ from rest_framework.views import APIView
 from config.settings.base import env
 from pgis_toolkit.celery_app import app
 from pgis_toolkit.maps.models import (
+    FeatureCollection,
     Layer,
     LayerFile,
     LayerGroup,
@@ -17,6 +20,7 @@ from pgis_toolkit.maps.models import (
     WMSLayer,
 )
 from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
+from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
 from .serializers import LayerSerializer, WMSLayerSerializer
 
@@ -182,3 +186,24 @@ def get_layer_upload_task_response(request):
         except Exception as e:
             return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
     return Response({'message': "Please wait result"}, status=200)
+
+
+'''VectorTile Generation for Maps Layer'''
+
+class LayerVectorTileQuerySet(LayerMVTView, DetailView):
+    '''
+    url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=",
+    '''
+    vector_tile_layer_name = None
+    vector_tile_fields = ('pk','layer','attributes')
+
+    def get(self, request, *args, **kwargs):
+        queryset=FeatureCollection.objects.all()
+        request_keys = request.GET.keys()
+        '''filter by layer id'''
+        if 'layer' not in request_keys or request.GET['layer'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        layer_id=request.GET['layer']
+        queryset=queryset.filter(layer=layer_id)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
