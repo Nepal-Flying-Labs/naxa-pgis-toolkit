@@ -1,5 +1,7 @@
 from .base import *  # noqa
 from .base import env
+from geo.Geoserver import Geoserver
+
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -58,6 +60,12 @@ INSTALLED_APPS += ["django_extensions"]  # noqa F405
 
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+# geoserver
+geoserver = Geoserver(env("GEOSERVER_ADDRESS", default='http://localhost:8080/geoserver'),
+                      username=env("GEOSERVER_USERNAME", default='admin'),
+                      password=env("GEOSERVER_PASSWORD", default='geoserver'))
 CELERY_IMPORTS = ['pgis_toolkit.maps.tasks']
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_TIMEZONE = 'Asia/Kathmandu'
+
