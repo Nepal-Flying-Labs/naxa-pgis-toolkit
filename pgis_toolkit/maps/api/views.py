@@ -106,7 +106,6 @@ class LayerAPIView(APIView):
             else:
                 Layer.objects.get(id=created_object.id).delete()
                 return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-            created_object.save()
         return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
 
     def patch(self, request, pk=None):
