@@ -35,7 +35,7 @@ from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectShapeFile,
 )
 from pgis_toolkit.projects.utils.pagination import CustomPageNumberPagination
-from pgis_toolkit.projects.utils.vectortile import *
+from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):

@@ -11,6 +11,7 @@ from django.views import View
 from django.views.generic import DetailView, ListView
 from rest_framework import status, viewsets
 
+from pgis_toolkit.maps.models import FeatureCollection
 # from core.agriculture.agromap_models import FeatureCollection
 from pgis_toolkit.projects.models import ProjectLocationFeatureCollection
 
@@ -255,51 +256,20 @@ class PostgisBaseVectorTile(BaseVectorTileMixin):
             row = cursor.fetchone()[0]
             return row.tobytes() if row else b''
 
-
-# class MVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
-#     pass
-
-
-# class PostGISFeatureView(MVTView, ListView):
-#     model = FeatureCollection
-#     # model = LayerDataCollection
-#     vector_tile_layer_name = "file_data"
-#     vector_tile_fields = ("geometry", "attributes", "layer",)
-
-
-'''
-class PostGISFeatureViewWithManualVectorTileQuerySet(MVTView, DetailView):
-    # vector_tile_layer_name = "file_data"
-    vector_tile_fields = ("attributes",)
-
-    def get(self, request, *args, **kwargs):
-        self.vector_tile_queryset = FeatureCollection.objects.filter(
-            layer=kwargs.get('pk'))
-        # print(self.vector_tile_queryset,"self.vector_tile_queryset")
-        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
-'''
-# added later
-
-
-# class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
-#     pass
-
-# added later
-
-
-# class PostGISFeatureView(LayerMVTView, ListView):
-#     model = LayerDataCollection
-#     # vector_tile_layer_name = "file_data"
-#     vector_tile_fields = ("geometry", "attributes")
-
-
+#Project location MVT View
 class ProjectLocationMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
     pass
-
-# added later
-
 
 class PostGISFeatureView(ProjectLocationMVTView, ListView):
     model = ProjectLocationFeatureCollection
     # vector_tile_layer_name = "file_data"
-    vector_tile_fields = ("geometry", "attributes")
+    vector_tile_fields = ("attributes",)
+
+
+#Layer MVT View
+class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+    pass
+
+class PostGISFeatureView(LayerMVTView, ListView):
+    model = FeatureCollection
+    vector_tile_fields = ("layer", "attributes")
