@@ -13,6 +13,12 @@ class WMSLayerSerializer(serializers.ModelSerializer):
         model = WMSLayer
         fields = '__all__'
 
+class ThemeListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Theme
+        # fields = '__all__'
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
 class ThemeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme
