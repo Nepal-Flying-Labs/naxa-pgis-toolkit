@@ -1,4 +1,4 @@
-# from celery.result import AsyncResult
+from celery.result import AsyncResult
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from rest_framework import status
@@ -25,7 +25,7 @@ from pgis_toolkit.maps.models import (
 from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
-from .serializers import LayerSerializer, WMSLayerSerializer, ThemeSerializer
+from .serializers import LayerSerializer, WMSLayerSerializer, ThemeSerializer, ThemeListSerializer
 
 
 @api_view(['GET'])
@@ -193,8 +193,17 @@ def get_layer_upload_task_response(request):
 '''A viewset to create and update Theme objects.'''
 class ThemeViewset(viewsets.ModelViewSet):
     queryset = Theme.active.all()
+    print(queryset, "is theme queryset")
     http_method_names = ['get', 'post', 'patch']
-    serializer_class = ThemeSerializer
+    default_serializer_class = ThemeSerializer
+
+    serializer_classes = {
+        'list': ThemeListSerializer,
+        'retrieve': ThemeSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def create(self, request, *args, **kwargs):
         errors = []
@@ -239,6 +248,11 @@ class ThemeViewset(viewsets.ModelViewSet):
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
+    def list(self, request, *args, **kwargs):
+        project = request.query_params.get('project', None)
+        queryset = self.queryset.filter(project__id=project) if project else self.queryset
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 '''VectorTile Generation for Maps Layer'''
 
