@@ -13,9 +13,10 @@ from .functions import handleCSV, handleGeoJSON, handleShapeFile
 def UploadVectorLayer(layer_id):
     errors=[]
     try:
-        layer_instance=Layer.active.get(id=layer_id)
-        '''create vector layer instance'''
-        vector_layer_instance=Vectorlayer.objects.get_or_create(layer=layer_instance)
+        print(layer_id,"layer_iddddddddddddddd")
+        layer_instance=Layer.objects.get(id=layer_id)
+        # '''create vector layer instance'''
+        # vector_layer_instance=Vectorlayer.objects.get_or_create(layer=layer_instance)
         layer_file_instance=LayerFile.objects.get(layer=layer_id)
 
         '''Knowing file extension'''
@@ -29,8 +30,8 @@ def UploadVectorLayer(layer_id):
                 return response, None
         elif file_extension == ".csv":
             try:
-                lat_field = request_data.get('lat')
-                lon_field = request_data.get('lon')
+                # lat_field = request_data.get('lat')
+                # lon_field = request_data.get('lon')
                 response = handleCSV(layer_id)
             except Exception as e:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Error Occured', 'Error': str(e)})

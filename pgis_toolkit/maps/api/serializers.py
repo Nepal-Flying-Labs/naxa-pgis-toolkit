@@ -7,3 +7,8 @@ class LayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
         fields = '__all__'
+
+class WMSLayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WMSLayer
+        fields = '__all__'

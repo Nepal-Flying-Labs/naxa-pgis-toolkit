@@ -18,7 +18,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
 
-from .serializers import LayerSerializer
+from .serializers import LayerSerializer, WMSLayerSerializer
 
 
 @api_view(['GET'])
@@ -93,6 +93,7 @@ class LayerAPIView(APIView):
             serializer = LayerSerializer(data=request_dict)
             if serializer.is_valid():
                 created_object = serializer.save()
+                print(created_object.id,"idddddddd")
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
                     '''handle Vector layer upload'''
@@ -100,17 +101,29 @@ class LayerAPIView(APIView):
                         layer_file_instance = LayerFile.objects.create(
                             file=request.FILES['file'],layer=created_object)
                     else:
-                        Layer.objects.filter(id=layer_id).delete()
+                        Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
                     response=UploadVectorLayer.delay(created_object.id)
+                    # return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
+
                 elif layer_type == "Raster":
                     '''handle Raster layer upload'''
                     UploadRasterLayer(created_object.id, request_dict)
+
                 elif layer_type == "WMS":
                     '''handle WMS layer upload'''
-                    UploadWMSLayer(created_object.id, request_dict)
+                    wms_layer_instance=WMSLayer.objects.get(layer=created_object.id)
+                    wms_serializer = WMSLayerSerializer(wms_layer_instance, data=request_dict, partial=True)
+                    if wms_serializer.is_valid():
+                        wms_serializer.save()
+                    else:
+                        for er in wms_serializer._errors:
+                            errors.append(
+                                {'errorName': er, 'details': wms_serializer._errors[er][0]})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                    return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
                 else:
                     Layer.objects.get(id=created_object.id).delete()
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
