@@ -1,13 +1,11 @@
 from celery.result import AsyncResult
+from django.db.models import Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
-from rest_framework import status
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import filters, status, viewsets
-from django.db.models import Q
-
 
 from config.settings.base import env
 from pgis_toolkit.celery_app import app
@@ -22,10 +20,24 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
+from pgis_toolkit.maps.tasks import (
+    UpdateVectorLayer,
+    UploadRasterLayer,
+    UploadVectorLayer,
+    UploadWMSLayer,
+)
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
-from .serializers import LayerSerializer, WMSLayerSerializer, ThemeSerializer, ThemeListSerializer
+from .serializers import (
+    LayerSerializer,
+    LayerUpdateSerializer,
+    SubLayerListSerializer,
+    SubLayerSerializer,
+    SubLayerUpdateSerializer,
+    ThemeListSerializer,
+    ThemeSerializer,
+    WMSLayerSerializer,
+)
 
 
 @api_view(['GET'])
@@ -144,35 +156,69 @@ class LayerAPIView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def patch(self, request, pk=None):
-        request.data._mutable=True
-        request_dict = request.data
-        request_keys = request_dict.keys()
-        if 'layer_type' in request_keys:
-            request_dict.pop('layer_type')
-        name = request_dict['name'] if 'name' in request_keys else None
-        if Layer.active.exclude(pk=pk).filter(name=name).exists():
-            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
-        layer_instance = Layer.active.get(pk=pk)
-        serializer = LayerSerializer(layer_instance, data=request_dict, partial=True)
-        if serializer.is_valid():
-            created_object = serializer.save()
-            layer_type = Layer.active.get(pk=pk).layer_type
-            '''handle Vector layer update'''
-            if layer_type == "Vector":
-                pass
+        errors=[]
+        try:
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            name = request_dict['name'] if 'name' in request_keys else None
+            layer_instance=Layer.active.get(pk=pk)
+            project_id=layer_instance.theme.project.id
+            if Layer.active.exclude(pk=pk).filter(theme__project=project_id,name=name).exists():
+                return Response(data={'message': 'Cannot create duplicate layer names with in project.'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = LayerUpdateSerializer(layer_instance, data=request_dict, partial=True)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                layer_type = layer_instance.layer_type
                 '''handle Vector layer update'''
-            elif layer_type == "Raster":
-                pass
-                '''handle Vector layer upload'''
-            elif layer_type == "WMS":
-                if 'url' in request_keys and request_dict['url'] != "":
-                    wms_instance = WMSLayer.objects.get(layer__id=pk)
-                    wms_instance.url = request_dict['url']
-                    wms_instance.save()
+                if layer_type == "Vector":
+                    response=UpdateVectorLayer(layer_instance,request_dict)
+                    if response=="successful":
+                        return Response(data={'message':response},status=200)
+                    else:
+                        return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
+
+                    '''handle Vector layer update'''
+                elif layer_type == "Raster":
+                    pass
+                    '''handle Vector layer upload'''
+                elif layer_type == "WMS":
+                    if 'url' in request_keys and request_dict['url'] != "":
+                        wms_instance = WMSLayer.objects.get(layer__id=pk)
+                        wms_instance.url = request_dict['url']
+                        wms_instance.save()
+                else:
+                    return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-            created_object.save()
-        return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+class SubLayerViewset(viewsets.ModelViewSet):
+    '''A viewset to get and update Sublayer instance'''
+    queryset = SubLayer.objects.all()
+    http_method_names = ['get', 'patch']
+    default_serializer_class = SubLayerSerializer
+
+    serializer_classes = {
+        'list': SubLayerListSerializer,
+        'partial_update':SubLayerUpdateSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        layer_id = request.query_params.get('layer', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer=layer_id)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
@@ -250,7 +296,9 @@ class ThemeViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         project = request.query_params.get('project', None)
-        queryset = self.queryset.filter(project__id=project) if project else self.queryset
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(project__id=project)
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
@@ -273,4 +321,3 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         queryset=queryset.filter(layer=layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
-

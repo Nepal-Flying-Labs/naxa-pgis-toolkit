@@ -4,12 +4,15 @@ from rest_framework.routers import DefaultRouter
 from pgis_toolkit.maps.api.views import (
     LayerAPIView,
     LayerVectorTileQuerySet,
+    SubLayerViewset,
+    ThemeViewset,
     get_layer_upload_task_response,
-    project_layers, ThemeViewset
+    project_layers,
 )
 
 router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
+router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 
 app_name = "projects"
 urlpatterns = [

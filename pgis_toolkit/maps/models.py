@@ -132,6 +132,7 @@ class WMSLayer(DateTimeStamp):
 
 class FeatureCollection(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
+    sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature")
     attributes=models.JSONField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
 
