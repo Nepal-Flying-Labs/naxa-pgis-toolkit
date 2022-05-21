@@ -28,3 +28,18 @@ class ThemeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme
         fields = '__all__'
+
+class SubLayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubLayer
+        fields = '__all__'
+
+class SubLayerListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubLayer
+        fields = ('id',"name")
+
+class SubLayerUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubLayer
+        fields = ('id','order','icon','icon_size','style')

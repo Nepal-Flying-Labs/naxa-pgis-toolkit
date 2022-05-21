@@ -30,6 +30,9 @@ from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
 from .serializers import (
     LayerSerializer,
+    SubLayerListSerializer,
+    SubLayerSerializer,
+    SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
@@ -187,6 +190,30 @@ class LayerAPIView(APIView):
             # created_object.save()
         return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
 
+
+class SubLayerViewset(viewsets.ModelViewSet):
+    '''A viewset to get and update Sublayer instance'''
+    queryset = SubLayer.objects.all()
+    http_method_names = ['get', 'patch']
+    default_serializer_class = SubLayerSerializer
+
+    serializer_classes = {
+        'list': SubLayerListSerializer,
+        'partial_update':SubLayerUpdateSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        layer_id = request.query_params.get('layer', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer=layer_id)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
     task_id = request.query_params.get('task_id', None)
@@ -263,7 +290,9 @@ class ThemeViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         project = request.query_params.get('project', None)
-        queryset = self.queryset.filter(project__id=project) if project else self.queryset
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(project__id=project)
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
