@@ -54,7 +54,7 @@ class WMSLayerAdmin(admin.ModelAdmin):
         return False
 
 class FeatureCollectionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'layer')
+    list_display = ('id', 'layer','sub_layer')
 
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)

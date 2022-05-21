@@ -13,6 +13,11 @@ class WMSLayerSerializer(serializers.ModelSerializer):
         model = WMSLayer
         fields = '__all__'
 
+class VectorLayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vectorlayer
+        fields = '__all__'
+
 class ThemeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme

@@ -1,13 +1,11 @@
 from celery.result import AsyncResult
+from django.db.models import Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
-from rest_framework import status
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import filters, status, viewsets
-from django.db.models import Q
-
 
 from config.settings.base import env
 from pgis_toolkit.celery_app import app
@@ -22,10 +20,20 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-from pgis_toolkit.maps.tasks import UploadRasterLayer, UploadVectorLayer, UploadWMSLayer
+from pgis_toolkit.maps.tasks import (
+    UpdateVectorLayer,
+    UploadRasterLayer,
+    UploadVectorLayer,
+    UploadWMSLayer,
+)
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
-from .serializers import LayerSerializer, WMSLayerSerializer, ThemeSerializer, ThemeListSerializer
+from .serializers import (
+    LayerSerializer,
+    ThemeListSerializer,
+    ThemeSerializer,
+    WMSLayerSerializer,
+)
 
 
 @api_view(['GET'])
@@ -159,7 +167,12 @@ class LayerAPIView(APIView):
             layer_type = Layer.active.get(pk=pk).layer_type
             '''handle Vector layer update'''
             if layer_type == "Vector":
-                pass
+                response=UpdateVectorLayer(layer_instance,request_dict)
+                if response=="successful":
+                    return Response(data={'message':response},status=200)
+                else:
+                    return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
+
                 '''handle Vector layer update'''
             elif layer_type == "Raster":
                 pass
@@ -170,8 +183,8 @@ class LayerAPIView(APIView):
                     wms_instance.url = request_dict['url']
                     wms_instance.save()
             else:
-                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-            created_object.save()
+                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
+            # created_object.save()
         return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
@@ -273,4 +286,3 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         queryset=queryset.filter(layer=layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
-
