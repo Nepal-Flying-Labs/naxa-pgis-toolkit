@@ -306,7 +306,7 @@ class ThemeViewset(viewsets.ModelViewSet):
 
 class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     '''
-    url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=",
+    url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
     vector_tile_fields = ('pk','layer','attributes')
@@ -319,5 +319,9 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id=request.GET['layer']
         queryset=queryset.filter(layer=layer_id)
+
+        if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
+            sub_layer_id=request.GET['sub_layer']
+            queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
