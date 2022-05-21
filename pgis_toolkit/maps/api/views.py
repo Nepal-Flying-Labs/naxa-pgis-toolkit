@@ -30,6 +30,7 @@ from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
 from .serializers import (
     LayerSerializer,
+    LayerUpdateSerializer,
     SubLayerListSerializer,
     SubLayerSerializer,
     SubLayerUpdateSerializer,
@@ -155,41 +156,46 @@ class LayerAPIView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def patch(self, request, pk=None):
-        request.data._mutable=True
-        request_dict = request.data
-        request_keys = request_dict.keys()
-        if 'layer_type' in request_keys:
-            request_dict.pop('layer_type')
-        name = request_dict['name'] if 'name' in request_keys else None
-        if Layer.active.exclude(pk=pk).filter(name=name).exists():
-            return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
-        layer_instance = Layer.active.get(pk=pk)
-        serializer = LayerSerializer(layer_instance, data=request_dict, partial=True)
-        if serializer.is_valid():
-            created_object = serializer.save()
-            layer_type = Layer.active.get(pk=pk).layer_type
-            '''handle Vector layer update'''
-            if layer_type == "Vector":
-                response=UpdateVectorLayer(layer_instance,request_dict)
-                if response=="successful":
-                    return Response(data={'message':response},status=200)
-                else:
-                    return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
-
+        errors=[]
+        try:
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            name = request_dict['name'] if 'name' in request_keys else None
+            layer_instance=Layer.active.get(pk=pk)
+            project_id=layer_instance.theme.project.id
+            if Layer.active.exclude(pk=pk).filter(theme__project=project_id,name=name).exists():
+                return Response(data={'message': 'Cannot create duplicate layer names with in project.'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = LayerUpdateSerializer(layer_instance, data=request_dict, partial=True)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                layer_type = layer_instance.layer_type
                 '''handle Vector layer update'''
-            elif layer_type == "Raster":
-                pass
-                '''handle Vector layer upload'''
-            elif layer_type == "WMS":
-                if 'url' in request_keys and request_dict['url'] != "":
-                    wms_instance = WMSLayer.objects.get(layer__id=pk)
-                    wms_instance.url = request_dict['url']
-                    wms_instance.save()
-            else:
-                return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
-            # created_object.save()
-        return Response(data={'message': 'Layer Updated', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                if layer_type == "Vector":
+                    response=UpdateVectorLayer(layer_instance,request_dict)
+                    if response=="successful":
+                        return Response(data={'message':response},status=200)
+                    else:
+                        return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
+                    '''handle Vector layer update'''
+                elif layer_type == "Raster":
+                    pass
+                    '''handle Vector layer upload'''
+                elif layer_type == "WMS":
+                    if 'url' in request_keys and request_dict['url'] != "":
+                        wms_instance = WMSLayer.objects.get(layer__id=pk)
+                        wms_instance.url = request_dict['url']
+                        wms_instance.save()
+                else:
+                    return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
