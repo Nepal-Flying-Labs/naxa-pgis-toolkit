@@ -106,6 +106,8 @@ class LayerAPIView(APIView):
         errors=[]
         try:
             request_dict = request.data
+            request_dict._mutable=True
+            # print(request_dict,"ewvfbhjbjh")
             name = request_dict['name'] if 'name' in request_dict.keys() else None
             if Layer.active.filter(name=name).exists():
                 return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -121,7 +123,8 @@ class LayerAPIView(APIView):
                     else:
                         Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
-                    response=UploadVectorLayer.delay(created_object.id)
+                    request_dict.pop('file')
+                    response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
