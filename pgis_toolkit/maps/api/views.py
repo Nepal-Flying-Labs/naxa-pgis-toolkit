@@ -123,8 +123,8 @@ class LayerAPIView(APIView):
                         Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
                     request_dict.pop('file')
-                    response=UploadVectorLayer.delay(created_object.id,request_dict)
-                    # return Response(response)
+                    response=UploadVectorLayer(created_object.id,request_dict)
+                    return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
 
