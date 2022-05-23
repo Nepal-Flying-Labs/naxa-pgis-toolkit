@@ -76,7 +76,7 @@ def project_layers(request,id):
             for layer in layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
-                    print(layer.id,layer.layer_type)
+                    # print(layer.id,layer.layer_type)
                     layer_detail_instance=Vectorlayer.objects.get(layer=layer.id)
                     sub_layer_list=[]
                     sub_layer_qs=SubLayer.active.filter(layer=layer.id)
@@ -106,6 +106,7 @@ class LayerAPIView(APIView):
         errors=[]
         try:
             request_dict = request.data
+            request_dict._mutable = True
             name = request_dict['name'] if 'name' in request_dict.keys() else None
             if Layer.active.filter(name=name).exists():
                 return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -128,7 +129,16 @@ class LayerAPIView(APIView):
 
                 elif layer_type == "Raster":
                     '''handle Raster layer upload'''
-                    UploadRasterLayer(created_object.id, request_dict)
+                    if 'file' in request_dict.keys() and request_dict['file'] != "":
+                        LayerFile.objects.create(file=request_dict['file'], layer=created_object)
+                    else:
+                        Layer.objects.filter(id=created_object.id).delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
+                    request_dict.pop('file')
+                    response = UploadRasterLayer.delay(created_object.id, request_dict)
+                    # return Response(response)
+                    return Response(status=200,
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
 
                 elif layer_type == "WMS":
                     '''handle WMS layer upload'''
@@ -239,7 +249,6 @@ def get_layer_upload_task_response(request):
 '''A viewset to create and update Theme objects.'''
 class ThemeViewset(viewsets.ModelViewSet):
     queryset = Theme.active.all()
-    print(queryset, "is theme queryset")
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ThemeSerializer
 

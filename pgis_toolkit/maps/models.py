@@ -51,7 +51,7 @@ class Layer(IsDeleted,DateTimeStamp):
         app_label = 'maps'
 
 class LayerFile(DateTimeStamp):
-    file = models.FileField(upload_to='shapefiles/%Y/%m/%d')
+    file = models.FileField(upload_to='geofiles/%Y/%m/%d')
     layer=models.OneToOneField(Layer,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_file')
 
     def __str__(self):
@@ -114,8 +114,7 @@ class RasterLayer(DateTimeStamp):
         max_length=100, blank=True, null=True)
     geoserver_layer_name = models.CharField(
         max_length=100, blank=True, null=True)
-    sld=models.TextField(
-        max_length=250, blank=True, null=True)
+    sld=models.TextField(blank=True, null=True)
 
     class Meta:
         app_label = 'maps'

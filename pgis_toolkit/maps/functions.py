@@ -289,3 +289,12 @@ def handleGeoJSON(shapefile_id, layer_id, dataset_name, user_id, data_type):
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
+
+#function to clear files in a specific directory
+def clear_dir(dir):
+    for files in os.listdir(dir):
+        path = os.path.join(dir, files)
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            os.remove(path)
