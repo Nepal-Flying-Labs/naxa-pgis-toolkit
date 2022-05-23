@@ -30,6 +30,14 @@ def geoserver_layer_publish(layer_instance):
     connection_db = create_engine(env("CONNECTION_DB"))
     table_name = layer_instance.name.replace(" ", "")
     try:
+        '''creating workspace named pgis if '''
+        workspaces = geoserver.get_workspaces()
+        workspaces_list = []
+        for data in workspaces["workspaces"]["workspace"]:
+            workspaces_list.append(data['name'])
+        if not "pgis" in workspaces_list:
+            # For creating workspace
+            geoserver.create_workspace(workspace="pgis")
         '''publishing layer in geoserver'''
         geoserver.create_featurestore(store_name=table_name,
                                       workspace='pgis',
