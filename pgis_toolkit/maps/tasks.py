@@ -22,7 +22,7 @@ from .functions import handleCSV, handleGeoJSON, handleShapeFile
 
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def UploadVectorLayer(layer_id):
+def UploadVectorLayer(layer_id,request_data):
     print("entered UploadVectorLayer")
     errors=[]
     try:
@@ -39,12 +39,18 @@ def UploadVectorLayer(layer_id):
             else:
                 return response, None
         elif file_extension == ".csv":
-            try:
-                # lat_field = request_data.get('lat')
-                # lon_field = request_data.get('lon')
-                response = handleCSV(layer_id)
-            except Exception as e:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured2', 'error': str(e)})
+            # try:
+            lat_field = request_data.get('lat_field')
+            lon_field = request_data.get('lon_field')
+            if not lat_field or not lon_field:
+                return "error occured: lat_field and lon_field are required" ,None
+            response = handleCSV(layer_id,lat_field,lon_field)
+            if response=="successful":
+                return "successful", layer_id
+            else:
+                return response, None
+            # except Exception as e:
+            #     return 'Error Occured: '+str(e),None
 
         elif file_extension == ".geojson":
             response = handleGeoJSON(layer_id)

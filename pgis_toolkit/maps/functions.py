@@ -248,10 +248,10 @@ def handleShapeFile(layer_id):
 
 
 # @shared_task(max_retries=1, soft_time_limit=8000)
-def handleCSV(shapefile_id, layer_id, dataset_name, lat_field, lon_field, user_id, data_type):
+def handleCSV(layer_id,lat_field,lon_field):
     try:
-        layer_object = Layer.objects.get(id=layer_id)
-        file_object = Shapefile.objects.get(id=shapefile_id)
+        layer_instance = Layer.objects.get(id=layer_id)
+        file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
         df = pd.read_csv(my_file, keep_default_na=False)
@@ -262,13 +262,13 @@ def handleCSV(shapefile_id, layer_id, dataset_name, lat_field, lon_field, user_i
 
         '''saving geometry type'''
         geom_type = "Point"
-        layer_object.geom_type = "Point"
-        layer_object.save()
+        layer_instance.geom_type = "Point"
+        layer_instance.save()
 
         geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
 
         response = upload_feature(
-            geodataframe, layer_object, shapefile_id, dataset_name, user_id, data_type, geom_type)
+            geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
