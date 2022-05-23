@@ -49,11 +49,12 @@ def UploadVectorLayer(layer_id,request_data):
                 return "successful", layer_id
             else:
                 return response, None
-            # except Exception as e:
-            #     return 'Error Occured: '+str(e),None
-
         elif file_extension == ".geojson":
             response = handleGeoJSON(layer_id)
+            if response=="successful":
+                return "successful", layer_id
+            else:
+                return response, None
         else:
             return 'Error Occured: Invalid file extension', None
 

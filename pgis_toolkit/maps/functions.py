@@ -247,7 +247,6 @@ def handleShapeFile(layer_id):
         return ("error occured : " + str(e))
 
 
-# @shared_task(max_retries=1, soft_time_limit=8000)
 def handleCSV(layer_id,lat_field,lon_field):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
@@ -275,11 +274,10 @@ def handleCSV(layer_id,lat_field,lon_field):
         return ("error occured : " + str(e))
 
 
-# @shared_task(max_retries=1, soft_time_limit=8000)
-def handleGeoJSON(shapefile_id, layer_id, dataset_name, user_id, data_type):
+def handleGeoJSON(layer_id):
     try:
-        layer_object = Layer.objects.get(id=layer_id)
-        file_object = Shapefile.objects.get(id=shapefile_id)
+        layer_instance = Layer.objects.get(id=layer_id)
+        file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
         geodataframe = gpd.read_file(my_file)
@@ -323,11 +321,11 @@ def handleGeoJSON(shapefile_id, layer_id, dataset_name, user_id, data_type):
             return (f"error occured : missing geometry")
 
         '''save geometry type'''
-        layer_object.geom_type = geom_type
-        layer_object.save()
+        layer_instance.geom_type = geom_type
+        layer_instance.save()
 
         response = upload_feature(
-            geodataframe, layer_object, shapefile_id, dataset_name, user_id, data_type, geom_type)
+            geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
