@@ -4,6 +4,7 @@ from celery import Celery, shared_task
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
 
+from config.settings.local import geoserver
 from pgis_toolkit.maps.api.serializers import (
     VectorLayerSerializer,
     VectorLayerUpdateSerializer
@@ -21,7 +22,8 @@ from .functions import handleCSV, handleGeoJSON, handleShapeFile
 
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def UploadVectorLayer(layer_id):
+def UploadVectorLayer(layer_id,request_data):
+    print("entered UploadVectorLayer")
     errors=[]
     try:
         layer_instance=Layer.objects.get(id=layer_id)
@@ -37,19 +39,27 @@ def UploadVectorLayer(layer_id):
             else:
                 return response, None
         elif file_extension == ".csv":
-            try:
-                # lat_field = request_data.get('lat')
-                # lon_field = request_data.get('lon')
-                response = handleCSV(layer_id)
-            except Exception as e:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Error Occured', 'Error': str(e)})
-
+            # try:
+            lat_field = request_data.get('lat_field')
+            lon_field = request_data.get('lon_field')
+            if not lat_field or not lon_field:
+                return "error occured: lat_field and lon_field are required" ,None
+            response = handleCSV(layer_id,lat_field,lon_field)
+            if response=="successful":
+                return "successful", layer_id
+            else:
+                return response, None
         elif file_extension == ".geojson":
             response = handleGeoJSON(layer_id)
+            if response=="successful":
+                return "successful", layer_id
+            else:
+                return response, None
         else:
             return 'Error Occured: Invalid file extension', None
 
     except Exception as e:
+        Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured: '+ str(errors), None
         # return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': errors})
@@ -57,6 +67,7 @@ def UploadVectorLayer(layer_id):
 
 def UpdateVectorLayer(layer_instance, request_data):
     try:
+        # geoserver.create_workspace(workspace="custom_workspace")
         errors=[]
         vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
         vector_layer_serializer = VectorLayerUpdateSerializer(vector_layer_instance, data=request_data, partial=True)
