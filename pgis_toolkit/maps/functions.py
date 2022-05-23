@@ -330,3 +330,12 @@ def handleGeoJSON(layer_id):
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
+
+#function to clear files in a specific directory
+def clear_dir(dir):
+    for files in os.listdir(dir):
+        path = os.path.join(dir, files)
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            os.remove(path)

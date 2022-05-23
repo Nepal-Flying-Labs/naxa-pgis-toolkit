@@ -23,6 +23,11 @@ class VectorLayerSerializer(serializers.ModelSerializer):
         model = Vectorlayer
         fields = '__all__'
 
+class RasterLayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RasterLayer
+        fields = '__all__'
+        
 class VectorLayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vectorlayer
