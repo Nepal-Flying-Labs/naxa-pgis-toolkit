@@ -5,4 +5,9 @@ IPYTHONDIR=/app/.ipython
 URL=http://0.0.0.0:8000
 CELERY_BROKER_URL=redis://redis//
 DJANGO_SECRET_KEY="4kB9ZhkXY3FNuQfd4kNEAX5AeF6sCzg9nFfWmwIu9oBAepjQrBEt3VpDBjJQh60k"
+
+#geoserver settings
 GEOSERVER_ADDRESS=http://geoserver:8080/geoserver
+GEOSERVER_USERNAME=admin
+GEOSERVER_PASSWORD=geoserver
+CONNECTION_DB=postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@db/changu_db

@@ -2,6 +2,7 @@ import glob
 import os
 import shutil
 import zipfile
+from distutils.command.config import config
 
 import geopandas as gpd
 import pandas as pd
@@ -15,9 +16,46 @@ from shapely.geometry import (
     Point,
     Polygon,
 )
+from sqlalchemy import create_engine
+
+from config.settings.base import env
+from config.settings.local import geoserver
 
 from .models import FeatureCollection, Layer, LayerAttribute, LayerFile, Vectorlayer
 
+
+def geoserver_layer_publish(layer_instance):
+    print("geoserver layer publish called")
+    '''Geoserver layer publish'''
+    connection_db = create_engine(env("CONNECTION_DB"))
+    table_name = layer_instance.name.replace(" ", "")
+    try:
+        '''publishing layer in geoserver'''
+        geoserver.create_featurestore(store_name=table_name,
+                                      workspace='pgis',
+                                      db=env("POSTGRES_DB",
+                                             default='postgres'),
+                                      host=env("POSTGRES_HOST",
+                                               default='localhost'),
+                                      pg_user=env(
+                                          "POSTGRES_USER", default='postgres'),
+                                      pg_password=env(
+                                          "POSTGRES_PASSWORD", default='postgres'),
+                                      schema='public')
+
+        sql = f'SELECT * FROM maps_featurecollection WHERE layer_id = {layer_instance.id}'
+        geoserver.publish_featurestore_sqlview(store_name=table_name, name=table_name, sql=sql, workspace='pgis')
+
+        vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
+        vector_layer_instance.geoserver_workspace = "pgis"
+        vector_layer_instance.geoserver_layer_name = table_name
+        vector_layer_instance.save()
+        return "successful"
+
+    except Exception as e:
+        print(str(e),"geo error")
+        Layer.objects.filter(id=layer_instance.id).delete()
+        return str(e)
 
 def get_geometry(geometry, geom_type):
     try:
@@ -124,15 +162,12 @@ def upload_feature(geodataframe, layer_instance, geom_type):
         except Exception as e:
             Layer.objects.filter(id=layer_id).delete()
             return ("attribute_error : "+str(e))
-        return "successful"
+
         # '''Geoserver layer publish'''
-        # response, layer_id = geoserver_layer_publish(
-        #     dataset_name, layer_instance, 'maps_datacollection', layer_id)
-        # if response == "successful":
-        #     return "successful", layer_id
-        # else:
+        response = geoserver_layer_publish(layer_instance)
+        # if not response == "successful":
         #     Layer.objects.filter(id=layer_id).delete()
-        #     return response, None
+        return response
 
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()

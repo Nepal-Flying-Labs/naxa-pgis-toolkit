@@ -63,3 +63,6 @@ requests==2.27.1
 seaborn==0.11.2
 matplotlib==3.5.2
 xmltodict==0.13.0
+
+SQLAlchemy==1.4.36
+greenlet==1.1.2
