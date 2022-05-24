@@ -6,8 +6,13 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from sqlalchemy import create_engine
+import geopandas
+import pandas
+import os
+import shutil
 
-from config.settings.base import env
+from config.settings.base import env, MEDIA_ROOT
 from pgis_toolkit.celery_app import app
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -28,7 +33,7 @@ from pgis_toolkit.maps.tasks import (
     UploadWMSLayer,
 )
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
-
+from pgis_toolkit.maps.functions import clear_dir
 from .serializers import (
     LayerSerializer,
     LayerUpdateSerializer,
@@ -337,3 +342,52 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+
+@api_view(['GET'])
+def layer_download(request):
+    layer_id = request.query_params.get('layer_id', None)
+    output_format = request.query_params.get('output_format', None)
+    output_format_choices = ['shapefile', 'geojson', 'csv', 'kml', 'gpx']
+    '''ensuring request is valid'''
+    if not layer_id or layer_id == "" or not output_format or output_format == "":
+        return Response(data={'message': 'layer_id and output format params are compulsory.'}, status=status.HTTP_400_BAD_REQUEST)
+    if output_format not in output_format_choices:
+        return Response(data={'message': 'Unsupported format. Only shapefile, geojson, csv, kml and gpx are supported.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not Layer.active.filter(id=layer_id).exists():
+        return Response(data={'message': 'The layer_id matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
+    layer_instance = Layer.active.get(id=layer_id)
+    if layer_instance.layer_type != "Vector":
+        return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
+    '''download in shapefile format'''
+    try:
+        if output_format == "shapefile":
+            db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+            con = create_engine(db_connection_url)  
+            sql = "SELECT geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+            df = geopandas.read_postgis(sql, con)
+            # attributes_df = df.iloc[:, [1]]
+            os.makedirs(MEDIA_ROOT + '/download', exist_ok=True)
+            df.to_file(MEDIA_ROOT+"/download/"+layer_instance.name+".shp")
+            # create a ZipFile
+            zipfile_path = MEDIA_ROOT + \
+                f'download/{layer_instance.name}'
+            files = MEDIA_ROOT + '/download'
+            shutil.make_archive(zipfile_path, 'zip', files)
+            # zip file path
+            file_url = MEDIA_ROOT + \
+                f'download/{layer_instance.name}.zip'
+            # downloading zip file
+            zip_file = open(file_url, 'rb')
+            response = HttpResponse(
+                zip_file, content_type='application/force-download')
+            response[
+                'Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.zip'
+            '''clearing the dir'''
+            clear_dir(MEDIA_ROOT+'/download/')
+            clear_dir(MEDIA_ROOT+'/../mediadownload/')
+            return response
+    except Exception as e:
+        clear_dir(MEDIA_ROOT+'/download/')
+        clear_dir(MEDIA_ROOT+'/../mediadownload/')
+        return Response(status=404, data={'Error': str(e)})

@@ -270,6 +270,7 @@ tags
 
 ### Project template
 pgis_toolkit/media/
+pgis_toolkit/mediadownload/
 #Geoserver data
 geoserver-data
 

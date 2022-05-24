@@ -7,7 +7,7 @@ from pgis_toolkit.maps.api.views import (
     SubLayerViewset,
     ThemeViewset,
     get_layer_upload_task_response,
-    project_layers,
+    project_layers, layer_download
 )
 
 router = DefaultRouter()
@@ -21,6 +21,7 @@ urlpatterns = [
     path('layer/', LayerAPIView.as_view(), name='layer'),
     path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
     path('get_layer_upload_task_response/', get_layer_upload_task_response),
-    path('layer_vectortile/<int:z>/<int:x>/<int:y>/', LayerVectorTileQuerySet.as_view(), name='layer_vectortile')
+    path('layer_vectortile/<int:z>/<int:x>/<int:y>/', LayerVectorTileQuerySet.as_view(), name='layer_vectortile'),
+    path('layer_download/', layer_download, name='layer_download')
 
 ]
