@@ -11,6 +11,7 @@ import geopandas
 import pandas
 import os
 import shutil
+import fiona
 
 from config.settings.base import env, MEDIA_ROOT
 from pgis_toolkit.celery_app import app
@@ -359,35 +360,57 @@ def layer_download(request):
     layer_instance = Layer.active.get(id=layer_id)
     if layer_instance.layer_type != "Vector":
         return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
-    '''download in shapefile format'''
+    '''connect to database and pull required data'''
     try:
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)  
+        sql = "SELECT geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        gdf = geopandas.read_postgis(sql, con)
+        attributes_df = gdf.iloc[:, [1]]
+        # os.makedirs(MEDIA_ROOT + '/download', exist_ok=True)
+        os.makedirs(MEDIA_ROOT + '/../mediadownload', exist_ok=True)
+        dir = MEDIA_ROOT+"/../mediadownload/"
+        '''pack data in different formats'''
         if output_format == "shapefile":
-            db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-            con = create_engine(db_connection_url)  
-            sql = "SELECT geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
-            df = geopandas.read_postgis(sql, con)
-            # attributes_df = df.iloc[:, [1]]
-            os.makedirs(MEDIA_ROOT + '/download', exist_ok=True)
-            df.to_file(MEDIA_ROOT+"/download/"+layer_instance.name+".shp")
+            gdf.to_file(dir+layer_instance.name+".shp") 
             # create a ZipFile
-            zipfile_path = MEDIA_ROOT + \
-                f'download/{layer_instance.name}'
-            files = MEDIA_ROOT + '/download'
+            zipfile_path = MEDIA_ROOT+"/../mediadownload/" + f'{layer_instance.name}'
+            files = dir
             shutil.make_archive(zipfile_path, 'zip', files)
             # zip file path
-            file_url = MEDIA_ROOT + \
-                f'download/{layer_instance.name}.zip'
-            # downloading zip file
-            zip_file = open(file_url, 'rb')
-            response = HttpResponse(
-                zip_file, content_type='application/force-download')
-            response[
-                'Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.zip'
-            '''clearing the dir'''
-            clear_dir(MEDIA_ROOT+'/download/')
-            clear_dir(MEDIA_ROOT+'/../mediadownload/')
-            return response
+            file_url = dir + f'{layer_instance.name}.zip'
+        elif output_format == "geojson":
+            gdf.to_file(dir+layer_instance.name+".geojson", driver='GeoJSON')
+            file_url = dir + f'{layer_instance.name}.geojson'
+        elif output_format == "csv":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
+            gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
+            # print(gdf.assign(geometry=gdf["geom"].apply(lambda p: p.wkt)).to_csv(), " is csv")
+            file_url = dir + f'{layer_instance.name}.csv'
+        elif output_format == "kml":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
+            gdf.to_file(dir+layer_instance.name+".kml", driver='KML')
+            file_url = dir + f'{layer_instance.name}.kml'
+        elif output_format == "gpx":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['GPX'] = 'rw'
+            gdf.to_file(dir + layer_instance.name+".gpx", driver='GPX', GPX_USE_EXTENSIONS='YES')
+            file_url = dir + f'{layer_instance.name}.gpx'
+            '''prompt download'''
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        if output_format == "shapefile":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.zip'
+        elif output_format == "geojson":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.geojson'
+        elif output_format == "csv":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.csv'
+        elif output_format == "kml":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.kml'
+        elif output_format == "gpx":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.gpx'
+        '''clearing the dir'''
+        clear_dir(dir)
+        return response
     except Exception as e:
-        clear_dir(MEDIA_ROOT+'/download/')
-        clear_dir(MEDIA_ROOT+'/../mediadownload/')
+        clear_dir(dir)
         return Response(status=404, data={'Error': str(e)})
