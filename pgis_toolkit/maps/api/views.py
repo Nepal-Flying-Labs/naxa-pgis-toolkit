@@ -362,19 +362,23 @@ def layer_download(request):
         return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
     '''connect to database and pull required data'''
     try:
+        dir = MEDIA_ROOT+"/../mediadownload/"
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)  
-        sql = "SELECT geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        sql = "SELECT id, geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
-        attributes_df = gdf.iloc[:, [1]]
-        # os.makedirs(MEDIA_ROOT + '/download', exist_ok=True)
+        number_df = pandas.DataFrame(gdf['id'])
+        attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+        '''remove the attributes dictionary now'''
+        gdf = gdf.drop(columns=['attributes'])
+        attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+        gdf=gdf.merge(attribute_number_df, on='id')
         os.makedirs(MEDIA_ROOT + '/../mediadownload', exist_ok=True)
-        dir = MEDIA_ROOT+"/../mediadownload/"
         '''pack data in different formats'''
         if output_format == "shapefile":
             gdf.to_file(dir+layer_instance.name+".shp") 
             # create a ZipFile
-            zipfile_path = MEDIA_ROOT+"/../mediadownload/" + f'{layer_instance.name}'
+            zipfile_path = dir + f'{layer_instance.name}'
             files = dir
             shutil.make_archive(zipfile_path, 'zip', files)
             # zip file path
