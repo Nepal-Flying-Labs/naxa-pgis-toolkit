@@ -347,6 +347,10 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
 
 @api_view(['GET'])
 def layer_download(request):
+    '''
+    http://localhost:8000/api/maps/layer_download/?layer_id=200&output_format=shapefile
+    choices:'shapefile', 'geojson', 'csv', 'kml', 'gpx'
+    '''
     layer_id = request.query_params.get('layer_id', None)
     output_format = request.query_params.get('output_format', None)
     output_format_choices = ['shapefile', 'geojson', 'csv', 'kml', 'gpx']
