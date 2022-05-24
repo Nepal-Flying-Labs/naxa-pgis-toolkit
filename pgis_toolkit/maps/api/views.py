@@ -1,6 +1,6 @@
 from celery.result import AsyncResult
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
@@ -27,8 +27,8 @@ from pgis_toolkit.maps.models import (
     WMSLayer,
 )
 from pgis_toolkit.maps.tasks import (
-    UpdateVectorLayer,
     UpdateRasterLayer,
+    UpdateVectorLayer,
     UploadRasterLayer,
     UploadVectorLayer,
     UploadWMSLayer,
@@ -109,6 +109,48 @@ def project_layers(request,id):
 
 
 class LayerAPIView(APIView):
+    def get_object(self, pk):
+        try:
+            return Layer.objects.get(pk=pk)
+        except Layer.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk, format=None):
+        '''
+        http://0.0.0.0:8000/api/maps/layer/<layer_id>/
+        '''
+        try:
+            if not pk:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "pk is missing"})
+            layer_instance = self.get_object(pk)
+            results={}
+            '''layer detail'''
+            layer_keys=['id','name','default_load','layer_type','is_osm_layer']
+            for key in layer_keys:
+                results[key]=layer_instance.__dict__[key]
+            results['theme']=layer_instance.theme.id if layer_instance.theme else None
+            results['group']=layer_instance.group.id if layer_instance.group else None
+
+            '''Corressponding layer detail'''
+            if layer_instance.layer_type=="Vector":
+                vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
+                vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'icon', 'icon_size', 'show_label', 'label_field', 'label_style']
+                for key in vector_layer_keys:
+                    results[key]=vector_layer_instance.__dict__[key]
+            elif layer_instance.layer_type=="Raster":
+                raster_layer_instance=RasterLayer.objects.get(layer=layer_instance.id)
+                raster_layer_keys=['geoserver_workspace', 'geoserver_layer_name']
+                for key in raster_layer_keys:
+                    results[key]=raster_layer_instance.__dict__[key]
+            elif layer_instance.layer_type=="WMS":
+                wms_layer_instance=WMSLayer.objects.get(layer=layer_instance.id)
+                wms_layer_keys=['url']
+                for key in wms_layer_keys:
+                    results[key]=wms_layer_instance.__dict__[key]
+            return Response(results,status=200)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occurred', 'error': str(e)})
+
     def post(self, request, format=None):
         errors=[]
         try:
@@ -215,6 +257,7 @@ class LayerAPIView(APIView):
         except Exception as e:
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
