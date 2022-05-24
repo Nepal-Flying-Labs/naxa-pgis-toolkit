@@ -6,8 +6,14 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from sqlalchemy import create_engine
+import geopandas
+import pandas
+import os
+import shutil
+import fiona
 
-from config.settings.base import env
+from config.settings.base import env, MEDIA_ROOT
 from pgis_toolkit.celery_app import app
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -28,7 +34,7 @@ from pgis_toolkit.maps.tasks import (
     UploadWMSLayer,
 )
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
-
+from pgis_toolkit.maps.functions import clear_dir
 from .serializers import (
     LayerSerializer,
     LayerUpdateSerializer,
@@ -380,3 +386,82 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+
+@api_view(['GET'])
+def layer_download(request):
+    '''
+    http://localhost:8000/api/maps/layer_download/?layer_id=200&output_format=shapefile
+    choices:'shapefile', 'geojson', 'csv', 'kml', 'gpx'
+    '''
+    layer_id = request.query_params.get('layer_id', None)
+    output_format = request.query_params.get('output_format', None)
+    output_format_choices = ['shapefile', 'geojson', 'csv', 'kml', 'gpx']
+    '''ensuring request is valid'''
+    if not layer_id or layer_id == "" or not output_format or output_format == "":
+        return Response(data={'message': 'layer_id and output format params are compulsory.'}, status=status.HTTP_400_BAD_REQUEST)
+    if output_format not in output_format_choices:
+        return Response(data={'message': 'Unsupported format. Only shapefile, geojson, csv, kml and gpx are supported.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not Layer.active.filter(id=layer_id).exists():
+        return Response(data={'message': 'The layer_id matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
+    layer_instance = Layer.active.get(id=layer_id)
+    if layer_instance.layer_type != "Vector":
+        return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
+    '''connect to database and pull required data'''
+    try:
+        dir = MEDIA_ROOT+"/../mediadownload/"
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)  
+        sql = "SELECT id, geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        gdf = geopandas.read_postgis(sql, con)
+        number_df = pandas.DataFrame(gdf['id'])
+        attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+        '''remove the attributes dictionary now'''
+        gdf = gdf.drop(columns=['attributes'])
+        attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+        gdf=gdf.merge(attribute_number_df, on='id')
+        os.makedirs(MEDIA_ROOT + '/../mediadownload', exist_ok=True)
+        '''pack data in different formats'''
+        if output_format == "shapefile":
+            gdf.to_file(dir+layer_instance.name+".shp") 
+            # create a ZipFile
+            zipfile_path = dir + f'{layer_instance.name}'
+            files = dir
+            shutil.make_archive(zipfile_path, 'zip', files)
+            # zip file path
+            file_url = dir + f'{layer_instance.name}.zip'
+        elif output_format == "geojson":
+            gdf.to_file(dir+layer_instance.name+".geojson", driver='GeoJSON')
+            file_url = dir + f'{layer_instance.name}.geojson'
+        elif output_format == "csv":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
+            gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
+            # print(gdf.assign(geometry=gdf["geom"].apply(lambda p: p.wkt)).to_csv(), " is csv")
+            file_url = dir + f'{layer_instance.name}.csv'
+        elif output_format == "kml":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
+            gdf.to_file(dir+layer_instance.name+".kml", driver='KML')
+            file_url = dir + f'{layer_instance.name}.kml'
+        elif output_format == "gpx":
+            geopandas.io.file.fiona.drvsupport.supported_drivers['GPX'] = 'rw'
+            gdf.to_file(dir + layer_instance.name+".gpx", driver='GPX', GPX_USE_EXTENSIONS='YES')
+            file_url = dir + f'{layer_instance.name}.gpx'
+            '''prompt download'''
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        if output_format == "shapefile":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.zip'
+        elif output_format == "geojson":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.geojson'
+        elif output_format == "csv":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.csv'
+        elif output_format == "kml":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.kml'
+        elif output_format == "gpx":
+            response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.gpx'
+        '''clearing the dir'''
+        clear_dir(dir)
+        return response
+    except Exception as e:
+        clear_dir(dir)
+        return Response(status=404, data={'Error': str(e)})
