@@ -22,6 +22,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.tasks import (
     UpdateVectorLayer,
+    UpdateRasterLayer,
     UploadRasterLayer,
     UploadVectorLayer,
     UploadWMSLayer,
@@ -190,7 +191,8 @@ class LayerAPIView(APIView):
 
                     '''handle Vector layer update'''
                 elif layer_type == "Raster":
-                    pass
+                    response = UpdateRasterLayer.delay(pk, request_dict)
+                    return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
                     '''handle Vector layer upload'''
                 elif layer_type == "WMS":
                     if 'url' in request_keys and request_dict['url'] != "":

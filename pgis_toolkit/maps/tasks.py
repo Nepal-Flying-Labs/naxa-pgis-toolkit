@@ -171,6 +171,36 @@ def UploadRasterLayer(layer_id, request_dict):
         layer_file_instance.delete()
         return str(e), None
 
+@shared_task(max_retries=1, soft_time_limit=8000)
+def UpdateRasterLayer(layer_id, request_dict):
+    from pgis_toolkit.maps.models import Layer, RasterLayer
+    from config.settings.local import geoserver
+    from config.settings.base import MEDIA_ROOT
+    from django.core.files import File
+    '''update sld of raster layer'''
+    try:
+        layer_instance = Layer.active.get(pk=layer_id)
+        raster_layer_instance = RasterLayer.objects.get(layer=layer_id)
+        if 'sld' in request_dict.keys() and request_dict['sld'] != '':
+            raster_layer_instance.sld = request_dict['sld']
+            raster_layer_instance.save()
+            geoserver.delete_style(style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
+            os.makedirs(MEDIA_ROOT + "/raster_layer_sld", exist_ok=True)
+            sld_content = raster_layer_instance.sld
+            f = open(MEDIA_ROOT + "/raster_layer_sld/" +
+                     raster_layer_instance.geoserver_layer_name + '.sld', 'w')
+            sld_file = File(f)
+            sld_file.write(sld_content)
+            f.close()
+            sld_path = 'pgis_toolkit/media/raster_layer_sld/' + raster_layer_instance.geoserver_layer_name+'.sld'
+            '''For uploading SLD file and connect it with layer'''
+            geoserver.upload_style(
+                path=sld_path, workspace=raster_layer_instance.geoserver_workspace)
+            geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
+                                    style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
+            return "successful", layer_id
+    except Exception as e:
+        return str(e), None
 
 def UploadWMSLayer(layer_id, request_dict):
     if 'url' in request_dict.keys() and request_dict['url'] != "":
