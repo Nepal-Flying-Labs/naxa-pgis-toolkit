@@ -35,12 +35,13 @@ def geoserver_layer_publish(layer_instance):
         workspaces_list = []
         for data in workspaces["workspaces"]["workspace"]:
             workspaces_list.append(data['name'])
-        if not "pgis" in workspaces_list:
+        workspace_name='pgis_'+str(layer_instance.theme.project.id)
+        if not workspace_name in workspaces_list:
             # For creating workspace
-            geoserver.create_workspace(workspace="pgis")
+            geoserver.create_workspace(workspace=workspace_name)
         '''publishing layer in geoserver'''
         geoserver.create_featurestore(store_name=table_name,
-                                      workspace='pgis',
+                                      workspace=workspace_name,
                                       db=env("POSTGRES_DB",
                                              default='postgres'),
                                       host=env("POSTGRES_HOST",
@@ -52,7 +53,7 @@ def geoserver_layer_publish(layer_instance):
                                       schema='public')
 
         sql = f'SELECT * FROM maps_featurecollection WHERE layer_id = {layer_instance.id}'
-        geoserver.publish_featurestore_sqlview(store_name=table_name, name=table_name, sql=sql, workspace='pgis')
+        geoserver.publish_featurestore_sqlview(store_name=table_name, name=table_name, sql=sql, workspace=workspace_name)
 
         vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
         vector_layer_instance.geoserver_workspace = "pgis"
