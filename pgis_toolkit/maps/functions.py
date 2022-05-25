@@ -340,3 +340,67 @@ def clear_dir(dir):
             shutil.rmtree(path)
         except OSError:
             os.remove(path)
+
+def advance_filter_data(field, operator, value, dataset):
+    result_dataset = []
+    if operator == 1:
+        key = "attributes__"+field
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.filter(**filter_dict)
+    elif operator == 2:
+        key = "attributes__"+field+"__lt"
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.filter(**filter_dict)
+    elif operator == 3:
+        key = "attributes__"+field+"__gt"
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.filter(**filter_dict)
+    elif operator == 4:
+        key = "attributes__"+field
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.exclude(**filter_dict)
+    elif operator == 5:
+        key = "attributes__"+field+"__lte"
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.filter(**filter_dict)
+    elif operator == 6:
+        key = "attributes__"+field+"__gte"
+        filter_dict = {}
+        filter_dict[key] = value
+        result_dataset = dataset.filter(**filter_dict)
+    elif operator == 7:
+        if "%" in value:
+            if value.startswith("%") and value.endswith("%"):
+                value = value.strip("%")
+                key = "attributes__"+field+"__icontains"
+                filter_dict = {}
+                filter_dict[key] = value
+                result_dataset = dataset.filter(**filter_dict)
+            elif value.startswith("%"):
+                value = value.strip("%")
+                key = "attributes__"+field+"__endswith"
+                filter_dict = {}
+                filter_dict[key] = value
+                result_dataset = dataset.filter(**filter_dict)
+            elif value.endswith("%"):
+                value = value.strip("%")
+                key = "attributes__"+field+"__startswith"
+                filter_dict = {}
+                filter_dict[key] = value
+                result_dataset = dataset.filter(**filter_dict)
+            elif not value.startswith("%") and not value.endswith("%"):
+                value = value.split("%")
+                key1 = "attributes__"+field+"__startswith"
+                filter_dict1 = {}
+                filter_dict1[key1] = value[0]
+                result_dataset = dataset.filter(**filter_dict1)
+                key2 = "attributes__"+field+"__endswith"
+                filter_dict2 = {}
+                filter_dict2[key2] = value[1]
+                result_dataset = result_dataset.filter(**filter_dict2)
+    return result_dataset
