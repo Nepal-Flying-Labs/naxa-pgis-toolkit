@@ -12,6 +12,7 @@ import pandas
 import os
 import shutil
 import fiona
+import json
 
 from config.settings.base import env, MEDIA_ROOT
 from pgis_toolkit.celery_app import app
@@ -34,7 +35,7 @@ from pgis_toolkit.maps.tasks import (
     UploadWMSLayer,
 )
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
-from pgis_toolkit.maps.functions import clear_dir
+from pgis_toolkit.maps.functions import clear_dir, advance_filter_data
 from .serializers import (
     LayerSerializer,
     LayerUpdateSerializer,
@@ -387,7 +388,55 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
+'''VectorTile Generation for Advance Filter Layer'''
 
+class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
+    #http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer_id=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+
+    vector_tile_layer_name = None
+    vector_tile_fields = ('pk', 'layer', 'attributes')
+
+    def get(self, request, *args, **kwargs):
+        if not request.GET.keys():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        request_keys = request.GET.keys()
+        if 'layer_id' not in request_keys or request.GET['layer_id'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        layer_id = request.GET['layer_id']
+        if not Layer.active.filter(id=layer_id).exists():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        layer_instance = Layer.objects.get(id=layer_id)
+        expr_params = request.GET['expression']
+        operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
+                         5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
+        if layer_id and expr_params:
+            expressions = json.loads(expr_params)
+            join = ''
+            dataset = FeatureCollection.active.filter(layer=int(layer_id))
+            result_dataset = []
+            for expr in expressions:
+                if 'join' not in expr.keys():
+                    field = expr['field']
+                    operator = expr['operator']
+                    value = expr['value']
+                    if join == "OR":
+                        OR_dataset = advance_filter_data(
+                            field, operator, value, dataset)
+                        result_dataset = result_dataset | OR_dataset
+                    elif join == "AND":
+                        result_dataset = advance_filter_data(
+                            field, operator, value, result_dataset)
+                    else:
+                        result_dataset = advance_filter_data(
+                            field, operator, value, dataset)
+                else:
+                    join = expr['join']
+        if result_dataset is None:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = result_dataset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''download vectort data in popular formats'''
 @api_view(['GET'])
 def layer_download(request):
     '''
@@ -412,7 +461,7 @@ def layer_download(request):
         dir = MEDIA_ROOT+"/../mediadownload/"
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)  
-        sql = "SELECT id, geometry as geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
         number_df = pandas.DataFrame(gdf['id'])
         attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
@@ -420,7 +469,7 @@ def layer_download(request):
         gdf = gdf.drop(columns=['attributes'])
         attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
         gdf=gdf.merge(attribute_number_df, on='id')
-        os.makedirs(MEDIA_ROOT + '/../mediadownload', exist_ok=True)
+        os.makedirs(dir, exist_ok=True)
         '''pack data in different formats'''
         if output_format == "shapefile":
             gdf.to_file(dir+layer_instance.name+".shp") 
@@ -465,3 +514,4 @@ def layer_download(request):
     except Exception as e:
         clear_dir(dir)
         return Response(status=404, data={'Error': str(e)})
+
