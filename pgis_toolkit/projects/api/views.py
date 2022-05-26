@@ -15,7 +15,8 @@ from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -363,6 +364,7 @@ def clear_dir(dir):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def layer_template_download(request):
     #creating directory to save shapefile
     dir=settings.MEDIA_ROOT + '/template_download/shapefiles/'
