@@ -4,7 +4,7 @@ from .models import *
 
 
 class ThemeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'name', 'project')
+    list_display = ('id', 'is_deleted','order', 'name', 'project')
     search_fields = ('id', 'name')
     list_filter = ('project',)
 
