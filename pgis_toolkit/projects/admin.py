@@ -15,7 +15,7 @@ class OrganizationAdmin(admin.ModelAdmin):
 class DefaultThemeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'order')
     search_fields = ('id', 'name')
-    
+
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'organization', 'name')
     search_fields = ('id', 'name')
@@ -48,7 +48,7 @@ admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(DefaultTheme, DefaultThemeAdmin)
 admin.site.register(Project, ProjectAdmin)
-admin.site.register(LayerTemplate)
+admin.site.register(LayerTemplate,LayerTemplateAdmin)
 admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)
 admin.site.register(Country, CountryAdmin)
 admin.site.register(State, StateAdmin)
