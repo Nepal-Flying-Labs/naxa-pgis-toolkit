@@ -332,6 +332,11 @@ class ThemeViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
+                '''updating order'''
+                theme_qs=Theme.active.filter(project__id=project)
+                for theme in theme_qs:
+                    theme.order+=1
+                    theme.save()
                 return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 for er in serializer._errors:
