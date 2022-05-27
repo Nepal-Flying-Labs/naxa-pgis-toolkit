@@ -83,7 +83,7 @@ def create_theme(project_id):
     project = Project.active.get(id=project_id)
     default_themes = DefaultTheme.objects.all()
     for theme in default_themes:
-        Theme.objects.create(project=project, name=theme.name, order=theme.order)
+        Theme.objects.create(project=project, name=theme.name, order=theme.order,description=theme.description)
 
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.active.all()
