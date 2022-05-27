@@ -112,7 +112,7 @@ def project_layers(request,id):
                 # elif layer.layer_type=="WMS":
                 #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
                 layer_list.append(layer_item)
-            theme_item={"id":theme.id,'name':theme.name,'group':group_list,'layer':layer_list}
+            theme_item={"id":theme.id,'name':theme.name,'description':theme.description,'group':group_list,'layer':layer_list}
             theme_list.append(theme_item)
         return Response(theme_list)
     except Exception as e:
