@@ -18,6 +18,7 @@ class Theme(IsDeleted,DateTimeStamp):
     project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(default=0)
+    description=models.TextField(blank=True,null=True)
 
     def __str__(self):
         return str(self.name)

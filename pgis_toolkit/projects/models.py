@@ -114,6 +114,7 @@ class State(models.Model):
 class DefaultTheme(models.Model):
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(blank=True,null=True)
+    description=models.TextField(blank=True, null=True)
 
     def __str__(self):
         return str(self.name)
