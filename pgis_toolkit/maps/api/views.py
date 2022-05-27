@@ -332,6 +332,11 @@ class ThemeViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
+                # '''updating order'''
+                # theme_qs=Theme.active.filter(project__id=project)
+                # for theme in theme_qs:
+                #     theme.order+=1
+                #     theme.save()
                 return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 for er in serializer._errors:
@@ -353,7 +358,7 @@ class ThemeViewset(viewsets.ModelViewSet):
             project = theme_instance.project.id
         if 'name' in request_keys and request_dict['name'] != "":
             name = request_dict['name']
-            if Theme.active.filter(Q(project__id=project) & Q(name=name)).exists():
+            if Theme.active.exclude(id=pk).filter(Q(project__id=project) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate theme name for the project.'},status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(theme_instance, request_dict, partial=True)
         if serializer.is_valid():
@@ -642,7 +647,7 @@ class LayerGroupViewset(viewsets.ModelViewSet):
             theme = layergroup_instance.theme.id
         if 'name' in request_keys and request_dict['name'] != "":
             name = request_dict['name']
-            if LayerGroup.active.filter(Q(theme__id=theme) & Q(name=name)).exists():
+            if LayerGroup.active.exclude(id=pk).filter(Q(theme__id=theme) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate LayerGroup name for the project.'},status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(layergroup_instance, request_dict, partial=True)
         if serializer.is_valid():
