@@ -56,6 +56,16 @@ class WMSLayerAdmin(admin.ModelAdmin):
 class FeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer','sub_layer')
 
+class ProjectLayerTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'geometry_type')
+    search_fields = ('id', 'name')
+    list_filter = ('geometry_type','project')
+
+class ProjectLayerTemplateAttributeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer_template', 'name', 'data_type','length','precision','alias', 'unit')
+    search_fields = ('id', 'name', 'alias')
+    list_filter = ('layer_template', 'data_type')
+
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(LayerGroup, LayerGroupAdmin)
@@ -67,3 +77,5 @@ admin.site.register(WMSLayer,WMSLayerAdmin)
 admin.site.register(LayerAttribute,LayerAttributeAdmin)
 admin.site.register(LayerFile,LayerFileAdmin)
 admin.site.register(FeatureCollection,FeatureCollectionAdmin)
+admin.site.register(ProjectsLayerTemplate,ProjectLayerTemplateAdmin)
+admin.site.register(ProjectsLayerTemplateAttribute,ProjectLayerTemplateAttributeAdmin)
