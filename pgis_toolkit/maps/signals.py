@@ -26,7 +26,7 @@ def post_save_layer(sender, instance, created,**kwargs):
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 @receiver(post_save, sender=Theme)
-def post_save_layer(sender, instance, created,**kwargs):
+def post_save_theme(sender, instance, created,**kwargs):
     '''
     This signal is to create an instance based on layer_type of created Layer
     '''
