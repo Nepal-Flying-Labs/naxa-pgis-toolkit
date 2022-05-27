@@ -15,7 +15,7 @@ from pgis_toolkit.utils.constants import (
 
 # Create your models here.
 class Theme(IsDeleted,DateTimeStamp):
-    project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,blank=True,null=True)
+    project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
     order=models.PositiveIntegerField(default=0)
 
