@@ -9,6 +9,7 @@ from celery.result import AsyncResult
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
+from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -366,8 +367,40 @@ class ThemeViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-'''VectorTile Generation for Maps Layer'''
 
+def reorder_item(table_name,data):
+    try:
+        if table_name=="theme":
+            model=Theme
+        else:
+            return "Invalid params table"
+        for key, value in data.items():
+            instance = model.objects.get(id=key)
+            instance.order = value
+            instance.save()
+        return "successful"
+    except Exception as e:
+        return Response(str(e))
+
+@api_view(['POST'])
+def reorder(request):
+    '''
+    http://0.0.0.0:8000/api/maps/reorder/?table=theme
+    '''
+    try:
+        table = request.query_params.get('table', None)
+        if not table:
+            return Response(data={'message': 'error occured','error':"params table is missing"}, status=status.HTTP_400_BAD_REQUEST)
+        if request.data:
+            response=reorder_item(table,request.data)
+            if not response=="successful":
+                return Response(data={'message': 'error occured','error':response}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "successful"}, status=200)
+    except Exception as e:
+        return Response(data={'message': 'error occured','error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+'''VectorTile Generation for Maps Layer'''
 class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
