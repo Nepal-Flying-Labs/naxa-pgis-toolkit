@@ -55,7 +55,8 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer, FeatureCollectionListSerializer, FeatureCollectionSerializer
+    WMSLayerSerializer, FeatureCollectionListSerializer, FeatureCollectionSerializer,
+    LayerGroupListSerializer, LayerGroupSerializer
 )
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
@@ -565,3 +566,69 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True, context={})
         return paginator.get_paginated_response(data=serializer.data)
+
+
+'''A viewset to create and update Layer Group objects.'''
+class LayerGroupViewset(viewsets.ModelViewSet):
+    queryset = LayerGroup.active.all()
+    http_method_names = ['get', 'post', 'patch']
+    default_serializer_class = LayerGroupSerializer
+
+    serializer_classes = {
+        'list': LayerGroupListSerializer,
+        'retrieve': LayerGroupSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def create(self, request, *args, **kwargs):
+        errors = []
+        try:
+            name = request.data.get('name', None)
+            theme = request.data.get('theme', None)
+            if LayerGroup.active.filter(Q(theme__id=theme) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the theme.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        errors = []
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        layergroup_instance = LayerGroup.active.get(pk=pk)
+        if 'theme' in request_keys and request_dict['theme'] != "":
+            theme = request_dict['theme']
+        else:
+            theme = layergroup_instance.theme.id
+        if 'name' in request_keys and request_dict['name'] != "":
+            name = request_dict['name']
+            if LayerGroup.active.filter(Q(theme__id=theme) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(layergroup_instance, request_dict, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            for er in serializer._errors:
+                errors.append(
+                    {'errorName': er, 'details': serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+    def list(self, request, *args, **kwargs):
+        theme = request.query_params.get('theme', None)
+        if not theme:
+            return Response(data={'message': 'params theme is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(theme__id=theme)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
