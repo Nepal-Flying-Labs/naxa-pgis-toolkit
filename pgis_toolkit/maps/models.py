@@ -17,7 +17,7 @@ from pgis_toolkit.utils.constants import (
 class Theme(IsDeleted,DateTimeStamp):
     project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,blank=True,null=True)
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return str(self.name)
@@ -27,7 +27,7 @@ class Theme(IsDeleted,DateTimeStamp):
 class LayerGroup(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True)
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return str(self.name)
@@ -40,7 +40,7 @@ class Layer(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
     group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_group')
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
     default_load=models.BooleanField(default=False)
     layer_type=models.CharField(max_length=20,choices=LAYER_TYPE_CHOICES)
     is_osm_layer=models.BooleanField(default=False)
@@ -62,7 +62,7 @@ class LayerFile(DateTimeStamp):
 class SubLayer(IsDeleted,DateTimeStamp):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
     icon = models.FileField(upload_to="icons",  blank=True, null=True)
     icon_size = models.JSONField(blank=True, null=True)
     style = models.JSONField(default=dict, blank=True, null=True)

@@ -86,7 +86,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 class DefaultThemeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DefaultTheme
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        fields = '__all__'
 
 class DefaultThemeSerializer(serializers.ModelSerializer):
     class Meta:

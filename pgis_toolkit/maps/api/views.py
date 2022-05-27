@@ -1,6 +1,8 @@
 import json
+import operator
 import os
 import shutil
+from functools import reduce
 
 import fiona
 import geopandas
@@ -9,20 +11,12 @@ from celery.result import AsyncResult
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
+from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from sqlalchemy import create_engine
-
-import geopandas
-import pandas
-import os
-import shutil
-import fiona
-import json
-import operator
-from functools import reduce
 
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app
@@ -45,9 +39,14 @@ from pgis_toolkit.maps.tasks import (
     UploadVectorLayer,
     UploadWMSLayer,
 )
+from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
 from .serializers import (
+    FeatureCollectionListSerializer,
+    FeatureCollectionSerializer,
+    LayerGroupListSerializer,
+    LayerGroupSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
     SubLayerListSerializer,
@@ -55,10 +54,8 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer, FeatureCollectionListSerializer, FeatureCollectionSerializer,
-    LayerGroupListSerializer, LayerGroupSerializer
+    WMSLayerSerializer,
 )
-from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 
 @api_view(['GET'])
@@ -376,8 +373,40 @@ class ThemeViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-'''VectorTile Generation for Maps Layer'''
 
+def reorder_item(table_name,data):
+    try:
+        if table_name=="theme":
+            model=Theme
+        else:
+            return "Invalid params table"
+        for key, value in data.items():
+            instance = model.objects.get(id=key)
+            instance.order = value
+            instance.save()
+        return "successful"
+    except Exception as e:
+        return Response(str(e))
+
+@api_view(['POST'])
+def reorder(request):
+    '''
+    http://0.0.0.0:8000/api/maps/reorder/?table=theme
+    '''
+    try:
+        table = request.query_params.get('table', None)
+        if not table:
+            return Response(data={'message': 'error occured','error':"params table is missing"}, status=status.HTTP_400_BAD_REQUEST)
+        if request.data:
+            response=reorder_item(table,request.data)
+            if not response=="successful":
+                return Response(data={'message': 'error occured','error':response}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "successful"}, status=200)
+    except Exception as e:
+        return Response(data={'message': 'error occured','error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+'''VectorTile Generation for Maps Layer'''
 class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
@@ -550,7 +579,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         if search_key:
             search_fields = list(queryset.first().attributes.keys())
             filter_kwargs = {}
-            for field in search_fields:                
+            for field in search_fields:
                 filter_kwargs['attributes__'+field+'__icontains'] = search_key
             list_of_Q = [Q(**{key: val})
                             for key, val in filter_kwargs.items()]
