@@ -73,3 +73,14 @@ class FeatureCollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollection
         fields= '__all__'
+    
+class LayerGroupListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerGroup
+        # fields = '__all__'
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+class LayerGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerGroup
+        fields = '__all__'
