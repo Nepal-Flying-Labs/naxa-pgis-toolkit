@@ -15,6 +15,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from sqlalchemy import create_engine
 
+import geopandas
+import pandas
+import os
+import shutil
+import fiona
+import json
+import operator
+from functools import reduce
+
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app
 from pgis_toolkit.maps.functions import advance_filter_data, clear_dir
@@ -46,8 +55,9 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer,
+    WMSLayerSerializer, FeatureCollectionListSerializer, FeatureCollectionSerializer
 )
+from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 
 @api_view(['GET'])
@@ -109,7 +119,6 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
-
 
 class LayerAPIView(APIView):
     def get_object(self, pk):
@@ -516,3 +525,43 @@ def layer_download(request):
     except Exception as e:
         clear_dir(dir)
         return Response(status=404, data={'Error': str(e)})
+
+class FeatureCollectionViewset(viewsets.ModelViewSet):
+    queryset = FeatureCollection.active.all()
+    http_method_names = ['get']
+    default_serializer_class = FeatureCollectionSerializer
+    serializer_classes = {
+        'list': FeatureCollectionListSerializer,
+        'retrieve': FeatureCollectionSerializer
+    }
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
+        layer_id = request.query_params.get('layer_id', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer__id=layer_id)
+        '''search_key'''
+        search_key = request.query_params.get('search_key', None)
+        if search_key:
+            search_fields = list(queryset.first().attributes.keys())
+            filter_kwargs = {}
+            for field in search_fields:                
+                filter_kwargs['attributes__'+field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            queryset = queryset.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else queryset
+        ''''order_by'''
+        order_by = request.query_params.get('order_by', None)
+        if order_by:
+            if 'id' in order_by:
+                queryset = queryset.order_by(order_by)
+            else:
+                queryset = queryset.order_by('attributes__'+order_by)
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True, context={})
+        return paginator.get_paginated_response(data=serializer.data)

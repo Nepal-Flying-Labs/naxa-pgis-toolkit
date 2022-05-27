@@ -7,12 +7,13 @@ from pgis_toolkit.maps.api.views import (
     SubLayerViewset,
     ThemeViewset,
     get_layer_upload_task_response,
-    project_layers, layer_download, AdvanceFilterVectorTileQuerySet
+    project_layers, layer_download, AdvanceFilterVectorTileQuerySet, FeatureCollectionViewset
 )
 
 router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
+router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 
 app_name = "projects"
 urlpatterns = [
