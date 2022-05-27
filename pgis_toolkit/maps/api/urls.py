@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.maps.api.views import (  # ReorderView,
     AdvanceFilterVectorTileQuerySet,
+    FeatureCollectionViewset,
     LayerAPIView,
+    LayerGroupViewset,
     LayerVectorTileQuerySet,
     SubLayerViewset,
     ThemeViewset,
@@ -16,11 +18,12 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
 router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
+router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
+router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 
 app_name = "projects"
 urlpatterns = [
     path('', include(router.urls)),
-    # path('reorder/',ReorderView.as_view() , name='reorder'),
     path('project_layers/<int:id>/', project_layers, name='project_layers'),
     path('layer/', LayerAPIView.as_view(), name='layer'),
     path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),

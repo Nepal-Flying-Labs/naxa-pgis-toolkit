@@ -1,6 +1,8 @@
 import json
+import operator
 import os
 import shutil
+from functools import reduce
 
 import fiona
 import geopandas
@@ -37,9 +39,14 @@ from pgis_toolkit.maps.tasks import (
     UploadVectorLayer,
     UploadWMSLayer,
 )
+from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
 from .serializers import (
+    FeatureCollectionListSerializer,
+    FeatureCollectionSerializer,
+    LayerGroupListSerializer,
+    LayerGroupSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
     SubLayerListSerializer,
@@ -110,7 +117,6 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
-
 
 class LayerAPIView(APIView):
     def get_object(self, pk):
@@ -549,3 +555,109 @@ def layer_download(request):
     except Exception as e:
         clear_dir(dir)
         return Response(status=404, data={'Error': str(e)})
+
+class FeatureCollectionViewset(viewsets.ModelViewSet):
+    queryset = FeatureCollection.active.all()
+    http_method_names = ['get']
+    default_serializer_class = FeatureCollectionSerializer
+    serializer_classes = {
+        'list': FeatureCollectionListSerializer,
+        'retrieve': FeatureCollectionSerializer
+    }
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
+        layer_id = request.query_params.get('layer_id', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer__id=layer_id)
+        '''search_key'''
+        search_key = request.query_params.get('search_key', None)
+        if search_key:
+            search_fields = list(queryset.first().attributes.keys())
+            filter_kwargs = {}
+            for field in search_fields:
+                filter_kwargs['attributes__'+field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            queryset = queryset.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else queryset
+        ''''order_by'''
+        order_by = request.query_params.get('order_by', None)
+        if order_by:
+            if 'id' in order_by:
+                queryset = queryset.order_by(order_by)
+            else:
+                queryset = queryset.order_by('attributes__'+order_by)
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True, context={})
+        return paginator.get_paginated_response(data=serializer.data)
+
+
+'''A viewset to create and update Layer Group objects.'''
+class LayerGroupViewset(viewsets.ModelViewSet):
+    queryset = LayerGroup.active.all()
+    http_method_names = ['get', 'post', 'patch']
+    default_serializer_class = LayerGroupSerializer
+
+    serializer_classes = {
+        'list': LayerGroupListSerializer,
+        'retrieve': LayerGroupSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def create(self, request, *args, **kwargs):
+        errors = []
+        try:
+            name = request.data.get('name', None)
+            theme = request.data.get('theme', None)
+            if LayerGroup.active.filter(Q(theme__id=theme) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the theme.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        errors = []
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        layergroup_instance = LayerGroup.active.get(pk=pk)
+        if 'theme' in request_keys and request_dict['theme'] != "":
+            theme = request_dict['theme']
+        else:
+            theme = layergroup_instance.theme.id
+        if 'name' in request_keys and request_dict['name'] != "":
+            name = request_dict['name']
+            if LayerGroup.active.filter(Q(theme__id=theme) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(layergroup_instance, request_dict, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            for er in serializer._errors:
+                errors.append(
+                    {'errorName': er, 'details': serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+    def list(self, request, *args, **kwargs):
+        theme = request.query_params.get('theme', None)
+        if not theme:
+            return Response(data={'message': 'params theme is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(theme__id=theme)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)

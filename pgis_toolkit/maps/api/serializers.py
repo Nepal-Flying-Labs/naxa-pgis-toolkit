@@ -58,3 +58,29 @@ class SubLayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubLayer
         fields = ('id','order','icon','icon_size','style')
+
+class FeatureCollectionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollection
+        fields = ('id',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation |= instance.attributes
+        return representation
+
+class FeatureCollectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollection
+        fields= '__all__'
+    
+class LayerGroupListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerGroup
+        # fields = '__all__'
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+class LayerGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerGroup
+        fields = '__all__'
