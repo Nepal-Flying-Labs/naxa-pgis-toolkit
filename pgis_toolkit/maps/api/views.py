@@ -1,3 +1,10 @@
+import json
+import os
+import shutil
+
+import fiona
+import geopandas
+import pandas
 from celery.result import AsyncResult
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -7,6 +14,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from sqlalchemy import create_engine
+
 import geopandas
 import pandas
 import os
@@ -16,9 +24,9 @@ import json
 import operator
 from functools import reduce
 
-
-from config.settings.base import env, MEDIA_ROOT
+from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app
+from pgis_toolkit.maps.functions import advance_filter_data, clear_dir
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
@@ -38,7 +46,7 @@ from pgis_toolkit.maps.tasks import (
     UploadWMSLayer,
 )
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
-from pgis_toolkit.maps.functions import clear_dir, advance_filter_data
+
 from .serializers import (
     LayerSerializer,
     LayerUpdateSerializer,
@@ -60,17 +68,17 @@ def project_layers(request,id):
     '''
     try:
         theme_list=[]
-        theme_qs=Theme.active.filter(project=id).order_by('order')
+        theme_qs=Theme.active.select_related('project').filter(project=id).order_by('order')
         for theme in theme_qs:
             group_list=[]
-            group_qs=LayerGroup.active.filter(theme=theme.id).order_by("order")
+            group_qs=LayerGroup.active.select_related('theme').filter(theme=theme.id).order_by("order")
             for group in group_qs:
                 group_layer_list=[]
-                group_layer_qs=Layer.active.filter(group=group.id).order_by('order')
+                group_layer_qs=Layer.active.select_related('group').filter(group=group.id).order_by('order')
                 for layer in group_layer_qs:
                     layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                     if layer.layer_type=="Vector":
-                        layer_detail_instance=Vectorlayer.objects.get(layer=layer.id)
+                        layer_detail_instance=Vectorlayer.objects.select_related('layer').get(layer=layer.id)
                         icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
                         layer_item['icon']=icon_url
                         layer_item['icon_size']=layer_detail_instance.icon_size,
@@ -84,14 +92,14 @@ def project_layers(request,id):
                 group_list.append(group_item)
 
             layer_list=[]
-            layer_qs=Layer.active.filter(theme=theme.id,group=None)
+            layer_qs=Layer.active.select_related('theme').filter(theme=theme.id,group=None).order_by('order')
             for layer in layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
                     # print(layer.id,layer.layer_type)
-                    layer_detail_instance=Vectorlayer.objects.get(layer=layer.id)
+                    layer_detail_instance=Vectorlayer.objects.select_related('layer').get(layer=layer.id)
                     sub_layer_list=[]
-                    sub_layer_qs=SubLayer.active.filter(layer=layer.id)
+                    sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                     for sub_layer in sub_layer_qs:
                         icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
                         sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
@@ -137,17 +145,17 @@ class LayerAPIView(APIView):
 
             '''Corressponding layer detail'''
             if layer_instance.layer_type=="Vector":
-                vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
+                vector_layer_instance=Vectorlayer.objects.select_related('layer').get(layer=layer_instance.id)
                 vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'icon', 'icon_size', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
             elif layer_instance.layer_type=="Raster":
-                raster_layer_instance=RasterLayer.objects.get(layer=layer_instance.id)
+                raster_layer_instance=RasterLayer.objects.select_related('layer').get(layer=layer_instance.id)
                 raster_layer_keys=['geoserver_workspace', 'geoserver_layer_name']
                 for key in raster_layer_keys:
                     results[key]=raster_layer_instance.__dict__[key]
             elif layer_instance.layer_type=="WMS":
-                wms_layer_instance=WMSLayer.objects.get(layer=layer_instance.id)
+                wms_layer_instance=WMSLayer.objects.select_related('layer').get(layer=layer_instance.id)
                 wms_layer_keys=['url']
                 for key in wms_layer_keys:
                     results[key]=wms_layer_instance.__dict__[key]
@@ -463,7 +471,7 @@ def layer_download(request):
     try:
         dir = MEDIA_ROOT+"/../mediadownload/"
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-        con = create_engine(db_connection_url)  
+        con = create_engine(db_connection_url)
         sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
         number_df = pandas.DataFrame(gdf['id'])
@@ -475,7 +483,7 @@ def layer_download(request):
         os.makedirs(dir, exist_ok=True)
         '''pack data in different formats'''
         if output_format == "shapefile":
-            gdf.to_file(dir+layer_instance.name+".shp") 
+            gdf.to_file(dir+layer_instance.name+".shp")
             # create a ZipFile
             zipfile_path = dir + f'{layer_instance.name}'
             files = dir
