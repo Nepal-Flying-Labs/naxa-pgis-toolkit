@@ -30,7 +30,7 @@ from pgis_toolkit.maps.models import (
     SubLayer,
     Theme,
     Vectorlayer,
-    WMSLayer,
+    WMSLayer, ProjectsLayerTemplate, ProjectsLayerTemplateAttribute
 )
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
@@ -55,6 +55,7 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
+    ProjectLayerTemplateListSerializer, ProjectLayerTemplateSerializer
 )
 
 
@@ -648,7 +649,7 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         if 'name' in request_keys and request_dict['name'] != "":
             name = request_dict['name']
             if LayerGroup.active.exclude(id=pk).filter(Q(theme__id=theme) & Q(name=name)).exists():
-                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'message': 'Cannot create duplicate LayerGroup name for the theme.'},status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(layergroup_instance, request_dict, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -666,3 +667,69 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         queryset = self.queryset.filter(theme__id=theme)
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+
+class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
+    queryset = ProjectsLayerTemplate.active.all()
+    http_method_names = ['get', 'post', 'patch']
+    default_serializer_class = ProjectLayerTemplateSerializer
+
+    serializer_classes = {
+        'list': ProjectLayerTemplateListSerializer,
+        'retrieve': ProjectLayerTemplateSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    
+    def list(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template/?project=2'''
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(project__id=project)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        errors = []
+        try:
+            name = request.data.get('name', None)
+            project = request.data.get('project', None)
+            if ProjectsLayerTemplate.active.filter(Q(project__id=project) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplate name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        errors = []
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        project_layer_template_instance = ProjectsLayerTemplate.active.get(pk=pk)
+        if 'project' in request_keys and request_dict['project'] != "":
+            project = request_dict['project']
+        else:
+            project = project_layer_template_instance.project.id
+        if 'name' in request_keys and request_dict['name'] != "":
+            name = request_dict['name']
+            if ProjectsLayerTemplate.active.exclude(id=pk).filter(Q(project__id=project) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplate name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(project_layer_template_instance, request_dict, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            for er in serializer._errors:
+                errors.append(
+                    {'errorName': er, 'details': serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
