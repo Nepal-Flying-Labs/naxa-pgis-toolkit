@@ -4,7 +4,13 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Project
+from pgis_toolkit.projects.models import (
+    DateTimeStamp,
+    IsDeleted,
+    Project,
+    Template,
+    TemplateAttribute,
+)
 from pgis_toolkit.utils.constants import (
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
@@ -15,9 +21,10 @@ from pgis_toolkit.utils.constants import (
 
 # Create your models here.
 class Theme(IsDeleted,DateTimeStamp):
-    project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,blank=True,null=True)
+    project=models.ForeignKey(Project, related_name='ThemeProject', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
+    description=models.TextField(blank=True,null=True)
 
     def __str__(self):
         return str(self.name)
@@ -27,7 +34,7 @@ class Theme(IsDeleted,DateTimeStamp):
 class LayerGroup(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True)
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return str(self.name)
@@ -40,7 +47,7 @@ class Layer(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
     group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_group')
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
     default_load=models.BooleanField(default=False)
     layer_type=models.CharField(max_length=20,choices=LAYER_TYPE_CHOICES)
     is_osm_layer=models.BooleanField(default=False)
@@ -62,7 +69,7 @@ class LayerFile(DateTimeStamp):
 class SubLayer(IsDeleted,DateTimeStamp):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
     name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(blank=True,null=True)
+    order=models.PositiveIntegerField(default=0)
     icon = models.FileField(upload_to="icons",  blank=True, null=True)
     icon_size = models.JSONField(blank=True, null=True)
     style = models.JSONField(default=dict, blank=True, null=True)
@@ -161,3 +168,16 @@ class LayerAttribute(DateTimeStamp):
         elif self.data_type=="float" and not (self.length or self.precision):
             # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
             raise ValidationError('length and precision should not be null')
+
+
+class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
+    project=models.ForeignKey(Project,on_delete=models.CASCADE)
+    class Meta:
+        app_label = 'maps'
+
+
+class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
+    layer_template=models.ForeignKey(ProjectsLayerTemplate,on_delete=models.CASCADE)
+    class Meta:
+        app_label = 'maps'
+        unique_together = (("layer_template", "name"),)
