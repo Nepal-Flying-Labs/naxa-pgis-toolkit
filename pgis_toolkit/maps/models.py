@@ -4,7 +4,13 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Project
+from pgis_toolkit.projects.models import (
+    DateTimeStamp,
+    IsDeleted,
+    Project,
+    Template,
+    TemplateAttribute,
+)
 from pgis_toolkit.utils.constants import (
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
@@ -162,3 +168,16 @@ class LayerAttribute(DateTimeStamp):
         elif self.data_type=="float" and not (self.length or self.precision):
             # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
             raise ValidationError('length and precision should not be null')
+
+
+class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
+    project=models.ForeignKey(Project,on_delete=models.CASCADE)
+    class Meta:
+        app_label = 'maps'
+
+
+class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
+    layer_template=models.ForeignKey(ProjectsLayerTemplate,on_delete=models.CASCADE)
+    class Meta:
+        app_label = 'maps'
+        unique_together = (("layer_template", "name"),)

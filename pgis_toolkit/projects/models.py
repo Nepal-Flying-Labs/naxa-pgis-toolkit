@@ -161,7 +161,7 @@ class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     class Meta:
         app_label = 'projects'
 
-class LayerTemplate(IsDeleted,DateTimeStamp):
+class Template(models.Model):
     name=models.CharField(max_length=254)
     geometry_type=models.CharField(max_length=50,choices=GEOMETRY_TYPE_CHOICES)
 
@@ -169,7 +169,8 @@ class LayerTemplate(IsDeleted,DateTimeStamp):
         return f'{self.name}'
 
     class Meta:
-        app_label = 'projects'
+        # app_label = 'projects'
+        abstract=True
 
     def clean(self):
         """
@@ -180,8 +181,8 @@ class LayerTemplate(IsDeleted,DateTimeStamp):
                 f'Layer template with name {self.name} already exists')
 
 
-class LayerTemplateAttribute(DateTimeStamp):
-    layer_template=models.ForeignKey(LayerTemplate,on_delete=models.CASCADE)
+class TemplateAttribute(models.Model):
+    # layer_template=models.ForeignKey(LayerTemplate,on_delete=models.CASCADE)
     name=models.CharField(max_length=254)
     alias=models.CharField(max_length=254,blank=True,null=True)
     data_type=models.CharField(max_length=20,choices=DATA_TYPE_CHOICES,default='str')
@@ -190,8 +191,9 @@ class LayerTemplateAttribute(DateTimeStamp):
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     # choices=ArrayField(models.CharField(max_length=100, blank=True),size=20,blank=True, null=True)
     class Meta:
-        app_label = 'projects'
-        unique_together = (("layer_template", "name"),)
+        # app_label = 'projects'
+        abstract=True
+        # unique_together = (("layer_template", "name"),)
 
     def clean(self):
         """
@@ -203,3 +205,16 @@ class LayerTemplateAttribute(DateTimeStamp):
         elif self.data_type=="float" and not (self.length or self.precision):
             # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
             raise ValidationError('length and precision should not be null')
+
+
+class LayerTemplate(Template,IsDeleted,DateTimeStamp):
+
+    class Meta:
+        app_label = 'projects'
+
+class LayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
+    layer_template=models.ForeignKey(LayerTemplate,on_delete=models.CASCADE)
+
+    class Meta:
+        app_label = 'projects'
+        unique_together = (("layer_template", "name"),)

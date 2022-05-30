@@ -27,7 +27,7 @@ from .models import FeatureCollection, Layer, LayerAttribute, LayerFile, Vectorl
 def geoserver_layer_publish(layer_instance):
     print("geoserver layer publish called")
     '''Geoserver layer publish'''
-    connection_db = create_engine(env("CONNECTION_DB"))
+    # connection_db = create_engine(env("CONNECTION_DB"))
     table_name = layer_instance.name.replace(" ", "")
     try:
         '''creating workspace named pgis if '''
