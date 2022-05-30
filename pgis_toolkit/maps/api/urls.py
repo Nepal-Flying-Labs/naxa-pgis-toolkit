@@ -12,7 +12,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     get_layer_upload_task_response,
     layer_download,
     project_layers,
-    reorder,
+    reorder,ProjectLayerTemplateViewset, ProjectLayerTemplateAttributeViewset
 )
 
 router = DefaultRouter()
@@ -20,7 +20,8 @@ router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
-
+router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
+router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 app_name = "projects"
 urlpatterns = [
     path('', include(router.urls)),

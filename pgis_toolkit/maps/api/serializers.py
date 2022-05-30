@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from pgis_toolkit.maps.models import *
 
-
 class LayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
@@ -83,4 +82,24 @@ class LayerGroupListSerializer(serializers.ModelSerializer):
 class LayerGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerGroup
+        fields = '__all__'
+
+class ProjectLayerTemplateListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplate
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+class ProjectLayerTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplate
+        fields = '__all__'
+
+class ProjectsLayerTemplateAttributeListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateAttribute
+        exclude = ('uploaded_date', 'last_updated')
+
+class ProjectsLayerTemplateAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateAttribute
         fields = '__all__'
