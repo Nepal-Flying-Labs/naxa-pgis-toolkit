@@ -381,17 +381,22 @@ class ThemeViewset(viewsets.ModelViewSet):
 
 def reorder_item(table_name,data):
     try:
-        if table_name=="theme":
-            model=Theme
-        else:
+        models={'theme':Theme,'layer':Layer}
+        try:
+            model=models[table_name]
+        except:
             return "Invalid params table"
+        instances=[]
         for key, value in data.items():
             instance = model.objects.get(id=key)
+            instances += [instance]
             instance.order = value
-            instance.save()
+
+        '''update order in bulk'''
+        model.objects.bulk_update(instances, ['order'])
         return "successful"
     except Exception as e:
-        return Response(str(e))
+        return str(e)
 
 @api_view(['POST'])
 def reorder(request):
