@@ -57,6 +57,24 @@ class Layer(IsDeleted,DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
+    @property
+    def vector_layer(self):
+        if self.id:
+            return Vectorlayer.objects.select_related('layer').get(layer=self.id)
+        return Vectorlayer.objects.none()
+
+    @property
+    def raster_layer(self):
+        if self.id:
+            return RasterLayer.objects.select_related('layer').get(layer=self.id)
+        return RasterLayer.objects.none()
+
+    @property
+    def wms_layer(self):
+        if self.id:
+            return WMSLayer.objects.select_related('layer').get(layer=self.id)
+        return WMSLayer.objects.none()
+
 class LayerFile(DateTimeStamp):
     file = models.FileField(upload_to='geofiles/%Y/%m/%d')
     layer=models.OneToOneField(Layer,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_file')
