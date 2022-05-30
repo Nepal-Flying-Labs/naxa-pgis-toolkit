@@ -294,18 +294,21 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
-    task_id = request.query_params.get('task_id', None)
-    result = AsyncResult(task_id, app=app)
-    if result.ready():                     # check task state: true/false
-        try:
-            response, layer_id = result.get()
-            if response == "successful":
-                return Response({"message": response, "layer_id": layer_id}, status=200)
-            else:
-                return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-    return Response({'message': "Please wait result"}, status=200)
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():                     # check task state: true/false
+            try:
+                response, layer_id = result.get()
+                if response == "successful":
+                    return Response({"message": response, "layer_id": layer_id}, status=200)
+                else:
+                    return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
 
 
 '''A viewset to create and update Theme objects.'''
