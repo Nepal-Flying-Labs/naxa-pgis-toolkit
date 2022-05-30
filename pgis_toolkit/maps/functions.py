@@ -64,7 +64,7 @@ def geoserver_layer_publish(layer_instance):
     except Exception as e:
         print(str(e),"geo error")
         Layer.objects.filter(id=layer_instance.id).delete()
-        return str(e)
+        return "geoserver error: "+str(e)
 
 def get_geometry(geometry, geom_type):
     try:
@@ -180,7 +180,7 @@ def upload_feature(geodataframe, layer_instance, geom_type):
 
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
-        return str(e)
+        return "error in feature upload: "+str(e)
 
 
 def handleShapeFile(layer_id):
