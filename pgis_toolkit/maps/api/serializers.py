@@ -93,3 +93,13 @@ class ProjectLayerTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectsLayerTemplate
         fields = '__all__'
+
+class ProjectsLayerTemplateAttributeListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateAttribute
+        exclude = ('uploaded_date', 'last_updated')
+
+class ProjectsLayerTemplateAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateAttribute
+        fields = '__all__'

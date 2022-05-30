@@ -55,7 +55,7 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
-    ProjectLayerTemplateListSerializer, ProjectLayerTemplateSerializer
+    ProjectLayerTemplateListSerializer, ProjectLayerTemplateSerializer, ProjectsLayerTemplateAttributeListSerializer, ProjectsLayerTemplateAttributeSerializer
 )
 
 
@@ -692,6 +692,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template/'''
         errors = []
         try:
             name = request.data.get('name', None)
@@ -712,6 +713,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template/1/'''
         errors = []
         request_dict = request.data
         request_keys = request_dict.keys()
@@ -725,6 +727,73 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
             if ProjectsLayerTemplate.active.exclude(id=pk).filter(Q(project__id=project) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplate name for the project.'},status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(project_layer_template_instance, request_dict, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            for er in serializer._errors:
+                errors.append(
+                    {'errorName': er, 'details': serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
+    queryset = ProjectsLayerTemplateAttribute.objects.all()
+    http_method_names = ['get', 'post', 'patch']
+    default_serializer_class = ProjectsLayerTemplateAttributeSerializer
+
+    serializer_classes = {
+        'list': ProjectsLayerTemplateAttributeListSerializer,
+        'retrieve': ProjectsLayerTemplateAttributeSerializer
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    
+    def list(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template_attribute/?template=2'''
+        layer_template = request.query_params.get('layer_template', None)
+        if not layer_template:
+            return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer_template__id=layer_template)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template_attribute/'''
+        errors = []
+        try:
+            name = request.data.get('name', None)
+            layer_template = request.data.get('layer_template', None)
+            if ProjectsLayerTemplateAttribute.objects.filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplateAttribute name for the Template.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        '''http://localhost:8000/api/maps/project_layer_template_attribute/1/'''
+        errors = []
+        request_dict = request.data
+        request_keys = request_dict.keys()
+        project_layer_template_attribute = ProjectsLayerTemplateAttribute.objects.get(pk=pk)
+        if 'layer_template' in request_keys and request_dict['layer_template'] != "":
+            layer_template = request_dict['templayer_templatelate']
+        else:
+            layer_template = project_layer_template_attribute.layer_template.id
+        if 'name' in request_keys and request_dict['name'] != "":
+            name = request_dict['name']
+            if ProjectsLayerTemplateAttribute.objects.exclude(id=pk).filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplateAttribute name for the Template.'},status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(project_layer_template_attribute, request_dict, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
