@@ -78,12 +78,12 @@ class OrganizationViewset(viewsets.ModelViewSet):
 def delete_project(project_id):
     Project.active.filter(id=project_id).delete()
 
-'''create theme objects from default theme objects for each new project object created'''
-def create_theme(project_id):
-    project = Project.active.get(id=project_id)
-    default_themes = DefaultTheme.objects.all()
-    for theme in default_themes:
-        Theme.objects.create(project=project, name=theme.name, order=theme.order)
+# '''create theme objects from default theme objects for each new project object created'''
+# def create_theme(project_id):
+#     project = Project.active.get(id=project_id)
+#     default_themes = DefaultTheme.objects.all()
+#     for theme in default_themes:
+#         Theme.objects.create(project=project, name=theme.name, order=theme.order)
 
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.active.all()
@@ -137,7 +137,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                             response = handleProjectShapeFile(
                                 created_object.id)
                             if response == "successful":
-                                create_theme(created_object.id)
+                                # create_theme(created_object.id)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 delete_project(created_object.id)
@@ -152,7 +152,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                         if file_extension == ".geojson":
                             response = handleProjectGeoJSON(created_object.id)
                             if response == "successful":
-                                create_theme(created_object.id)
+                                # create_theme(created_object.id)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 delete_project(created_object.id)
@@ -174,7 +174,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                     for geom in wkt_list:
                         ProjectLocationFeatureCollection.objects.create(project=created_object,
                                                                         geometry=GEOSGeometry(geom))
-                    create_theme(created_object.id)
+                    # create_theme(created_object.id)
                     return Response(status=200, data={'Message': 'Object Successfully Created', 'data': serializer.data,
                                                         'object_id': created_object.id})
             else:
