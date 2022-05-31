@@ -32,6 +32,7 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer, ProjectsLayerTemplate, ProjectsLayerTemplateAttribute
 )
+from pgis_toolkit.projects.models import Project, LayerTemplate, LayerTemplateAttribute
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -668,7 +669,6 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-
 class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
@@ -802,3 +802,31 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                 errors.append(
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+'''Import General Template for a specific project'''
+@api_view(['POST'])
+def import_template(request):
+    try:
+        project = request.data.get('project', None)
+        if not project or not Project.active.filter(id=project).exists():
+                return Response(data={'message': 'Invalid project params!'}, status=status.HTTP_400_BAD_REQUEST)
+        project_instance = Project.active.get(id=project)
+        templates = request.data.get('templates', None)
+        if not templates:
+            return Response(data={'message': 'templates params is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+        templates_list = json.loads(templates)
+        if not LayerTemplate.objects.filter(id__in=templates_list).exists():
+            return Response(data={'message': 'Template object does not exist for the templates params list.'}, status=status.HTTP_400_BAD_REQUEST)
+        for template in templates_list:
+            '''retrieving layer template vaulues to clone later'''
+            template_values = LayerTemplate.objects.filter(id=template).values('name', 'geometry_type').first()
+            if ProjectsLayerTemplate.objects.filter(Q(name=template_values['name']) & Q(project=project)).exists():
+                return Response(data={'message': 'Cannot create duplicate template name for a project'}, status=status.HTTP_400_BAD_REQUEST)
+                '''creating project layer template object'''
+            project_template_instance = ProjectsLayerTemplate.objects.create(name=template_values['name'], geometry_type=template_values['geometry_type'], project=project_instance)
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            for attribute in template_attributes_values:
+                ProjectsLayerTemplateAttribute.objects.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
+    except Exception as e:
+        return Response(data='Error: '+str(e))
+    return Response(data={'message': f'{templates} Template imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
