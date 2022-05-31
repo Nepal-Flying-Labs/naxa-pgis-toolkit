@@ -69,20 +69,26 @@ def project_layers(request,id):
     try:
         theme_list=[]
         theme_qs=Theme.active.select_related('project').filter(project=id).order_by('order')
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme__project=id).order_by('order')
+        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme__project=id).values('id','layer','icon','icon_size','style')
+        layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme__project=id).order_by("order")
+
         for theme in theme_qs:
             group_list=[]
-            group_qs=LayerGroup.active.select_related('theme').filter(theme=theme.id).order_by("order")
+            group_qs=layer_group_queryset.filter(theme=theme.id).order_by("order")
             for group in group_qs:
                 group_layer_list=[]
-                group_layer_qs=Layer.active.select_related('group').filter(group=group.id).order_by('order')
+                group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
                 for layer in group_layer_qs:
                     layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                     if layer.layer_type=="Vector":
-                        layer_detail_instance=Vectorlayer.objects.select_related('layer').get(layer=layer.id)
-                        icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                        layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+                        # layer_detail_instance=layer.vector_layer
+                        icon_url=env("URL")+layer_detail_instance['icon'].url if layer_detail_instance['icon'] else None
                         layer_item['icon']=icon_url
-                        layer_item['icon_size']=layer_detail_instance.icon_size,
-                        layer_item['style']=layer_detail_instance.style
+                        layer_item['icon_size']=layer_detail_instance['icon_size'],
+                        layer_item['style']=layer_detail_instance['style']
+
                     # elif layer.layer_type=="Raster":
                     #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
                     # elif layer.layer_type=="WMS":
@@ -92,22 +98,22 @@ def project_layers(request,id):
                 group_list.append(group_item)
 
             layer_list=[]
-            layer_qs=Layer.active.select_related('theme').filter(theme=theme.id,group=None).order_by('order')
+            layer_qs=layer_queryset.filter(theme=theme.id,group=None).order_by('order')
+
             for layer in layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
-                    # print(layer.id,layer.layer_type)
-                    layer_detail_instance=Vectorlayer.objects.select_related('layer').get(layer=layer.id)
+                    layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                     sub_layer_list=[]
-                    sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
+                    sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                     for sub_layer in sub_layer_qs:
-                        icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
-                        sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
+                        icon_url=env("URL")+sub_layer['icon.url'] if sub_layer['icon'] else None
+                        sub_layer_item={"id":sub_layer['id'],"name":sub_layer['name'],'icon':icon_url,'icon_size':sub_layer['icon_size'],'style':sub_layer['style']}
                         sub_layer_list.append(sub_layer_item)
-                    icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                    icon_url=env("URL")+layer_detail_instance['icon'].url if layer_detail_instance['icon'] else None
                     layer_item['icon']=icon_url
-                    layer_item['icon_size']=layer_detail_instance.icon_size,
-                    layer_item['style']=layer_detail_instance.style
+                    layer_item['icon_size']=layer_detail_instance['icon_size'],
+                    layer_item['style']=layer_detail_instance['style']
                     layer_item['sub_layer']=sub_layer_list
                 # elif layer.layer_type=="Raster":
                 #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
@@ -296,18 +302,21 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
-    task_id = request.query_params.get('task_id', None)
-    result = AsyncResult(task_id, app=app)
-    if result.ready():                     # check task state: true/false
-        try:
-            response, layer_id = result.get()
-            if response == "successful":
-                return Response({"message": response, "layer_id": layer_id}, status=200)
-            else:
-                return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-    return Response({'message': "Please wait result"}, status=200)
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():                     # check task state: true/false
+            try:
+                response, layer_id = result.get()
+                if response == "successful":
+                    return Response({"message": response, "layer_id": layer_id}, status=200)
+                else:
+                    return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
 
 
 '''A viewset to create and update Theme objects.'''
@@ -383,17 +392,22 @@ class ThemeViewset(viewsets.ModelViewSet):
 
 def reorder_item(table_name,data):
     try:
-        if table_name=="theme":
-            model=Theme
-        else:
+        models={'theme':Theme,'layer':Layer}
+        try:
+            model=models[table_name]
+        except:
             return "Invalid params table"
+        instances=[]
         for key, value in data.items():
             instance = model.objects.get(id=key)
+            instances += [instance]
             instance.order = value
-            instance.save()
+
+        '''update order in bulk'''
+        model.objects.bulk_update(instances, ['order'])
         return "successful"
     except Exception as e:
-        return Response(str(e))
+        return str(e)
 
 @api_view(['POST'])
 def reorder(request):

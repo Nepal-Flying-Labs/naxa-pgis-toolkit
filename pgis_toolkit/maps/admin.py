@@ -14,7 +14,7 @@ class LayerGroupAdmin(admin.ModelAdmin):
     list_filter = ('theme',)
 
 class LayerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'name', 'layer_type', 'is_osm_layer')
+    list_display = ('id', 'is_deleted', 'order','name','group', 'layer_type', 'is_osm_layer')
     search_fields = ('id', 'name')
     list_filter = ('layer_type', 'default_load', 'is_osm_layer')
 

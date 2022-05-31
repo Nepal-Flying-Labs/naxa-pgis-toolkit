@@ -4,10 +4,11 @@ from celery import Celery, shared_task
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
 
+from config.settings.base import MEDIA_ROOT, env
 from config.settings.local import geoserver
 from pgis_toolkit.maps.api.serializers import (
     VectorLayerSerializer,
-    VectorLayerUpdateSerializer
+    VectorLayerUpdateSerializer,
 )
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -18,13 +19,14 @@ from pgis_toolkit.maps.models import (
     WMSLayer,
 )
 
-from .functions import handleCSV, handleGeoJSON, handleShapeFile
+from .functions import clear_dir, handleCSV, handleGeoJSON, handleShapeFile
 
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UploadVectorLayer(layer_id,request_data):
     print("entered UploadVectorLayer")
     errors=[]
+    dir = MEDIA_ROOT+"/geofiles/"
     try:
         layer_instance=Layer.objects.get(id=layer_id)
         layer_file_instance=LayerFile.objects.get(layer=layer_id)
@@ -34,31 +36,26 @@ def UploadVectorLayer(layer_id,request_data):
         file_extension = path_split[1]
         if file_extension == ".zip":
             response = handleShapeFile(layer_id)
-            if response=="successful":
-                return "successful", layer_id
-            else:
-                return response, None
         elif file_extension == ".csv":
-            # try:
             lat_field = request_data.get('lat_field')
             lon_field = request_data.get('lon_field')
             if not lat_field or not lon_field:
                 return "error occured: lat_field and lon_field are required" ,None
             response = handleCSV(layer_id,lat_field,lon_field)
-            if response=="successful":
-                return "successful", layer_id
-            else:
-                return response, None
         elif file_extension == ".geojson":
             response = handleGeoJSON(layer_id)
-            if response=="successful":
-                return "successful", layer_id
-            else:
-                return response, None
         else:
+            clear_dir(dir)
             return 'Error Occured: Invalid file extension', None
 
+        clear_dir(dir)
+        if response=="successful":
+            return "successful", layer_id
+        else:
+            return response, None
+
     except Exception as e:
+        clear_dir(dir)
         Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured: '+ str(errors), None
@@ -110,12 +107,13 @@ def UpdateVectorLayer(layer_instance, request_data):
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UploadRasterLayer(layer_id, request_dict):
-    from pgis_toolkit.maps.models import Layer, LayerFile, RasterLayer
-    from pgis_toolkit.maps.api.serializers import RasterLayerSerializer
-    from config.settings.local import geoserver
-    from config.settings.base import env, MEDIA_ROOT
     from django.core.files import File
+
+    from config.settings.base import MEDIA_ROOT, env
+    from config.settings.local import geoserver
+    from pgis_toolkit.maps.api.serializers import RasterLayerSerializer
     from pgis_toolkit.maps.functions import clear_dir
+    from pgis_toolkit.maps.models import Layer, LayerFile, RasterLayer
 
     try:
         errors=[]
@@ -173,10 +171,11 @@ def UploadRasterLayer(layer_id, request_dict):
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UpdateRasterLayer(layer_id, request_dict):
-    from pgis_toolkit.maps.models import Layer, RasterLayer
-    from config.settings.local import geoserver
-    from config.settings.base import MEDIA_ROOT
     from django.core.files import File
+
+    from config.settings.base import MEDIA_ROOT
+    from config.settings.local import geoserver
+    from pgis_toolkit.maps.models import Layer, RasterLayer
     '''update sld of raster layer'''
     try:
         layer_instance = Layer.active.get(pk=layer_id)
