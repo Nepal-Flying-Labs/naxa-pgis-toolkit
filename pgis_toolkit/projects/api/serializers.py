@@ -6,7 +6,7 @@ from pgis_toolkit.projects.models import (
     LayerTemplateAttribute,
     Organization,
     OrganizationCategory,
-    Project,
+    Project, Document
 )
 
 
@@ -148,3 +148,13 @@ class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
             # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
             raise serializers.ValidationError('length and precision should not be null')
         return data
+
+class DocumentListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        exclude=('uploaded_date','last_updated', 'project')
+
+class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = '__all__'

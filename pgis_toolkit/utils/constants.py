@@ -31,3 +31,18 @@ FILE_TYPE_CHOICES = (
     ('Shapefile', _('Shapefile')),
     ('GeoJSON', _('GeoJSON')),
 )
+
+PUBLISHED_MONTH_CHOICES = (
+    ('Jan', _('January')),
+    ('Feb', _('February')),
+    ('Mar', _('March')),
+    ('Apr', _('APril')),
+    ('May', _('May')),
+    ('Jun', _('June')),
+    ('Jul', _('July')),
+    ('Aug', _('August')),
+    ('Sep', _('September')),
+    ('Oct', _('October')),
+    ('Nov', _('November')),
+    ('Dec', _('December')),
+)

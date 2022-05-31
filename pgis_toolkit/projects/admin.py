@@ -43,6 +43,12 @@ class CountryAdmin (admin.ModelAdmin):
 class StateAdmin (admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
     search_fields = ('id', 'name', 'code')
+
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'project')
+    search_fields = ('id', 'name')
+    list_filter = ('project', 'published_year')
+
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
@@ -53,3 +59,4 @@ admin.site.register(LayerTemplateAttribute, LayerTemplateAttributeAdmin)
 admin.site.register(Country, CountryAdmin)
 admin.site.register(State, StateAdmin)
 admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
+admin.site.register(Document, DocumentAdmin)
