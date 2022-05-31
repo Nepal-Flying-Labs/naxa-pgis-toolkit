@@ -12,7 +12,8 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     get_layer_upload_task_response,
     layer_download,
     project_layers,
-    reorder,ProjectLayerTemplateViewset, ProjectLayerTemplateAttributeViewset
+    reorder,ProjectLayerTemplateViewset, ProjectLayerTemplateAttributeViewset,
+    import_template
 )
 
 router = DefaultRouter()
@@ -33,4 +34,5 @@ urlpatterns = [
     path('layer_vectortile/<int:z>/<int:x>/<int:y>/', LayerVectorTileQuerySet.as_view(), name='layer_vectortile'),
     path('layer_download/', layer_download, name='layer_download'),
     path('advance_filter_vectortile/<int:z>/<int:x>/<int:y>/', AdvanceFilterVectorTileQuerySet.as_view(), name="AdvanceFilterVectorTileQuerySet"),
+    path('import_template/', import_template, name='import_template'),
 ]
