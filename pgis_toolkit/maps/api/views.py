@@ -841,6 +841,7 @@ def import_template(request):
             template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
                 ProjectsLayerTemplateAttribute.objects.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
+        return Response(data={'message': f'{templates} Template imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
     except Exception as e:
+        ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
         return Response(data='Error: '+str(e))
-    return Response(data={'message': f'{templates} Template imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)

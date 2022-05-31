@@ -10,7 +10,7 @@ from pgis_toolkit.projects.api.views import (
     OrganizationViewset,
     ProjectLocationVectorTileQuerySet,
     ProjectViewset,
-    layer_template_download,
+    layer_template_download,DocumentViewset, document_download
 )
 
 router = DefaultRouter()
@@ -20,6 +20,7 @@ router.register(r'project', ProjectViewset, basename='project')
 router.register(r'default_theme', DefaultThemeViewset, basename='default_theme')
 router.register(r'layer_template', LayerTemplateViewset, basename='later_template')
 router.register(r'layer_template_attribute', LayerTemplateAttributeViewset, basename='layer_template_attribute')
+router.register(r'document', DocumentViewset, basename='document')
 
 app_name = "projects"
 urlpatterns = [
@@ -27,6 +28,6 @@ urlpatterns = [
     path('layer_template_download/', layer_template_download,
          name='layer_template_download'),
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
-    path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet.as_view(), name='project_location_vectortile')
-
+    path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet.as_view(), name='project_location_vectortile'),
+    path('document_download/', document_download, name='document_download')
 ]

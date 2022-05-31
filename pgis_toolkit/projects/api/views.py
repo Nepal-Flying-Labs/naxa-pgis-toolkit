@@ -29,7 +29,7 @@ from pgis_toolkit.projects.models import (
     Organization,
     OrganizationCategory,
     Project,
-    ProjectLocationFeatureCollection,
+    ProjectLocationFeatureCollection, Document
 )
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
@@ -551,3 +551,101 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
             queryset = queryset.filter(id__in=project_location_ids)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+class DocumentViewset(viewsets.ModelViewSet):
+    queryset=Document.objects.all()
+    http_method_names=['get', 'post', 'patch']
+    default_serializer_class = DocumentSerializer
+    serializer_classes = {
+        'list': DocumentListSerializer,
+        'retrieve': DocumentSerializer
+    }
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    
+    def create(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/projects/document/'''
+        try:
+            project = request.data.get('project', None)
+            name = request.data.get('name', None)
+            project = request.data.get('project', None)
+            if not project or not Project.active.filter(id=project).exists():
+                return Response(data={'message': 'Invalid project params!'}, status=status.HTTP_400_BAD_REQUEST)
+            if name and Document.objects.filter(Q(project__id=project) & Q(name=name)).exists():
+                return Response(data={'message': 'Cannot create duplicate document name for the same project!'}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                created_object = serializer.save()
+            return Response(data={'data': serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            Document.objects.get(id=created_object.id).delete()
+            return Response(data='Error: '+str(e))
+    
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        '''http://localhost:8000/api/projects/document/2/'''
+        try:
+            document_instance = Document.objects.get(pk=pk)
+            request.data._mutable = True
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            project = None
+            name = None
+            if 'project' in request_keys and request_dict['project'] != "" and 'name' in request_keys and request_dict['name'] != "":
+                project = request_dict['project']
+                name = request_dict['name']
+            elif 'project' in request_keys and request_dict['project'] != "":
+                project = request_dict['project']
+                name = document_instance.name
+            elif 'name' in request_keys and request_dict['name'] != "":
+                name = request_dict['name']
+                project = document_instance.project.id
+            if (name or project) and (Document.objects.exclude(pk=pk).filter(Q(project__id=project) & Q(name=name)).exists()):
+                return Response(data={'messgae': 'Cannot create duplicate document name for the same project!'})
+            if 'cover_image' in request_keys and isinstance(request_dict['cover_image'], str):
+                request_dict.pop('cover_image', None)
+                document_instance.cover_image = None
+                document_instance.cover_image_thumbnail = None
+            if 'file' in request_keys and isinstance(request_dict['file'], str):
+                request_dict.pop('file', None)
+                document_instance.file = None
+            serializer = self.get_serializer(document_instance, data=request_dict, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data='Error: '+str(e))
+
+    def list(self, request, *args, **kwargs):
+        '''http://localhost:8000/api/maps/document/?project=2'''
+        '''search is implemented from name field only.'''
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(project__id=project)
+        search_key = request.query_params.get('search_key', None)
+        if search_key:
+            queryset = queryset.filter(name__icontains=search_key)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+'''download document of a project'''
+@api_view(['GET'])
+def document_download(request):
+    '''http://localhost:8000/api/projects/document_download/?document=1'''
+    try:
+        document = request.query_params.get('document', None)
+        if not document:
+            return Response(data={'message': 'params document is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        if not Document.objects.filter(id=document).exists():
+            return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
+        document_instance = Document.objects.get(id=document)
+        document_extension = str(document_instance.file).split('.')[1]
+        document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
+        document_file = open(document_url, 'rb')
+        response = HttpResponse(
+            document_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{document_instance.name}.{document_extension}'
+        return response
+    except Exception as e:
+        return Response(data='Error: '+str(e))
