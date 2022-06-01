@@ -49,6 +49,11 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('project', 'published_year')
 
+class RequestDemoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'full_name', 'email', 'organization_name')
+    search_fields = ('id', 'full_name', 'email', 'organization_name')
+    list_filter = ('organization_name',)
+
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
@@ -60,3 +65,4 @@ admin.site.register(Country, CountryAdmin)
 admin.site.register(State, StateAdmin)
 admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
 admin.site.register(Document, DocumentAdmin)
+admin.site.register(RequestDemo, RequestDemoAdmin)

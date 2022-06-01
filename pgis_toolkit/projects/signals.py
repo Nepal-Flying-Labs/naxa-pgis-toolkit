@@ -1,9 +1,15 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+
+from config.settings import base as settings
+
 from rest_framework import status
 from rest_framework.response import Response
 
-from pgis_toolkit.projects.models import DefaultTheme, Document
+from pgis_toolkit.projects.models import DefaultTheme, Document, RequestDemo
 from pgis_toolkit.maps.models import Theme, Project
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
@@ -35,5 +41,29 @@ def post_save_document(sender, created, instance,**kwargs):
             make_thumbnail(instance.cover_image, instance.cover_image_thumbnail)
             return Response(status=status.HTTP_200_OK, data={"Message": "Cover Image Thumbnail Successfully created"})
     except Exception as e:
+        errors.append({'errorName': str(e), 'details': str(e)})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+@receiver(post_save, sender=RequestDemo)
+def post_save_requestdemo(sender, created, instance, **kwargs):
+    '''
+    This signal is to send email to the user requesting demo of pgis tool.
+    '''
+    errors=[]
+    try:
+        if created:
+            data = {
+                'paragraph_1': 'Thank you for taking interest in USAFIRI mapping tool. We will look on our availability and inform you the timings of the demo.',
+            }
+            template = 'email/email_request_demo.html'
+            html_message = render_to_string(template, data)
+            message = strip_tags(html_message)
+            subject = 'Succesful Request for Demo, USAFIRI'
+            from_email = settings.EMAIL_HOST_USER
+            recipient_list = [instance.email]
+            send_mail(subject, message, from_email, recipient_list,
+                    html_message=html_message, fail_silently=False)
+    except Exception as e:
+        instance.delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})

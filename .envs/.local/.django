@@ -11,3 +11,7 @@ GEOSERVER_ADDRESS=http://geoserver:8080/geoserver
 GEOSERVER_USERNAME=admin
 GEOSERVER_PASSWORD=geoserver
 CONNECTION_DB=postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit
+
+#email
+DJANGO_EMAIL_HOST_USER=naxatestsmtp@gmail.com
+DJANGO_EMAIL_HOST_PASSWORD=adorysqnwyucfkom

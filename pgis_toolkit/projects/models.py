@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 
 from pgis_toolkit.utils.constants import (
     DATA_TYPE_CHOICES,
@@ -12,7 +12,7 @@ from pgis_toolkit.utils.constants import (
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
     UNIT_CHOICES,
-    PUBLISHED_MONTH_CHOICES,
+    PUBLISHED_MONTH_CHOICES, CURRENT_YEAR
 )
 
 from .utils.managers import ActiveManager
@@ -227,7 +227,7 @@ class Document(DateTimeStamp):
     project=models.ForeignKey(Project, on_delete=models.CASCADE)
     cover_image=models.ImageField(upload_to='documents/cover_images/', blank=True, null=True)
     cover_image_thumbnail=models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
-    published_year = models.IntegerField(validators=[MaxValueValidator(2022), MinValueValidator(1980)])
+    published_year = models.IntegerField(validators=[MaxValueValidator(CURRENT_YEAR), MinValueValidator(1980)])
     published_month = models.CharField(max_length=3, choices=PUBLISHED_MONTH_CHOICES, blank=True, null=True)
     published_day = models.IntegerField(validators=[MaxValueValidator(31), MinValueValidator(1)], blank=True, null=True)
     file = models.FileField(upload_to='documents/files/', blank=True, null=True)
@@ -236,3 +236,14 @@ class Document(DateTimeStamp):
     class Meta:
         app_label = 'projects'
         unique_together = (("project", "name"),)
+
+class RequestDemo(DateTimeStamp):
+    full_name = models.CharField(max_length=254)
+    email = models.EmailField(max_length=254)
+    #validators=[RegexValidator(r'^\d{1,10}$')]
+    phone = models.CharField(max_length=10, blank=True, null=True) #no validators since pgis_toolkit users are foreign.
+    organization_name = models.CharField(max_length=254, blank=True, null=True)
+    marketing_communications = models.BooleanField(default=False)
+
+    class Meta:
+        app_label = 'projects'

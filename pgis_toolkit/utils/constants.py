@@ -1,4 +1,5 @@
 from django.utils.translation import ugettext_lazy as _
+from datetime import date
 
 LAYER_TYPE_CHOICES=(("Raster",_("Raster")),("Vector",_('Vector')),('WMS',_('WMS')))
 GEOMETRY_TYPE_CHOICES=(
@@ -46,3 +47,5 @@ PUBLISHED_MONTH_CHOICES = (
     ('Nov', _('November')),
     ('Dec', _('December')),
 )
+
+CURRENT_YEAR = int(date.today().year)
