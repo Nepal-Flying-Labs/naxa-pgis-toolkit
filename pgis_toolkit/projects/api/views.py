@@ -19,7 +19,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
@@ -29,7 +29,7 @@ from pgis_toolkit.projects.models import (
     Organization,
     OrganizationCategory,
     Project,
-    ProjectLocationFeatureCollection, Document
+    ProjectLocationFeatureCollection, Document, RequestDemo
 )
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
@@ -649,3 +649,15 @@ def document_download(request):
         return response
     except Exception as e:
         return Response(data='Error: '+str(e))
+
+class RequestDemoViewset(viewsets.ModelViewSet):
+    queryset = RequestDemo.objects.all()
+    serializer_class = RequestDemoSerializer
+    http_method_names = ['get', 'post']
+    
+    def get_permissions(self):
+        if self.action == 'list' or self.action == 'retrieve':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'create':
+            permission_classes = [AllowAny]
+        return [permission() for permission in permission_classes]

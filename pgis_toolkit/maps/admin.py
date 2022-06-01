@@ -57,7 +57,7 @@ class FeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer','sub_layer')
 
 class ProjectLayerTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'geometry_type')
+    list_display = ('id', 'name', 'geometry_type', 'project')
     search_fields = ('id', 'name')
     list_filter = ('geometry_type','project')
 

@@ -6,7 +6,7 @@ from pgis_toolkit.projects.models import (
     LayerTemplateAttribute,
     Organization,
     OrganizationCategory,
-    Project, Document
+    Project, Document, RequestDemo
 )
 
 
@@ -157,4 +157,9 @@ class DocumentListSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
+        fields = '__all__'
+    
+class RequestDemoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RequestDemo
         fields = '__all__'
