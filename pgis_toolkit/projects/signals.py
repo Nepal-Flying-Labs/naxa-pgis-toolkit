@@ -9,7 +9,7 @@ from config.settings import base as settings
 from rest_framework import status
 from rest_framework.response import Response
 
-from pgis_toolkit.projects.models import DefaultTheme, Document, RequestDemo
+from pgis_toolkit.projects.models import DefaultTheme, Document, RequestDemo, RequestDemoAlert
 from pgis_toolkit.maps.models import Theme, Project
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
@@ -52,6 +52,7 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
     errors=[]
     try:
         if created:
+            '''sending response to the user requesting demo'''
             data = {
                 'paragraph_1': 'Thank you for taking interest in USAFIRI mapping tool. We will look on our availability and inform you the timings of the demo.',
             }
@@ -61,6 +62,23 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
             subject = 'Succesful Request for Demo, USAFIRI'
             from_email = settings.EMAIL_HOST_USER
             recipient_list = [instance.email]
+            send_mail(subject, message, from_email, recipient_list,
+                    html_message=html_message, fail_silently=False)
+            '''informing the concerned team members of USAFIRI that a demo is requested.'''
+            data = {
+                'paragraph_1': f'''This is to inform you that Mr./Mrs. {instance.full_name} has requested for a demo of USAFIRI mapping tool.\nCredentials of the requesting user is as follows:
+                                    Name: {instance.full_name}
+                                    Email: {instance.email}
+                                    Phone: {instance.phone}
+                                    Organization: {instance.organization_name}
+                                    Marketing Communications: {instance.marketing_communications}''',
+            }
+            template = 'email/email_request_demo.html'
+            html_message = render_to_string(template, data)
+            message = strip_tags(html_message)
+            subject = 'Request for Demo'
+            from_email = settings.EMAIL_HOST_USER
+            recipient_list = RequestDemoAlert.objects.values_list('email', flat=True)
             send_mail(subject, message, from_email, recipient_list,
                     html_message=html_message, fail_silently=False)
     except Exception as e:

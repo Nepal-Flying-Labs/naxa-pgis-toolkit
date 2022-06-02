@@ -6,29 +6,49 @@ from django.utils.translation import gettext_lazy as _
 from pgis_toolkit.users.forms import UserAdminChangeForm, UserAdminCreationForm
 
 User = get_user_model()
+from .models import UserRole
 
+# @admin.register(User)
+# class UserAdmin(auth_admin.UserAdmin):
 
-@admin.register(User)
-class UserAdmin(auth_admin.UserAdmin):
+#     form = UserAdminChangeForm
+#     add_form = UserAdminCreationForm
+#     fieldsets = (
+#         (None, {"fields": ("username", "password")}),
+#         (_("Personal info"), {"fields": ("name", "email")}),
+#         (
+#             _("Permissions"),
+#             {
+#                 "fields": (
+#                     "is_active",
+#                     "is_staff",
+#                     "is_superuser",
+#                     "groups",
+#                     "user_permissions",
+#                 ),
+#             },
+#         ),
+#         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
+#     )
+#     list_display = ["username", "name", "is_superuser"]
+#     search_fields = ["name"]
 
-    form = UserAdminChangeForm
-    add_form = UserAdminCreationForm
+class UserAdmin(admin.ModelAdmin):
     fieldsets = (
-        (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {"fields": ("name", "email")}),
-        (
-            _("Permissions"),
-            {
-                "fields": (
-                    "is_active",
-                    "is_staff",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                ),
-            },
-        ),
+        (None, {"fields": ("is_deleted",)}),
+        (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
+        (_("Personal info"), {"fields": ("full_name", "email")}),
+        (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
-    list_display = ["username", "name", "is_superuser"]
-    search_fields = ["name"]
+    list_display = ("username", "full_name", "is_superuser")
+    search_fields = ("full_name",)
+
+admin.site.register(User, UserAdmin)
+
+class UserRoleAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'organization', 'group', 'project')
+    search_fields = ('id', 'user')
+    list_filter = ('organization', 'group', 'project')
+
+admin.site.register(UserRole, UserRoleAdmin)
