@@ -6,6 +6,7 @@ set -o nounset
 
 # python manage.py makemigrations
 # python manage.py migrate --fake
+python manage.py collectstatic --no-input
 python manage.py migrate
 # python manage.py runserver_plus --noreload addrport 0.0.0.0:8000
 python manage.py runserver_plus --noreload 0.0.0.0:8000
