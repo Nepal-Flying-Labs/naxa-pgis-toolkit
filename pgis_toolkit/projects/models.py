@@ -247,3 +247,10 @@ class RequestDemo(DateTimeStamp):
 
     class Meta:
         app_label = 'projects'
+
+class RequestDemoAlert(models.Model):
+    name = models.CharField(max_length=254, blank=True, null=True)
+    email = models.EmailField(max_length=254)
+    
+    class Meta:
+        app_label = 'projects'
