@@ -2,6 +2,7 @@ import json
 import operator
 import os
 import shutil
+import time
 from functools import reduce
 
 import fiona
@@ -26,13 +27,14 @@ from pgis_toolkit.maps.models import (
     Layer,
     LayerFile,
     LayerGroup,
+    ProjectsLayerTemplate,
+    ProjectsLayerTemplateAttribute,
     RasterLayer,
     SubLayer,
     Theme,
     Vectorlayer,
-    WMSLayer, ProjectsLayerTemplate, ProjectsLayerTemplateAttribute
+    WMSLayer,
 )
-from pgis_toolkit.projects.models import Project, LayerTemplate, LayerTemplateAttribute
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -40,6 +42,7 @@ from pgis_toolkit.maps.tasks import (
     UploadVectorLayer,
     UploadWMSLayer,
 )
+from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 
@@ -50,13 +53,16 @@ from .serializers import (
     LayerGroupSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
+    ProjectLayerTemplateListSerializer,
+    ProjectLayerTemplateSerializer,
+    ProjectsLayerTemplateAttributeListSerializer,
+    ProjectsLayerTemplateAttributeSerializer,
     SubLayerListSerializer,
     SubLayerSerializer,
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
-    ProjectLayerTemplateListSerializer, ProjectLayerTemplateSerializer, ProjectsLayerTemplateAttributeListSerializer, ProjectsLayerTemplateAttributeSerializer
 )
 
 
@@ -190,6 +196,13 @@ class LayerAPIView(APIView):
                         Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
                     request_dict.pop('file')
+                    '''wait untils the layer instance is created'''
+                    iterate=True
+                    while iterate:
+                        if Layer.objects.filter(id=created_object.id).exists():
+                            iterate=False
+                        else:
+                            time.sleep(3)
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
@@ -695,7 +708,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def list(self, request, *args, **kwargs):
         '''http://localhost:8000/api/maps/project_layer_template/?project=2'''
         project = request.query_params.get('project', None)
@@ -762,7 +775,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def list(self, request, *args, **kwargs):
         '''http://localhost:8000/api/maps/project_layer_template_attribute/?template=2'''
         layer_template = request.query_params.get('layer_template', None)
