@@ -66,12 +66,12 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
                     html_message=html_message, fail_silently=False)
             '''informing the concerned team members of USAFIRI that a demo is requested.'''
             data = {
-                'paragraph_1': f'''This is to inform you that Mr./Mrs. {instance.full_name} has requested for a demo of USAFIRI mapping tool.\nCredentials of the requesting user is as follows:
-                                    Name: {instance.full_name}
-                                    Email: {instance.email}
-                                    Phone: {instance.phone}
-                                    Organization: {instance.organization_name}
-                                    Marketing Communications: {instance.marketing_communications}''',
+                'paragraph_1': f'This is to inform you that Mr./Mrs. {instance.full_name} has requested for a demo of USAFIRI mapping tool. Credentials of the requesting user is as follows: \
+                \nName: {instance.full_name} \
+                \nEmail: {instance.email} \
+                \nPhone: {instance.phone} \
+                \nOrganization: {instance.organization_name} \
+                \nMarketing Communications: {instance.marketing_communications}',
             }
             template = 'email/email_request_demo.html'
             html_message = render_to_string(template, data)
