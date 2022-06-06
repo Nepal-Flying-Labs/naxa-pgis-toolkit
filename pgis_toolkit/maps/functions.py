@@ -56,7 +56,7 @@ def geoserver_layer_publish(layer_instance):
         geoserver.publish_featurestore_sqlview(store_name=table_name, name=table_name, sql=sql, workspace=workspace_name)
 
         vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
-        vector_layer_instance.geoserver_workspace = "pgis"
+        vector_layer_instance.geoserver_workspace = workspace_name
         vector_layer_instance.geoserver_layer_name = table_name
         vector_layer_instance.save()
         return "successful"
