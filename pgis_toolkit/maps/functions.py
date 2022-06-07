@@ -3,9 +3,11 @@ import os
 import shutil
 import zipfile
 from distutils.command.config import config
+from typing import List, Optional, Set
 
 import geopandas as gpd
 import pandas as pd
+import requests
 from django.contrib.gis.geos import GEOSGeometry
 from shapely import speedups
 from shapely.geometry import (
@@ -22,6 +24,131 @@ from config.settings.base import env
 from config.settings.local import geoserver
 
 from .models import FeatureCollection, Layer, LayerAttribute, LayerFile, Vectorlayer
+
+
+class Geoserver1:
+    """
+    Attributes
+    ----------
+    service_url : str
+        The URL for the GeoServer instance.
+    username : str
+        Login name for session.
+    password: str
+        Password for session.
+    """
+
+    def __init__(
+        self,
+        service_url: str = "http://geoserver:8080/geoserver",  # default deployment url during installation
+        username: str = "admin",  # default username during geoserver installation
+        password: str = "geoserver",  # default password during geoserver installation
+    ):
+        self.service_url = service_url
+        self.username = username
+        self.password = password
+
+        # private request method to reduce repetition of putting auth(username,password) in all requests call. DRY principle
+
+    def _requests(self, method: str, url: str, **kwargs) -> requests.Response:
+        if method == "post":
+            return requests.post(url, auth=(self.username, self.password), **kwargs)
+        elif method == "get":
+            return requests.get(url, auth=(self.username, self.password), **kwargs)
+        elif method == "put":
+            return requests.put(url, auth=(self.username, self.password), **kwargs)
+
+    def get_workspaces(self):
+        """
+        Returns all the workspaces.
+        """
+        try:
+            url = "{}/rest/workspaces".format(self.service_url)
+            r = requests.get(url, auth=(self.username, self.password))
+            return r.json()
+
+        except Exception as e:
+            return "get_workspaces error: {}".format(e)
+
+    def publish_featurestore_sqlview(
+        self,
+        name: str,
+        store_name: str,
+        sql: str,
+        geom_name: str = "geom",
+        geom_type: str = "Geometry",
+        srid: Optional[int] = 4326,
+        workspace: Optional[str] = None,
+    ):
+        """
+
+        Parameters
+        ----------
+        name : str
+        store_name : str
+        sql : str
+        geom_name : str
+        geom_type : str
+        workspace : str, optional
+
+        """
+        if workspace is None:
+            workspace = "default"
+
+        layer_xml = """<featureType>
+        <name>{0}</name>
+        <enabled>"off"</enabled>
+        <inMemoryCached>false</inMemoryCached>
+        <namespace>
+            <name>{4}</name>
+        </namespace>
+        <title>{0}</title>
+        <srs>EPSG:{5}</srs>
+        <metadata>
+            <entry key="JDBC_VIRTUAL_TABLE">
+                <virtualTable>
+                    <name>{0}</name>
+                    <sql>{1}</sql>
+                    <escapeSql>true</escapeSql>
+                    <geometry>
+                        <name>{2}</name>
+                        <type>{3}</type>
+                        <srid>{5}</srid>
+                    </geometry>
+                </virtualTable>
+            </entry>
+        </metadata>
+        </featureType>""".format(
+            name, sql, geom_name, geom_type, workspace, srid
+        )
+
+        url = "{}/rest/workspaces/{}/datastores/{}/featuretypes".format(
+            self.service_url, workspace, store_name
+        )
+
+        headers = {"content-type": "text/xml"}
+
+        try:
+            r = requests.post(
+                url,
+                data=layer_xml,
+                auth=(self.username, self.password),
+                headers=headers,
+            )
+            if r.status_code not in [200, 201]:
+                return "{}: Data can not be published! {}".format(
+                    r.status_code, r.content
+                )
+
+        except Exception as e:
+            return "Error: {}".format(e)
+
+def test_advertised():
+    geoserver1=Geoserver1()
+    print(geoserver1.get_workspaces(),"geoserver1")
+    sql = 'SELECT * FROM maps_featurecollection WHERE layer_id = 309'
+    geoserver.publish_featurestore_sqlview(store_name="SecurityForcesGeoserver88", name="SecurityForcesGeoserver88_mannual7", sql=sql, workspace='pgis')
+
 
 
 def geoserver_layer_publish(layer_instance):
@@ -62,8 +189,8 @@ def geoserver_layer_publish(layer_instance):
         return "successful"
 
     except Exception as e:
-        print(str(e),"geo error")
-        Layer.objects.filter(id=layer_instance.id).delete()
+        # print(str(e),"geo error")
+        # Layer.objects.filter(id=layer_instance.id).delete()
         return "geoserver error: "+str(e)
 
 def get_geometry(geometry, geom_type):
@@ -174,12 +301,10 @@ def upload_feature(geodataframe, layer_instance, geom_type):
 
         # '''Geoserver layer publish'''
         response = geoserver_layer_publish(layer_instance)
-        # if not response == "successful":
-        #     Layer.objects.filter(id=layer_id).delete()
         return response
 
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return "error in feature upload: "+str(e)
 
 
@@ -229,12 +354,12 @@ def handleShapeFile(layer_id):
             elif "Polygon" and "MultiPolygon" in geom_types:
                 geom_type = "MultiPolygon"
             else:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return (f"error occured : more than one geometry type is found i.e. {geom_types}")
         elif len(geom_types) > 2:
             return (f"error occured : more than one geometry type is found i.e. {geom_types}")
         else:
-            Layer.objects.filter(id=layer_id).delete()
+            # Layer.objects.filter(id=layer_id).delete()
             return (f"error occured : missing geometry")
 
         vector_layer_instance.geom_type = geom_type
@@ -244,7 +369,7 @@ def handleShapeFile(layer_id):
             geodataframe, layer_instance, geom_type)
         return response
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 
