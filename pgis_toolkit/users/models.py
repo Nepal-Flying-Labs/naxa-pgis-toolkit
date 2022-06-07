@@ -1,12 +1,9 @@
-from django.contrib.auth.models import AbstractUser, Group
+from django.contrib.auth.models import AbstractUser, Group, UserManager
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from pgis_toolkit.projects.models import (
-    DateTimeStamp,
-    IsDeleted,
-    Organization, Project
-)
+
+from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 
 # class User(AbstractUser):
 #     """
@@ -36,7 +33,7 @@ class User(IsDeleted, AbstractUser):
     full_name = models.CharField(max_length=254)
     '''removing unnecessary fields'''
     first_name = None
-    last_name = None  
+    last_name = None
     groups = None
     user_permissions = None
     address = models.CharField(max_length=254)
@@ -44,6 +41,7 @@ class User(IsDeleted, AbstractUser):
     image_thumbnail = models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
     contact = models.CharField(max_length=13, blank=True, null=True)
     email_verification_token = models.UUIDField(blank=True, null=True)
+    objects = UserManager()
 
     class Meta:
         app_label = 'users'
