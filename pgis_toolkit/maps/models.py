@@ -118,6 +118,7 @@ class Vectorlayer(DateTimeStamp):
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True) #icon for point datatype
     icon_size = models.JSONField(blank=True, null=True)
+    icon_url=models.URLField(blank=True,null=True)
 
     show_label = models.BooleanField(default=False)
     label_field = models.CharField(max_length=100, blank=True, null=True) #field name on which basis feature is label
