@@ -52,6 +52,7 @@ def UploadVectorLayer(layer_id,request_data):
         if response=="successful":
             return "successful", layer_id
         else:
+            Layer.objects.filter(id=layer_id).delete()
             return response, None
 
     except Exception as e:
