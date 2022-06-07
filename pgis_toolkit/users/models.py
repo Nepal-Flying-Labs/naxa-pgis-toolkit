@@ -55,3 +55,13 @@ class UserRole(IsDeleted):
     class Meta:
         app_label = 'users'
         unique_together = (("user", "project"),)
+
+class PreliminaryUser(IsDeleted):
+    email = models.EmailField(max_length=254, unique=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
+    email_verification_token = models.UUIDField()
+    
+    class Meta:
+        app_label = 'users'
