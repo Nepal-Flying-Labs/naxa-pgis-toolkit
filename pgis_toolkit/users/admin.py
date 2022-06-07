@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from pgis_toolkit.users.forms import UserAdminChangeForm, UserAdminCreationForm
 
 User = get_user_model()
-from .models import UserRole
+from .models import UserRole, PreliminaryUser
 
 # @admin.register(User)
 # class UserAdmin(auth_admin.UserAdmin):
@@ -44,11 +44,17 @@ class UserAdmin(admin.ModelAdmin):
     list_display = ("username", "full_name", "is_superuser")
     search_fields = ("full_name",)
 
-admin.site.register(User, UserAdmin)
-
 class UserRoleAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'organization', 'group', 'project')
     search_fields = ('id', 'user')
     list_filter = ('organization', 'group', 'project')
 
+class PreliminaryUserAdmin(admin.ModelAdmin):
+    list_display = ('id', 'email', 'organization', 'project', 'group')
+    search_fields = ('id', 'email')
+    list_filter = ('organization', 'project', 'group')
+
+
+admin.site.register(User, UserAdmin)
 admin.site.register(UserRole, UserRoleAdmin)
+admin.site.register(PreliminaryUser, PreliminaryUserAdmin)
