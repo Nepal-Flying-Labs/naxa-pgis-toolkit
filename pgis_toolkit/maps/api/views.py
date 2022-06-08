@@ -70,7 +70,7 @@ from .serializers import (
 def project_layers(request,id):
     '''
     http://0.0.0.0:8000/api/maps/project_layers/<project_id>/
-    This API is for the left bar of the map page
+    This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
     '''
     try:
         theme_list=[]
@@ -133,6 +133,10 @@ def project_layers(request,id):
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 class LayerAPIView(APIView):
+    '''
+    View for Layer instance
+    http://0.0.0.0:8000/api/maps/layer/
+    '''
     def get_object(self, pk):
         try:
             return Layer.objects.get(pk=pk)
@@ -141,6 +145,7 @@ class LayerAPIView(APIView):
 
     def get(self, request, pk, format=None):
         '''
+        This action is to retrieve the layer detail
         http://0.0.0.0:8000/api/maps/layer/<layer_id>/
         '''
         try:
@@ -315,6 +320,9 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
+    '''
+    View to get the response of aynchronous task run for vector and raster layer upload
+    '''
     try:
         task_id = request.query_params.get('task_id', None)
         result = AsyncResult(task_id, app=app)
@@ -332,8 +340,10 @@ def get_layer_upload_task_response(request):
         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
 
 
-'''A viewset to create and update Theme objects.'''
 class ThemeViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for Theme instance.
+    '''
     queryset = Theme.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ThemeSerializer
@@ -425,6 +435,8 @@ def reorder_item(table_name,data):
 @api_view(['POST'])
 def reorder(request):
     '''
+    General functional view to manage ordering
+    table=theme or layer
     http://0.0.0.0:8000/api/maps/reorder/?table=theme
     '''
     try:
@@ -440,9 +452,9 @@ def reorder(request):
         return Response(data={'message': 'error occured','error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-'''VectorTile Generation for Maps Layer'''
 class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     '''
+    VectorTile Generation for Maps Layer
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
@@ -463,10 +475,12 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
-'''VectorTile Generation for Advance Filter Layer'''
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
-    #http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer_id=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    '''
+    VectorTile Generation for Advance Filter Layer
+    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer_id=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    '''
 
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'layer', 'attributes')
@@ -511,12 +525,12 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = result_dataset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
-'''download vectort data in popular formats'''
 @api_view(['GET'])
 def layer_download(request):
     '''
+    Download vector data in popular formats
     http://localhost:8000/api/maps/layer_download/?layer_id=200&output_format=shapefile
-    choices:'shapefile', 'geojson', 'csv', 'kml', 'gpx'
+    format supported: 'shapefile', 'geojson', 'csv', 'kml', 'gpx'
     '''
     layer_id = request.query_params.get('layer_id', None)
     output_format = request.query_params.get('output_format', None)
@@ -583,7 +597,7 @@ def layer_download(request):
             response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.kml'
         elif output_format == "gpx":
             response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.gpx'
-        '''clearing the dir'''
+        '''clearing the directory'''
         clear_dir(dir)
         return response
     except Exception as e:
@@ -591,6 +605,9 @@ def layer_download(request):
         return Response(status=404, data={'Error': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for FeatureCollection innstance
+    '''
     queryset = FeatureCollection.active.all()
     http_method_names = ['get']
     default_serializer_class = FeatureCollectionSerializer
@@ -631,8 +648,10 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         return paginator.get_paginated_response(data=serializer.data)
 
 
-'''A viewset to create and update Layer Group objects.'''
 class LayerGroupViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for LayerGroup objects.
+    '''
     queryset = LayerGroup.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = LayerGroupSerializer
@@ -697,6 +716,9 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for ProjectLayerTemplate objects.
+    '''
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectLayerTemplateSerializer
@@ -710,7 +732,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template/?project=2'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template/?project=2
+        '''
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
@@ -719,7 +743,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template/'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template/
+        '''
         errors = []
         try:
             name = request.data.get('name', None)
@@ -740,7 +766,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template/1/'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template/1/
+        '''
         errors = []
         request_dict = request.data
         request_keys = request_dict.keys()
@@ -764,6 +792,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for ProjectLayerTemplateAttribute objects.
+    '''
     queryset = ProjectsLayerTemplateAttribute.objects.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
@@ -777,7 +808,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template_attribute/?template=2'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template_attribute/?template=2
+        '''
         layer_template = request.query_params.get('layer_template', None)
         if not layer_template:
             return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
@@ -786,7 +819,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template_attribute/'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template_attribute/
+        '''
         errors = []
         try:
             name = request.data.get('name', None)
@@ -807,7 +842,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
-        '''http://localhost:8000/api/maps/project_layer_template_attribute/1/'''
+        '''
+        http://localhost:8000/api/maps/project_layer_template_attribute/1/
+        '''
         errors = []
         request_dict = request.data
         request_keys = request_dict.keys()
@@ -830,9 +867,11 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
-'''Import General Template for a specific project'''
 @api_view(['POST'])
 def import_template(request):
+    '''
+    View to import General Template for a specific project
+    '''
     try:
         project = request.data.get('project', None)
         if not project or not Project.active.filter(id=project).exists():
