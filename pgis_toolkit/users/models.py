@@ -55,11 +55,12 @@ class UserRole(IsDeleted):
     class Meta:
         app_label = 'users'
         unique_together = (("user", "project"),)
-
+        
+'''Model to store required information to verify and identify user for registration using the email invite approach'''
 class PreliminaryUser(IsDeleted):
     email = models.EmailField(max_length=254, unique=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
     email_verification_token = models.UUIDField()
     
