@@ -21,7 +21,7 @@ from django.db.models import Q
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser
 
-from .serializers import UserSerializer, PreliminaryUserSerializer
+from .serializers import UserSerializer, PreliminaryUserSerializer, UserRoleSerializer
 
 User = get_user_model()
 
@@ -155,7 +155,19 @@ class PreliminaryUserGETAPIView(APIView):
             preliminary_user_instance = PreliminaryUser.objects.get(email_verification_token=token)
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)
-            data_dict['user_created'] = True if User.active.filter(email=preliminary_user_instance.email) else False
-            return Response(data=data_dict, status=status.HTTP_200_OK)
+            '''checking whether the user is already registered'''
+            if User.active.filter(email=preliminary_user_instance.email).exists():
+                data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
+                data_dict['user_created'] = True 
+                '''creating new user role for already registered user'''
+                user_role_serializer = UserRoleSerializer(data=data_dict)
+                if user_role_serializer.is_valid():
+                    user_role_serializer.save()
+                    '''delete PreliminaryUserInstance once the job is done'''
+                    preliminary_user_instance.delete()
+                    return Response(data={'message': 'Successully created new user role.', 'data': data_dict}, status=status.HTTP_200_OK)
+            else:
+                data_dict['user_created'] = False
+                return Response(data=data_dict, status=status.HTTP_200_OK)
         except Exception as e:
             return Response('Error: ' + str(e))
