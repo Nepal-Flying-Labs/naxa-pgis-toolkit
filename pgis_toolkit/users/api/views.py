@@ -42,11 +42,7 @@ env = environ.Env()
 #         serializer = UserSerializer(request.user, context={"request": request})
 #         return Response(status=status.HTTP_200_OK, data=serializer.data)
 
-class UsersViewsSet(viewsets.ModelViewSet):
-    queryset = User.active.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'post', 'patch']
+
 
 '''
 for project invite, organzation is required in payload.
@@ -142,6 +138,7 @@ class PreliminaryUserAPIView(APIView):
             errors.append({'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
+'''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserGETAPIView(APIView):
     '''http://localhost:8000/api/users/preliminary_user_retrieve/?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
     permission_classes = [AllowAny]
@@ -171,3 +168,10 @@ class PreliminaryUserGETAPIView(APIView):
                 return Response(data=data_dict, status=status.HTTP_200_OK)
         except Exception as e:
             return Response('Error: ' + str(e))
+
+'''Viewset to CRUD operations of user model'''
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.active.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch']
