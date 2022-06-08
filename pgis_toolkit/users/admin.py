@@ -41,7 +41,7 @@ class UserAdmin(admin.ModelAdmin):
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
-    list_display = ("username", "full_name", "is_superuser")
+    list_display = ("is_deleted","id", "full_name", "email", "is_active")
     search_fields = ("full_name",)
 
 class UserRoleAdmin(admin.ModelAdmin):
