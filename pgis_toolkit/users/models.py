@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
-
+from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 # class User(AbstractUser):
 #     """
 #     Default custom user model for PGIS toolkit.
@@ -36,6 +36,8 @@ class User(IsDeleted, AbstractUser):
     last_name = None
     groups = None
     user_permissions = None
+    #overriding email field by making it unique field
+    email = models.EmailField(unique=True)
     address = models.CharField(max_length=254)
     image = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     image_thumbnail = models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
@@ -45,6 +47,15 @@ class User(IsDeleted, AbstractUser):
 
     class Meta:
         app_label = 'users'
+
+    def save(self, *args, **kwargs):
+        if self.image:
+            if not make_thumbnail(self.image, self.image_thumbnail):
+                raise Exception(
+                    'Could not create thumbnail- is the file type is valid')
+        # if self.password:
+        #     self.password=make_password(self.password)
+        super(User, self).save(*args, **kwargs)
 
 class UserRole(IsDeleted):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

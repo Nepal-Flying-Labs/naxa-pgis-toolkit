@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from pgis_toolkit.users.models import PreliminaryUser
+from pgis_toolkit.users.models import PreliminaryUser, UserRole
 User = get_user_model()
 
 
@@ -16,9 +16,14 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("username", "name")
+        fields = '__all__'
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = PreliminaryUser
+        fields = '__all__'
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserRole
         fields = '__all__'
