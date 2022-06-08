@@ -208,8 +208,8 @@ class LayerAPIView(APIView):
                             iterate=False
                         else:
                             time.sleep(3)
-                    response=UploadVectorLayer.delay(created_object.id,request_dict)
-                    # return Response(response)
+                    response=UploadVectorLayer(created_object.id,request_dict)
+                    return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
 

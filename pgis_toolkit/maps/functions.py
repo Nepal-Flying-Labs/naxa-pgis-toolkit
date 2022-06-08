@@ -1,11 +1,14 @@
 import glob
+import json
 import os
 import shutil
 import zipfile
 from distutils.command.config import config
 from typing import List, Optional, Set
 
+import fiona
 import geopandas as gpd
+import kml2geojson
 import pandas as pd
 import requests
 from django.contrib.gis.geos import GEOSGeometry
@@ -392,6 +395,59 @@ def handleCSV(layer_id,lat_field,lon_field):
 
         geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
 
+        response = upload_feature(
+            geodataframe, layer_instance,geom_type)
+        return response
+    except Exception as e:
+        Layer.objects.filter(id=layer_id).delete()
+        return ("error occured : " + str(e))
+
+def handleKML(layer_id):
+    try:
+        layer_instance = Layer.objects.get(id=layer_id)
+        file_object = LayerFile.objects.get(layer=layer_id)
+        my_file = file_object.file.path
+        file_dir = os.path.dirname(my_file)
+        convert_response=kml2geojson.main.convert(my_file, "/app/pgis_toolkit/media/")
+        temp_geojson_file_path="/app/pgis_toolkit/media/geofiles/temp_geojson.geojson"
+        with open(temp_geojson_file_path, 'w') as f:
+            json.dump(convert_response[0], f, indent=2)
+        geodataframe = gpd.read_file(temp_geojson_file_path)
+
+        # gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'raw'
+        # geodataframe = gpd.read_file(my_file, driver='KML')
+
+        # df= pd.DataFrame(geo_df)
+        # fiona.drvsupport.supported_drivers['KML'] = 'rw' #LIBKML
+        # with fiona.open(my_file) as collection:
+        #     geodataframe = gpd.GeoDataFrame.from_features(collection)
+        # print(geodataframe,"geodf")
+
+        geom_types=[]
+        for index, row in geodataframe.iterrows():
+            geom_type = (GEOSGeometry(
+                str(row["geometry"]))).geom_type
+            if geom_type not in geom_types:
+                geom_types.append(geom_type)
+        if len(geom_types) == 1:
+            geom_type = geom_type
+        elif len(geom_types) == 2:
+            if "Point" and "MultiPoint" in geom_types:
+                geom_type = "MultiPoint"
+            elif "LineString" and "MultiLineString" in geom_types:
+                geom_type = "MultiLineString"
+            elif "Polygon" and "MultiPolygon" in geom_types:
+                geom_type = "MultiPolygon"
+            else:
+                # Layer.objects.filter(id=layer_id).delete()
+                return (f"error occured : more than one geometry type is found i.e. {geom_types}")
+        elif len(geom_types) > 2:
+            return (f"error occured : more than one geometry type is found i.e. {geom_types}")
+        else:
+            # Layer.objects.filter(id=layer_id).delete()
+            return (f"error occured : missing geometry")
+
+        # print(geom_type,"geom_type")
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
         return response

@@ -67,3 +67,5 @@ xmltodict==0.13.0
 SQLAlchemy==1.4.36
 greenlet==1.1.2
 djangorestframework-simplejwt==5.2.0
+
+kml2geojson==5.1.0 #https://deparkes.co.uk/2017/11/17/python-convert-kml-to-geojson-with-kml2geojson/
