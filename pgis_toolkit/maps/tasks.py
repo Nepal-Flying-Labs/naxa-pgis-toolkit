@@ -19,7 +19,7 @@ from pgis_toolkit.maps.models import (
     WMSLayer,
 )
 
-from .functions import clear_dir, handleCSV, handleGeoJSON, handleShapeFile
+from .functions import clear_dir, handleCSV, handleGeoJSON, handleKML, handleShapeFile
 
 
 @shared_task(max_retries=1, soft_time_limit=8000)
@@ -44,6 +44,8 @@ def UploadVectorLayer(layer_id,request_data):
             response = handleCSV(layer_id,lat_field,lon_field)
         elif file_extension == ".geojson":
             response = handleGeoJSON(layer_id)
+        elif file_extension == ".kml":
+            response = handleKML(layer_id)
         else:
             clear_dir(dir)
             return 'Error Occured: Invalid file extension', None
