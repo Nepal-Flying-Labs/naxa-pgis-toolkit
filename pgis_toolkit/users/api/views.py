@@ -1,14 +1,27 @@
+import uuid
+import json
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from django.contrib.auth.models import Group
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from config.settings import base as settings
+from django.db.models import Q
 
-from .serializers import UserSerializer
+from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
+from pgis_toolkit.users.models import PreliminaryUser
+
+from .serializers import UserSerializer, PreliminaryUserSerializer
 
 User = get_user_model()
 
@@ -32,3 +45,110 @@ class UsersViewsSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'post', 'patch']
+
+'''
+for project invite, organzation is required in payload.
+handles multiple email in the form: ["example@gmail.com", "example2@gmail.com"]
+'''
+class PreliminaryUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    '''http://localhost:8000/api/users/preliminary_user_create/'''
+
+    def post(self, request, *args, **kwargs):
+        errors=[]
+        try:
+            verify_url = settings.URL + '/api/users/preliminary_user/?token='
+            request.data._mutable = True
+            email_list = request.data.get('email', None)
+            if not email_list:
+                return Response(data={'message': 'Params email is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            email_list = json.loads(email_list)
+            organization_name = request.data.pop('organization_name', None)
+            project_name = None
+            if organization_name:
+                '''checking if organization exists'''
+                if Organization.active.filter(name=organization_name[0]).exists():
+                    return Response(data={'message': 'Your organization is already registered!'}, status=status.HTTP_400_BAD_REQUEST)
+                '''creating organization object'''
+                organization_instance = Organization.active.create(name=organization_name[0])
+                request.data['organization'] = organization_instance.id
+                '''checking if group exists already'''
+                if Group.objects.filter(name='Organization Admin').exists():
+                    request.data['group'] = Group.objects.get(name='Organization Admin').id
+                else:
+                    '''creating new group object'''
+                    group_instance = Group.objects.create(name='Organization Admin')
+                    request.data['group'] = group_instance.id
+            else:
+                project_name = request.data.pop('project_name', None)
+                '''organization id is compulsory for sending project invitation'''
+                if not project_name and not 'organization' in request.data:
+                    return Response(data={'message': 'Params project_name and organization are required!'}, status=status.HTTP_400_BAD_REQUEST)
+                organization = request.data.get('organization')
+                organization_instance = Organization.active.get(id=organization)
+                if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_instance)).exists():
+                    return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
+                project_instance = Project.active.create(name=project_name[0], organization=organization_instance)
+                request.data['project'] = project_instance.id
+                '''checking if group exists already'''
+                if Group.objects.filter(name='Project Manager').exists():
+                    request.data['group'] = Group.objects.get(name='Project Manager').id
+                else:
+                    '''creating new group object'''
+                    group_instance = Group.objects.create(name='Project Manager')
+                    request.data['group'] = group_instance.id
+            '''create multiple or single preliminary user instances'''
+            created_object_list = []
+            for email in email_list:
+                request.data['email'] = email
+                request.data['email_verification_token'] = uuid.uuid4()
+                serializer = PreliminaryUserSerializer(data=request.data)
+                if serializer.is_valid():
+                    created_object = serializer.save()
+                    created_object_list.append(created_object)
+                    '''email invitation'''
+                    data = {
+                    'paragraph_1': f'You have been invited as {created_object.group} in USAFIRI mapping platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    }
+                    template = 'email/email_request_demo.html'
+                    html_message = render_to_string(template, data)
+                    message = strip_tags(html_message)
+                    subject = 'Email Verification, USAFIRI'
+                    from_email = settings.EMAIL_HOST_USER
+                    recipient_list = [created_object.email]
+                    send_mail(subject, message, from_email, recipient_list,
+                            html_message=html_message, fail_silently=False)
+                else:
+                    for er in serializer._errors:
+                        errors.append(
+                            {'errorName': er, 'details': serializer._errors[er][0]})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(data={'message': 'Email Invitation Successful!'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            if organization_name:
+                organization_instance.delete()
+            if project_name:
+                project_instance.delete()
+            group_instance.delete()
+            for obj in created_object_list:
+                obj.delete()
+            errors.append({'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+
+class PreliminaryUserGETAPIView(APIView):
+    '''http://localhost:8000/api/users/preliminary_user_retrieve/?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
+    permission_classes = [AllowAny]
+    def get(self, request, *args, **kwargs):
+        try:
+            token = request.query_params.get('token', None)
+            if not token:
+                return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
+            if not PreliminaryUser.objects.filter(email_verification_token=token).exists():
+                return Response(data={'message': 'PreliminaryUser matching queryset does not exists!'}, status=status.HTTP_400_BAD_REQUEST)
+            preliminary_user_instance = PreliminaryUser.objects.get(email_verification_token=token)
+            serializer = PreliminaryUserSerializer(preliminary_user_instance)
+            data_dict = dict(serializer.data)
+            data_dict['user_created'] = True if User.active.filter(email=preliminary_user_instance.email) else False
+            return Response(data=data_dict, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response('Error: ' + str(e))
