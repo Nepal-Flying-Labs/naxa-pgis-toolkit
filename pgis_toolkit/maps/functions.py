@@ -408,11 +408,26 @@ def handleKML(layer_id):
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_dir = os.path.dirname(my_file)
+
+        '''convert kml to geojson'''
         convert_response=kml2geojson.main.convert(my_file, "/app/pgis_toolkit/media/")
         temp_geojson_file_path="/app/pgis_toolkit/media/geofiles/temp_geojson.geojson"
         with open(temp_geojson_file_path, 'w') as f:
             json.dump(convert_response[0], f, indent=2)
+
+        '''read geojson file'''
         geodataframe = gpd.read_file(temp_geojson_file_path)
+
+        '''coordinate system validation'''
+        epsg = geodataframe.crs.to_epsg()
+        utm_zone = geodataframe.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                Layer.objects.filter(id=layer_id).delete()
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
+            else:
+                Layer.objects.filter(id=layer_id).delete()
+                return "Unknown Coordinate System", None
 
         # gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'raw'
         # geodataframe = gpd.read_file(my_file, driver='KML')
@@ -422,7 +437,7 @@ def handleKML(layer_id):
         # with fiona.open(my_file) as collection:
         #     geodataframe = gpd.GeoDataFrame.from_features(collection)
         # print(geodataframe,"geodf")
-
+        '''validaing geometry type'''
         geom_types=[]
         for index, row in geodataframe.iterrows():
             geom_type = (GEOSGeometry(
