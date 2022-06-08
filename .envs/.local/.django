@@ -15,3 +15,7 @@ CONNECTION_DB=postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcO
 #email
 DJANGO_EMAIL_HOST_USER=naxatestsmtp@gmail.com
 DJANGO_EMAIL_HOST_PASSWORD=adorysqnwyucfkom
+
+#UserGroup
+ORGANIZATION_ADMIN=4
+PROJECT_MANAGER=5

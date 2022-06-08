@@ -25,6 +25,8 @@ from .serializers import UserSerializer, PreliminaryUserSerializer
 
 User = get_user_model()
 
+import environ
+env = environ.Env()
 
 # class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
 #     serializer_class = UserSerializer
@@ -57,13 +59,16 @@ class PreliminaryUserAPIView(APIView):
     def post(self, request, *args, **kwargs):
         errors=[]
         try:
-            verify_url = settings.URL + '/api/users/preliminary_user/?token='
+            verify_url = settings.URL + '/api/users/preliminary_user_retrieve/?token='
             request.data._mutable = True
             email_list = request.data.get('email', None)
             if not email_list:
                 return Response(data={'message': 'Params email is missing!'}, status=status.HTTP_400_BAD_REQUEST)
             email_list = json.loads(email_list)
             organization_name = request.data.pop('organization_name', None)
+            group = request.data.get('group', None)
+            if not group or not Group.objects.filter(id=group).exists():
+                return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
             project_name = None
             if organization_name:
                 '''checking if organization exists'''
@@ -72,13 +77,14 @@ class PreliminaryUserAPIView(APIView):
                 '''creating organization object'''
                 organization_instance = Organization.active.create(name=organization_name[0])
                 request.data['organization'] = organization_instance.id
-                '''checking if group exists already'''
-                if Group.objects.filter(name='Organization Admin').exists():
-                    request.data['group'] = Group.objects.get(name='Organization Admin').id
-                else:
-                    '''creating new group object'''
-                    group_instance = Group.objects.create(name='Organization Admin')
-                    request.data['group'] = group_instance.id
+                # '''checking if group exists already'''
+                # if Group.objects.filter(name='Organization Admin').exists():
+                #     request.data['group'] = Group.objects.get(name='Organization Admin').id
+                # else:
+                #     '''creating new group object'''
+                #     group_instance = Group.objects.create(name='Organization Admin')
+                #     request.data['group'] = group_instance.id
+                request.data['group'] = int(env('ORGANIZATION_ADMIN'))
             else:
                 project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
@@ -90,13 +96,14 @@ class PreliminaryUserAPIView(APIView):
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_instance)
                 request.data['project'] = project_instance.id
-                '''checking if group exists already'''
-                if Group.objects.filter(name='Project Manager').exists():
-                    request.data['group'] = Group.objects.get(name='Project Manager').id
-                else:
-                    '''creating new group object'''
-                    group_instance = Group.objects.create(name='Project Manager')
-                    request.data['group'] = group_instance.id
+                # '''checking if group exists already'''
+                # if Group.objects.filter(name='Project Manager').exists():
+                #     request.data['group'] = Group.objects.get(name='Project Manager').id
+                # else:
+                #     '''creating new group object'''
+                #     group_instance = Group.objects.create(name='Project Manager')
+                #     request.data['group'] = group_instance.id
+                request.data['group'] = int(env('PROJECT_MANAGER'))       
             '''create multiple or single preliminary user instances'''
             created_object_list = []
             for email in email_list:
