@@ -30,6 +30,7 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     RasterLayer,
+    StandardIcon,
     SubLayer,
     Theme,
     Vectorlayer,
@@ -57,6 +58,7 @@ from .serializers import (
     ProjectLayerTemplateSerializer,
     ProjectsLayerTemplateAttributeListSerializer,
     ProjectsLayerTemplateAttributeSerializer,
+    StandardIconListSerializer,
     SubLayerListSerializer,
     SubLayerSerializer,
     SubLayerUpdateSerializer,
@@ -64,6 +66,15 @@ from .serializers import (
     ThemeSerializer,
     WMSLayerSerializer,
 )
+
+
+class StandardIconViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for Standard Icon Instance.
+    '''
+    queryset = StandardIcon.active.all()
+    http_method_names = ['get']
+    serializer_class = StandardIconListSerializer
 
 
 @api_view(['GET'])
@@ -166,6 +177,7 @@ class LayerAPIView(APIView):
                 vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'icon', 'icon_size', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
+                results['std_icon']=env("URL")+vector_layer_instance.std_icon.icon.url if vector_layer_instance.std_icon else None
             elif layer_instance.layer_type=="Raster":
                 raster_layer_instance=RasterLayer.objects.select_related('layer').get(layer=layer_instance.id)
                 raster_layer_keys=['geoserver_workspace', 'geoserver_layer_name']
