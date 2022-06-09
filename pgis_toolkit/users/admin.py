@@ -37,7 +37,7 @@ class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("is_deleted",)}),
         (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
-        (_("Personal info"), {"fields": ("full_name", "email")}),
+        (_("Personal info"), {"fields": ("full_name", "email", "image")}),
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )

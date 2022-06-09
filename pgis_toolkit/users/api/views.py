@@ -253,6 +253,21 @@ class UserViewSet(viewsets.ModelViewSet):
             errors.append({"error": str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "User Not Registered", "Error": errors})
 
+    def partial_update(self, request, pk=None):
+        user = User.active.get(pk=pk)
+        if isinstance(request.data.get('image'), str):
+            request.data._mutable = True
+            request.data.pop('image', None)
+            user.image = None
+            user.image_thumbnail = None
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            serializer = UserSerializer(user, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+
+
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):    
     permission_classes = [AllowAny]
@@ -262,7 +277,7 @@ class EmailConfirmationAPIView(APIView):
             token = request.query_params.get('token', None)
             if not token or not User.active.filter(email_verification_token=token).exists():
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "token query_params is missing or token matching user query does not exist!"})
-            user_instance = User.active.filter(email_verification_token=token)
+            user_instance = User.active.get(email_verification_token=token)
             user_instance.is_active = True
             user_instance.save()
             return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
