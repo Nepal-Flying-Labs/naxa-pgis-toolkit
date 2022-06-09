@@ -102,6 +102,8 @@ class SubLayer(IsDeleted,DateTimeStamp):
 class StandardIcon(DateTimeStamp,IsDeleted):
     name=models.CharField(max_length=50,blank=True,null=True)
     icon=models.FileField(upload_to="standard_icons/",validators=[validate_std_icon_extension])
+    class Meta:
+        app_label = 'maps'
 
 class Vectorlayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="vector_layer")

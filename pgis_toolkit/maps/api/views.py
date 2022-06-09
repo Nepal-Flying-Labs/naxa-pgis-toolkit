@@ -87,9 +87,9 @@ def project_layers(request,id):
         theme_list=[]
         theme_qs=Theme.active.select_related('project').filter(project=id).order_by('order')
         layer_queryset=Layer.active.select_related('theme','group').filter(theme__project=id).order_by('order')
-        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme__project=id).values('id','layer','icon','icon_size','style')
+        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme__project=id)
+        # vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme__project=id).values('id','layer','icon','icon_size','style')
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme__project=id).order_by("order")
-
         for theme in theme_qs:
             group_list=[]
             group_qs=layer_group_queryset.filter(theme=theme.id).order_by("order")
@@ -101,10 +101,11 @@ def project_layers(request,id):
                     if layer.layer_type=="Vector":
                         layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                         # layer_detail_instance=layer.vector_layer
-                        icon_url=env("URL")+layer_detail_instance['icon'].url if layer_detail_instance['icon'] else None
+                        icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
                         layer_item['icon']=icon_url
-                        layer_item['icon_size']=layer_detail_instance['icon_size'],
-                        layer_item['style']=layer_detail_instance['style']
+
+                        layer_item['icon_size']=layer_detail_instance.icon_size
+                        layer_item['style']=layer_detail_instance.style
 
                     # elif layer.layer_type=="Raster":
                     #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
@@ -122,15 +123,16 @@ def project_layers(request,id):
                 if layer.layer_type=="Vector":
                     layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                     sub_layer_list=[]
-                    sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
+                    sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
+                    # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                     for sub_layer in sub_layer_qs:
-                        icon_url=env("URL")+sub_layer['icon.url'] if sub_layer['icon'] else None
-                        sub_layer_item={"id":sub_layer['id'],"name":sub_layer['name'],'icon':icon_url,'icon_size':sub_layer['icon_size'],'style':sub_layer['style']}
+                        icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
+                        sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
                         sub_layer_list.append(sub_layer_item)
-                    icon_url=env("URL")+layer_detail_instance['icon'].url if layer_detail_instance['icon'] else None
+                    icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
                     layer_item['icon']=icon_url
-                    layer_item['icon_size']=layer_detail_instance['icon_size'],
-                    layer_item['style']=layer_detail_instance['style']
+                    layer_item['icon_size']=layer_detail_instance.icon_size,
+                    layer_item['style']=layer_detail_instance.style
                     layer_item['sub_layer']=sub_layer_list
                 # elif layer.layer_type=="Raster":
                 #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
