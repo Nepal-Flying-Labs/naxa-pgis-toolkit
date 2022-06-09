@@ -191,7 +191,7 @@ class UserViewSet(viewsets.ModelViewSet):
         created_object = None
         user_role_obj = None
         try:
-            verify_url = settings.URL + '/api/users/user_verify/?token='     
+            verify_url = settings.URL + '/api/users/email_verify/?token='     
             serializer = UserSerializer(data=request.data)
             if serializer.is_valid():
                 created_object = serializer.save()
@@ -252,3 +252,19 @@ class UserViewSet(viewsets.ModelViewSet):
                 UserRole.objects.get(id=user_role_obj.id).delete()            
             errors.append({"error": str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "User Not Registered", "Error": errors})
+
+'''Verify self registered user using token sent to their mail and activate their account.'''
+class EmailConfirmationAPIView(APIView):    
+    permission_classes = [AllowAny]
+    '''http://localhost:8000/api/users/email_verify/?token=5f53cbfd-de7b-45d9-b90a-5c364be8b0a9'''
+    def post(self, request, *args, **kwargs):
+        try:
+            token = request.query_params.get('token', None)
+            if not token or not User.active.filter(email_verification_token=token).exists():
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "token query_params is missing or token matching user query does not exist!"})
+            user_instance = User.active.filter(email_verification_token=token)
+            user_instance.is_active = True
+            user_instance.save()
+            return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
