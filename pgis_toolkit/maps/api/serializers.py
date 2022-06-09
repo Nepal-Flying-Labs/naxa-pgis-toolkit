@@ -2,10 +2,16 @@ from rest_framework import serializers
 
 from pgis_toolkit.maps.models import *
 
+
 class LayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
         fields = '__all__'
+
+class StandardIconListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StandardIcon
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
 class LayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,7 +32,7 @@ class RasterLayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = RasterLayer
         fields = '__all__'
-        
+
 class VectorLayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vectorlayer
@@ -72,7 +78,7 @@ class FeatureCollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollection
         fields= '__all__'
-    
+
 class LayerGroupListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerGroup

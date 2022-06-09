@@ -17,6 +17,7 @@ from pgis_toolkit.utils.constants import (
     LAYER_TYPE_CHOICES,
     UNIT_CHOICES,
 )
+from pgis_toolkit.utils.validators import validate_std_icon_extension
 
 
 # Create your models here.
@@ -98,6 +99,10 @@ class SubLayer(IsDeleted,DateTimeStamp):
         app_label = 'maps'
         # ordering = ('order',)
 
+class StandardIcon(DateTimeStamp,IsDeleted):
+    name=models.CharField(max_length=50,blank=True,null=True)
+    icon=models.FileField(upload_to="standard_icons/",validators=[validate_std_icon_extension])
+
 class Vectorlayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="vector_layer")
     geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
@@ -117,8 +122,9 @@ class Vectorlayer(DateTimeStamp):
 
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True) #icon for point datatype
-    icon_size = models.JSONField(blank=True, null=True)
-    icon_url=models.URLField(blank=True,null=True)
+    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    # icon_url=models.URLField(blank=True,null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_std_icon",blank=True,null=True)
 
     show_label = models.BooleanField(default=False)
     label_field = models.CharField(max_length=100, blank=True, null=True) #field name on which basis feature is label
