@@ -18,6 +18,17 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = '__all__'
 
+class UserListSerializer(serializers.ModelSerializer):
+    # role = serializers.SerializerMethodField()
+    # project = serializers. SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'image_thumbnail', 'full_name',  'phone_no', 'email')
+
+    # def get_role(self, instance):
+    #     user_role = UserRole.active.filter(user__id=instance.id).values_list('user__id', )
+
 class PreliminaryUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = PreliminaryUser
