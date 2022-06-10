@@ -157,7 +157,6 @@ def test_advertised():
 def geoserver_layer_publish(layer_instance):
     print("geoserver layer publish called")
     '''Geoserver layer publish'''
-    # connection_db = create_engine(env("CONNECTION_DB"))
     table_name = layer_instance.name.replace(" ", "")
     try:
         '''creating workspace named pgis if '''
@@ -192,8 +191,6 @@ def geoserver_layer_publish(layer_instance):
         return "successful"
 
     except Exception as e:
-        # print(str(e),"geo error")
-        # Layer.objects.filter(id=layer_instance.id).delete()
         return "geoserver error: "+str(e)
 
 def get_geometry(geometry, geom_type):
@@ -311,6 +308,35 @@ def upload_feature(geodataframe, layer_instance, geom_type):
         return "error in feature upload: "+str(e)
 
 
+def validate_geometry_type(geodataframe):
+    try:
+        geom_types = []
+        geom_type = None
+        for index, row in geodataframe.iterrows():
+            geom_type = (GEOSGeometry(
+                str(row["geometry"]))).geom_type
+            if geom_type not in geom_types:
+                geom_types.append(geom_type)
+        if len(geom_types) == 1:
+            geom_type = geom_type
+            return ("successful",geom_type)
+        elif len(geom_types) == 2:
+            if "Point" and "MultiPoint" in geom_types:
+                geom_type = "MultiPoint"
+            elif "LineString" and "MultiLineString" in geom_types:
+                geom_type = "MultiLineString"
+            elif "Polygon" and "MultiPolygon" in geom_types:
+                geom_type = "MultiPolygon"
+            else:
+                return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
+        elif len(geom_types) > 2:
+            return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
+        else:
+            return (f"error occured : missing geometry",None)
+    except Exception as e:
+        return (f"error occured in validating geometry type : {str(e)}",None)
+
+
 def handleShapeFile(layer_id):
     try:
         print("handle shapefile entered")
@@ -340,30 +366,9 @@ def handleShapeFile(layer_id):
                 return "Unknown Coordinate System", None
 
         '''validaing geometry type'''
-        geom_types = []
-        geom_type = None
-        for index, row in geodataframe.iterrows():
-            geom_type = (GEOSGeometry(
-                str(row["geometry"]))).geom_type
-            if geom_type not in geom_types:
-                geom_types.append(geom_type)
-        if len(geom_types) == 1:
-            geom_type = geom_type
-        elif len(geom_types) == 2:
-            if "Point" and "MultiPoint" in geom_types:
-                geom_type = "MultiPoint"
-            elif "LineString" and "MultiLineString" in geom_types:
-                geom_type = "MultiLineString"
-            elif "Polygon" and "MultiPolygon" in geom_types:
-                geom_type = "MultiPolygon"
-            else:
-                # Layer.objects.filter(id=layer_id).delete()
-                return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        elif len(geom_types) > 2:
-            return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        else:
-            # Layer.objects.filter(id=layer_id).delete()
-            return (f"error occured : missing geometry")
+        response,geom_type=validate_geometry_type(geodataframe)
+        if not geom_type:
+            return (response)
 
         vector_layer_instance.geom_type = geom_type
         vector_layer_instance.save()
@@ -372,7 +377,6 @@ def handleShapeFile(layer_id):
             geodataframe, layer_instance, geom_type)
         return response
     except Exception as e:
-        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 
@@ -437,32 +441,45 @@ def handleKML(layer_id):
         # with fiona.open(my_file) as collection:
         #     geodataframe = gpd.GeoDataFrame.from_features(collection)
         # print(geodataframe,"geodf")
-        '''validaing geometry type'''
-        geom_types=[]
-        for index, row in geodataframe.iterrows():
-            geom_type = (GEOSGeometry(
-                str(row["geometry"]))).geom_type
-            if geom_type not in geom_types:
-                geom_types.append(geom_type)
-        if len(geom_types) == 1:
-            geom_type = geom_type
-        elif len(geom_types) == 2:
-            if "Point" and "MultiPoint" in geom_types:
-                geom_type = "MultiPoint"
-            elif "LineString" and "MultiLineString" in geom_types:
-                geom_type = "MultiLineString"
-            elif "Polygon" and "MultiPolygon" in geom_types:
-                geom_type = "MultiPolygon"
-            else:
-                # Layer.objects.filter(id=layer_id).delete()
-                return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        elif len(geom_types) > 2:
-            return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        else:
-            # Layer.objects.filter(id=layer_id).delete()
-            return (f"error occured : missing geometry")
 
-        # print(geom_type,"geom_type")
+        '''validaing geometry type'''
+        response,geom_type=validate_geometry_type(geodataframe)
+        if not geom_type:
+            return (response)
+
+        response = upload_feature(
+            geodataframe, layer_instance,geom_type)
+        return response
+    except Exception as e:
+        Layer.objects.filter(id=layer_id).delete()
+        return ("error occured : " + str(e))
+
+def handleGPX(layer_id):
+    try:
+        layer_instance = Layer.objects.get(id=layer_id)
+        file_object = LayerFile.objects.get(layer=layer_id)
+        my_file = file_object.file.path
+        file_dir = os.path.dirname(my_file)
+
+        gpd.io.file.fiona.drvsupport.supported_drivers['GPX'] = 'rw'
+        geodataframe = gpd.read_file(my_file, driver='GPX',GPX_USE_EXTENSIONS='NO')
+
+        '''coordinate system validation'''
+        epsg = geodataframe.crs.to_epsg()
+        utm_zone = geodataframe.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                Layer.objects.filter(id=layer_id).delete()
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
+            else:
+                Layer.objects.filter(id=layer_id).delete()
+                return "Unknown Coordinate System", None
+
+        '''validaing geometry type'''
+        response,geom_type=validate_geometry_type(geodataframe)
+        if not geom_type:
+            return (response)
+
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
         return response
@@ -491,31 +508,9 @@ def handleGeoJSON(layer_id):
                 return "Unknown Coordinate System", None
 
         '''validaing geometry type'''
-        geom_types = []
-        geom_type = None
-        for index, row in geodataframe.iterrows():
-            geom_type = (GEOSGeometry(
-                str(row["geometry"]))).geom_type
-            if geom_type not in geom_types:
-                geom_types.append(geom_type)
-        if len(geom_types) == 1:
-            geom_type = geom_type
-        elif len(geom_types) == 2:
-            if "Point" and "MultiPoint" in geom_types:
-                geom_type = "MultiPoint"
-            elif "LineString" and "MultiLineString" in geom_types:
-                geom_type = "MultiLineString"
-            elif "Polygon" and "MultiPolygon" in geom_types:
-                geom_type = "MultiPolygon"
-            else:
-                Layer.objects.filter(id=layer_id).delete()
-                return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        elif len(geom_types) > 2:
-            Layer.objects.filter(id=layer_id).delete()
-            return (f"error occured : more than one geometry type is found i.e. {geom_types}")
-        else:
-            Layer.objects.filter(id=layer_id).delete()
-            return (f"error occured : missing geometry")
+        response,geom_type=validate_geometry_type(geodataframe)
+        if not geom_type:
+            return (response)
 
         '''save geometry type'''
         layer_instance.geom_type = geom_type
