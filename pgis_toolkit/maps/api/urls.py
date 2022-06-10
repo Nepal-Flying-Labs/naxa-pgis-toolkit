@@ -7,17 +7,21 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     LayerAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
+    ProjectLayerTemplateAttributeViewset,
+    ProjectLayerTemplateViewset,
+    StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
     get_layer_upload_task_response,
+    import_template,
     layer_download,
     project_layers,
-    reorder,ProjectLayerTemplateViewset, ProjectLayerTemplateAttributeViewset,
-    import_template
+    reorder,
 )
 
 router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
+router.register(r'standard_icon', StandardIconViewset, basename='standard_icon')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
