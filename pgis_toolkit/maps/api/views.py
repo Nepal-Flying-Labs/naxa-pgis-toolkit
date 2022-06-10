@@ -219,10 +219,15 @@ class LayerAPIView(APIView):
                     '''wait untils the layer instance is created'''
                     iterate=True
                     while iterate:
+                        # print("start iterate")
                         if Layer.objects.filter(id=created_object.id).exists():
+                            layer_instane=Layer.objects.get(id=created_object.id)
+                            # print(Layer.objects.filter(id=created_object.id),"existed")
                             iterate=False
                         else:
+                            # print("sleep for 3 sec")
                             time.sleep(3)
+
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
