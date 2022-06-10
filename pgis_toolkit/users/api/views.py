@@ -1,5 +1,8 @@
 import uuid
 import json
+from functools import reduce
+import operator
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.decorators import action, permission_classes
@@ -19,9 +22,10 @@ from config.settings import base as settings
 from django.db.models import Q
 
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
-from pgis_toolkit.users.models import PreliminaryUser
+from pgis_toolkit.users.models import PreliminaryUser, UserRole
+from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
-from .serializers import UserSerializer, PreliminaryUserSerializer, UserRoleSerializer
+from .serializers import UserSerializer, UserListSerializer, PreliminaryUserSerializer, UserRoleSerializer
 
 User = get_user_model()
 
@@ -132,7 +136,7 @@ class PreliminaryUserAPIView(APIView):
                 organization_instance.delete()
             if project_name:
                 project_instance.delete()
-            group_instance.delete()
+            # group_instance.delete()
             for obj in created_object_list:
                 obj.delete()
             errors.append({'details': str(e)})
@@ -178,7 +182,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.active.all()
     serializer_class = UserSerializer
     http_method_names = ['get', 'post', 'patch']
-
+    pagination_class = CustomPageNumberPagination
     def get_permissions(self):
         if self.action == 'list' or self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
             permission_classes = [IsAuthenticated]
@@ -267,7 +271,80 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
+    def list(self, request, *args, **kwargs):
+        '''
+        Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
+        For other roles, User can have multiple roles with different organizations but must have single role within each organization.
+        http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
+        '''
+        try:
+            paginator = CustomPageNumberPagination()
+            if not request.user.is_authenticated:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            '''removing the request user from user queryset'''
+            queryset = self.queryset.exclude(id=request.user.id)
+            '''checking if the requesting user has a role assigned'''
+            if not UserRole.active.filter(user__id=request.user.id).exists():
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
+            '''filtering queryset for web app administrator'''
+            if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+                queryset = queryset
+            elif 'organization' in request_keys and request_dict['organization'] != "":
+                organization = request_dict['organization']
+                '''making organization compulsory and checking if any role of the request exists for the given organization'''
+                if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
+                    user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
+                else:
+                    return Response(data={'message': 'No any user role of the requesting user found for the organizaiton!'}, status=status.HTTP_400_BAD_REQUEST)
+                '''filtering queryset according to the role of the user in the organization'''
+                if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
+                    org_user_ids = UserRole.active.filter(organization__id=organizaiton).values_list('user__id', flat=True)
+                    queryset = queryset.filter(id__in=org_user_ids)
+                    '''filtering queryset according to users in a project'''
+                elif 'project' in request_keys and request_dict['project'] != "":                    
+                    project = request_dict['project']
+                    if user_role_instance.group.id == int(env('PROJECT_MANAGER')):                   
+                        project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
+                        queryset = queryset.filter(id__in=project_user_ids)
+                        '''filtering queryset in a project of the same role i.e. data collector'''
+                    elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):                    
+                        group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
+                        queryset = queryset.filter(id__in=group_user_ids)
+                    else:
+                        '''return empty queryset when no any role is validated '''
+                        queryset = None
+                else:
+                    return Response(data={'message': 'Params project is required!'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
 
+            '''Search'''
+            search_key = request.query_params.get('search_key', None)
+            if search_key:
+                searched_queryset = None
+                search_fields = ['full_name', 'phone', 'email']
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs[field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
+                
+            '''Sorting'''
+            order_by = request.query_params.get('order_by', None)
+            if order_by and order_by != '':
+                queryset = queryset.order_by(order_by)
+
+            '''Paginate Queryset'''
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = UserListSerializer(
+                paginated_queryset, many=True, context={"request": request})
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+    
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):    
     permission_classes = [AllowAny]
