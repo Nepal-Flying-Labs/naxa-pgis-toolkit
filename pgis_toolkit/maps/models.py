@@ -108,11 +108,12 @@ class StandardIcon(DateTimeStamp,IsDeleted):
 class Vectorlayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="vector_layer")
     geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
-    bbox=ArrayField(models.FloatField(max_length=20, blank=True),
-                               default=list,
-                               size=4,
-                               blank=True, null=True
-                               )# bounding box in format minx,miny,maxx,maxy
+    # bbox=ArrayField(models.FloatField(max_length=20, blank=True),
+    #                            default=list,
+    #                            size=4,
+    #                            blank=True, null=True
+    #                            )# bounding box in format minx,miny,maxx,maxy
+    bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
     popup_fields=ArrayField(models.CharField(max_length=100, blank=True),
                                default=list,
                                size=100,
