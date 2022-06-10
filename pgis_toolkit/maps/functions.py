@@ -12,6 +12,7 @@ import kml2geojson
 import pandas as pd
 import requests
 from django.contrib.gis.geos import GEOSGeometry
+from django.db import transaction
 from shapely import speedups
 from shapely.geometry import (
     LineString,
@@ -370,7 +371,11 @@ def handleShapeFile(layer_id):
         if not geom_type:
             return (response)
 
+        '''extracting extent'''
+        total_bounds = geodataframe.total_bounds
+
         vector_layer_instance.geom_type = geom_type
+        vector_layer_instance.bbox = total_bounds.tolist()
         vector_layer_instance.save()
 
         response = upload_feature(
@@ -383,6 +388,7 @@ def handleShapeFile(layer_id):
 def handleCSV(layer_id,lat_field,lon_field):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
@@ -394,10 +400,20 @@ def handleCSV(layer_id,lat_field,lon_field):
 
         '''saving geometry type'''
         geom_type = "Point"
-        layer_instance.geom_type = "Point"
-        layer_instance.save()
+
 
         geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
+
+        '''extracting extent'''
+        total_bounds = geodataframe.total_bounds
+
+        '''save geometry_type and bbox'''
+        # with transaction.atomic():
+        # layer_instance.geom_type = "Point"
+        # layer_instance.save()
+        vector_layer_instance.geom_type = geom_type
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
 
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
@@ -409,6 +425,7 @@ def handleCSV(layer_id,lat_field,lon_field):
 def handleKML(layer_id):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_dir = os.path.dirname(my_file)
@@ -447,6 +464,15 @@ def handleKML(layer_id):
         if not geom_type:
             return (response)
 
+        '''extracting extent'''
+        total_bounds = geodataframe.total_bounds
+
+        '''save geometry_type and bbox'''
+        # with transaction.atomic():
+        vector_layer_instance.geom_type = geom_type
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
+
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
         return response
@@ -457,6 +483,7 @@ def handleKML(layer_id):
 def handleGPX(layer_id):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_dir = os.path.dirname(my_file)
@@ -480,6 +507,15 @@ def handleGPX(layer_id):
         if not geom_type:
             return (response)
 
+        '''extracting extent'''
+        total_bounds = geodataframe.total_bounds
+
+        '''save geometry_type and bbox'''
+        # with transaction.atomic():
+        vector_layer_instance.geom_type = geom_type
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
+
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
         return response
@@ -491,6 +527,8 @@ def handleGPX(layer_id):
 def handleGeoJSON(layer_id):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
+        print(vector_layer_instance,"sdvchgsdvchdinstanec")
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
@@ -512,9 +550,14 @@ def handleGeoJSON(layer_id):
         if not geom_type:
             return (response)
 
-        '''save geometry type'''
-        layer_instance.geom_type = geom_type
-        layer_instance.save()
+        '''extracting extent'''
+        total_bounds = geodataframe.total_bounds
+
+        '''save geometry_type and bbox'''
+        # with transaction.atomic():
+        vector_layer_instance.geom_type = geom_type
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
 
         response = upload_feature(
             geodataframe, layer_instance,geom_type)
