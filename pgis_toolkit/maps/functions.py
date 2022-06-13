@@ -310,6 +310,7 @@ def upload_feature(geodataframe, layer_instance, geom_type):
 
 
 def validate_geometry_type(geodataframe):
+    print("validate gemetry typ e entered")
     try:
         geom_types = []
         geom_type = None
@@ -320,7 +321,6 @@ def validate_geometry_type(geodataframe):
                 geom_types.append(geom_type)
         if len(geom_types) == 1:
             geom_type = geom_type
-            return ("successful",geom_type)
         elif len(geom_types) == 2:
             if "Point" and "MultiPoint" in geom_types:
                 geom_type = "MultiPoint"
@@ -334,21 +334,22 @@ def validate_geometry_type(geodataframe):
             return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
         else:
             return (f"error occured : missing geometry",None)
+        return ("successful",geom_type)
     except Exception as e:
-        return (f"error occured in validating geometry type : {str(e)}",None)
+        return (f"error occured in validating geometry type : {str(e)}","")
 
 
 def handleShapeFile(layer_id):
     try:
         print("handle shapefile entered")
         errors = []
+
         layer_instance = Layer.objects.get(id=layer_id)
         vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
         layer_file = LayerFile.objects.get(layer=layer_id).file.path
         file_path = os.path.dirname(layer_file)
         with zipfile.ZipFile(layer_file, 'r') as zip_ref:
             zip_ref.extractall(file_path)
-
         shape = glob.glob(
             r'{}/**/*.shp'.format(file_path), recursive=True)[0]
         geodataframe = gpd.read_file(shape)
@@ -356,7 +357,6 @@ def handleShapeFile(layer_id):
             shutil.rmtree(file_path)
         except OSError as e:
             print("Error: %s " % (e.strerror))
-
         epsg = geodataframe.crs.to_epsg()
         utm_zone = geodataframe.crs.utm_zone,
         if epsg != 4326:
@@ -365,12 +365,10 @@ def handleShapeFile(layer_id):
             else:
                 Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
-
         '''validaing geometry type'''
         response,geom_type=validate_geometry_type(geodataframe)
         if not geom_type:
             return (response)
-
         '''extracting extent'''
         total_bounds = geodataframe.total_bounds
 
@@ -382,7 +380,7 @@ def handleShapeFile(layer_id):
             geodataframe, layer_instance, geom_type)
         return response
     except Exception as e:
-        return ("error occured : " + str(e))
+        return ("error occured in handle shapefile: " + str(e))
 
 
 def handleCSV(layer_id,lat_field,lon_field):
@@ -528,7 +526,6 @@ def handleGeoJSON(layer_id):
     try:
         layer_instance = Layer.objects.get(id=layer_id)
         vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
-        print(vector_layer_instance,"sdvchgsdvchdinstanec")
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
