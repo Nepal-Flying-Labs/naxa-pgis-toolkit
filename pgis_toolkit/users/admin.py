@@ -37,7 +37,7 @@ class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("is_deleted",)}),
         (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
-        (_("Personal info"), {"fields": ("full_name", "email", "image")}),
+        (_("Personal info"), {"fields": ("full_name", "email", "contact", "image")}),
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
@@ -45,9 +45,9 @@ class UserAdmin(admin.ModelAdmin):
     search_fields = ("full_name",)
 
 class UserRoleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'organization', 'group', 'project')
+    list_display = ('id', 'user', 'organization', 'group', 'project', 'active')
     search_fields = ('id', 'user')
-    list_filter = ('organization', 'group', 'project')
+    list_filter = ('organization', 'group', 'project', 'active')
 
 class PreliminaryUserAdmin(admin.ModelAdmin):
     list_display = ('id', 'email', 'organization', 'project', 'group')

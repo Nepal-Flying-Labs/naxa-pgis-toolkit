@@ -24,7 +24,7 @@ class UserListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'image_thumbnail', 'full_name',  'phone_no', 'email')
+        fields = ('id', 'image_thumbnail', 'full_name',  'contact', 'email', 'organization')
 
     # def get_role(self, instance):
     #     user_role = UserRole.active.filter(user__id=instance.id).values_list('user__id', )
