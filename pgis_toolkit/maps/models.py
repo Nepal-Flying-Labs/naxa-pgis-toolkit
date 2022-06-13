@@ -1,4 +1,7 @@
+from datetime import MAXYEAR
+
 from django.contrib.gis.db import models as md
+from django.contrib.gis.db.models import Extent
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -172,6 +175,30 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
 
     class Meta:
         app_label = 'maps'
+
+    def save(self, *args, **kwargs):
+        '''Update box of vectorlayer'''
+        if self.geometry:
+            if self.geometry.geom_type=="Point":
+                coords=self.geometry.coords
+                feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+            else:
+                feature=FeatureCollection.objects.filter(id=self.id).aggregate(Extent('geometry'))
+                feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+            vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
+            layer_bbox= vector_layer_instance.bbox
+            if layer_bbox and feature_bbox:
+                if feature_bbox[0]<layer_bbox[0]:
+                    layer_bbox[0]=feature_bbox[0]
+                if feature_bbox[1]<layer_bbox[1]:
+                    layer_bbox[1]=feature_bbox[1]
+                if feature_bbox[2]>layer_bbox[2]:
+                    layer_bbox[2]=feature_bbox[2]
+                if feature_bbox[3]>layer_bbox[3]:
+                    layer_bbox[3]=feature_bbox[3]
+                vector_layer_instance.bbox=layer_bbox
+                vector_layer_instance.save()
+        super(FeatureCollection, self).save(*args, **kwargs)
 
 
 class LayerAttribute(DateTimeStamp):
