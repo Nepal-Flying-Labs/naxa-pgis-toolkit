@@ -98,6 +98,7 @@ def pre_delete_layer(sender, instance,**kwargs):
 
 # @receiver(post_save, sender=FeatureCollection)
 # def post_save_feature(sender, instance, created,**kwargs):
+#     print(created,"is created")
 #     '''
 #     This signal is to create an instance based on layer_type of created Layer
 #     '''
@@ -105,13 +106,14 @@ def pre_delete_layer(sender, instance,**kwargs):
 #     try:
 #         if created:
 #             layer_instance=Layer.objects.get(id=instance.layer.id)
-#             vector_layer_instance=Vectorlayer.objects.get(id=layer_instance.id)
+#             vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
 #             if instance.geometry:
 #                 feature = instance.aggregate(Extent('geometry'))
 #                 bbox = feature['geometry__extent']
-#                 print(bbox,"bdhsbhbooox")
-#                 # vector_layer_instance.save()
-#             return Response(status=status.HTTP_200_OK, data={"Message": "Theme Successfully updated"})
+#                 print(bbox,"boox from signal")
+#                 print(vector_layer_instance.bbox,"boox from vector layer")
+#             return Response(status=status.HTTP_200_OK, data={"Message": "Extent Successfully updated"})
 #     except Exception as e:
 #         errors.append({'errorName': str(e), 'details': str(e)})
+#         print(f'error occure: {errors} ')
 #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
