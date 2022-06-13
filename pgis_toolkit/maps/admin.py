@@ -33,7 +33,7 @@ class SubLayerAdmin(admin.ModelAdmin):
 
 class VectorLayerAdmin(admin.ModelAdmin):
     list_display = ('id','layer','geom_type','geoserver_workspace','geoserver_layer_name')
-    search_fields = ('id', 'layer')
+    search_fields = ('id', 'layer__name')
     list_filter = ('geom_type', )
 
     def has_add_permission(self, request):
