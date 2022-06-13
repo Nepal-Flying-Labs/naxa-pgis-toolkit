@@ -280,3 +280,4 @@ geoserver-data
 .envs/*
 !.envs/.local/
 docker-compose.yml
+compose/local_run/

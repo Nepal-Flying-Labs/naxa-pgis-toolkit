@@ -52,11 +52,13 @@ services:
       context: .
       dockerfile: ./compose/local/django/Dockerfile
     restart: always
-    command : "celery -A pgis_toolkit worker -f /logs/worker.log -l DEBUG"
+    command : "celery -A pgis_toolkit.celery_app worker -f /logs/worker.log -l DEBUG"
+    # celery -A app.celery_module.celeryapp worker --loglevel=info
     # entrypoint : "celery -A pgis_toolkit worker -l DEBUG -Q default --pool=solo"
     depends_on:
       - django
       - redis
+      - postgres
     volumes:
       - .:/app:z
       - ./logs/:/logs/
@@ -64,23 +66,21 @@ services:
       - ./.envs/.local/.django
       - ./.envs/.local/.postgres
 
-  pgadmin:
-    image: dpage/pgadmin4
-    env_file: ./.envs/.local/.pgadmin
-    ports:
-      - "5051:80"
-    restart: always
-    depends_on:
-      - postgres
-
   geoserver:
-      image: kartoza/geoserver:2.19.0
-      volumes:
-        - ./geoserver-data:/opt/geoserver/data_dir
-      env_file:
-        - ./.envs/.local/.geoserver
-      ports:
-        - 8080:8080
-      restart: on-failure
-      # networks:
-      #   - changu_nw_prod
+    image: kartoza/geoserver:2.19.0
+    volumes:
+      - ./geoserver-data:/opt/geoserver/data_dir
+    env_file:
+      - ./.envs/.local/.geoserver
+    ports:
+      - 8080:8080
+    restart: on-failure
+
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   env_file: ./.envs/.local/.pgadmin
+  #   ports:
+  #     - "5051:80"
+  #   restart: always
+  #   depends_on:
+  #     - postgres
