@@ -2,6 +2,7 @@ import uuid
 import json
 from functools import reduce
 import operator
+from itertools import groupby
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -20,6 +21,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from config.settings import base as settings
 from django.db.models import Q
+from django.db.models.query import QuerySet
 
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
@@ -281,7 +283,7 @@ class UserViewSet(viewsets.ModelViewSet):
             paginator = CustomPageNumberPagination()
             if not request.user.is_authenticated:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-            request_dict = request.data
+            request_dict = request.query_params
             request_keys = request_dict.keys()
             '''removing the request user from user queryset'''
             queryset = self.queryset.exclude(id=request.user.id)
@@ -289,6 +291,7 @@ class UserViewSet(viewsets.ModelViewSet):
             if not UserRole.active.filter(user__id=request.user.id).exists():
                 return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
+            organizaiton = None
             '''filtering queryset for web app administrator'''
             if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
                 queryset = queryset
@@ -322,21 +325,39 @@ class UserViewSet(viewsets.ModelViewSet):
                 return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
 
             '''Search'''
-            search_key = request.query_params.get('search_key', None)
-            if search_key:
+            if 'search_key' in request_keys and request_dict['search_key'] != '':
                 searched_queryset = None
-                search_fields = ['full_name', 'phone', 'email']
+                search_fields = ['full_name', 'contact', 'email']
                 filter_kwargs = {}
                 for field in search_fields:
-                    filter_kwargs[field+'__icontains'] = search_key
+                    filter_kwargs[field+'__icontains'] = request_dict['search_key']
                 list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
                 queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
                 
             '''Sorting'''
-            order_by = request.query_params.get('order_by', None)
-            if order_by and order_by != '':
-                queryset = queryset.order_by(order_by)
+            if 'order_by' in request_keys and request_dict['order_by'] != '':
+                queryset = queryset.order_by(request_dict['order_by'] )
 
+            '''Group by'''
+            if 'group_by' in request_keys and request_dict['group_by'] != '':
+                # user_role_qs = UserRole.active.all()
+                # query = user_role_qs.query
+                # query.group_by = [request_dict['group_by']]
+                # qs = QuerySet(query=query, model=UserRole)
+                # print(qs, "is queryset")
+                # user_ids = list(qs.values_list('id', flat=True))
+                # queryset = queryset.filter(id__in=user_ids)
+
+                group_by = request_dict['group_by']
+                if group_by == "project":
+                    user_ids = list(queryset.values_list('id', flat=True))
+                    user_role_qs = UserRole.active.filter(user__id__in=user_ids)
+                    project_list = list(user_role_qs.values_list('project', flat=True).distinct())
+                    data_dict = {}
+                    for project in project_list:
+                        project_name = Project.active.get(id=project).name
+                        data_dict[project_name] = user_role_qs.filter(project__id=project).values('user__image_thumbnail', 'user__full_name', 'project__name', 'group__name')
+                    return Response(data_dict, status=status.HTTP_200_OK)
             '''Paginate Queryset'''
             paginated_queryset = paginator.paginate_queryset(queryset, request)
             serializer = UserListSerializer(

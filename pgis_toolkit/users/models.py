@@ -59,13 +59,17 @@ class User(IsDeleted, AbstractUser):
 
 class UserRole(IsDeleted):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True)
+    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
-    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True)
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True)
+    active = models.BooleanField(default=True)
 
     class Meta:
         app_label = 'users'
         unique_together = (("user", "project"),)
+
+    def __str__(self):
+        return f'{self.user}, {self.organization}, {self.group}'
         
 '''Model to store required information to verify and identify user for registration using the email invite approach'''
 class PreliminaryUser(IsDeleted):
