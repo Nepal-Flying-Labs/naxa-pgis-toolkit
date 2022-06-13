@@ -200,11 +200,21 @@ class LayerAPIView(APIView):
         try:
             request_dict = request.data
             request_dict._mutable = True
-            name = request_dict['name'] if 'name' in request_dict.keys() else None
-            if Layer.active.filter(name=name).exists():
-                return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+
             serializer = LayerSerializer(data=request_dict)
             if serializer.is_valid():
+                '''verify whether layer name is unique within project or not'''
+                name = request_dict['name'] if 'name' in request_dict.keys() else None
+                theme_id = request_dict['theme'] if 'theme' in request_dict.keys() else None
+                theme_instance = Theme.objects.get(id=theme_id) if theme_id else None
+                project_id=Project.objects.get(id=theme_instance.project.id).id if theme_instance else None
+
+                if not project_id:
+                    return Response(data={'message': 'Theme can not be empty'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if Layer.active.filter(theme__project__id=project_id,name=name).exists():
+                    return Response(data={'message': 'Cannot create duplicate layer names.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
