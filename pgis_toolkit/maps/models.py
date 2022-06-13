@@ -88,25 +88,14 @@ class LayerFile(DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
-class SubLayer(IsDeleted,DateTimeStamp):
-    layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
-    name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(default=0)
-    icon = models.FileField(upload_to="icons",  blank=True, null=True)
-    icon_size = models.JSONField(blank=True, null=True)
-    style = models.JSONField(default=dict, blank=True, null=True)
-
-    def __str__(self):
-        return str(self.name)
-    class Meta:
-        app_label = 'maps'
-        # ordering = ('order',)
-
 class StandardIcon(DateTimeStamp,IsDeleted):
     name=models.CharField(max_length=50,blank=True,null=True)
     icon=models.FileField(upload_to="standard_icons/",validators=[validate_std_icon_extension])
     class Meta:
         app_label = 'maps'
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
 
 class Vectorlayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="vector_layer")
@@ -166,6 +155,23 @@ class WMSLayer(DateTimeStamp):
 
     class Meta:
         app_label = 'maps'
+
+
+class SubLayer(IsDeleted,DateTimeStamp):
+    layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
+    name=models.CharField(max_length=254)
+    order=models.PositiveIntegerField(default=0)
+    icon = models.FileField(upload_to="icons",  blank=True, null=True)
+    icon_size = models.JSONField(blank=True, null=True)
+    style = models.JSONField(default=dict, blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_std_icon",blank=True,null=True)
+
+    def __str__(self):
+        return str(self.name)
+    class Meta:
+        app_label = 'maps'
+        # ordering = ('order',)
+
 
 class FeatureCollection(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
