@@ -102,8 +102,9 @@ def project_layers(request,id):
                         layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                         # layer_detail_instance=layer.vector_layer
                         icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                        std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
                         layer_item['icon']=icon_url
-
+                        layer_item['std_icon']=std_icon_url
                         layer_item['icon_size']=layer_detail_instance.icon_size
                         layer_item['style']=layer_detail_instance.style
 
@@ -127,10 +128,13 @@ def project_layers(request,id):
                     # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                     for sub_layer in sub_layer_qs:
                         icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
-                        sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
+                        std_icon_url=env("URL")+sub_layer.std_icon.icon.url if sub_layer.std_icon else None
+                        sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'std_icon':std_icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
                         sub_layer_list.append(sub_layer_item)
                     icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                    std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
                     layer_item['icon']=icon_url
+                    layer_item['std_icon']=std_icon_url
                     layer_item['icon_size']=layer_detail_instance.icon_size,
                     layer_item['style']=layer_detail_instance.style
                     layer_item['sub_layer']=sub_layer_list
