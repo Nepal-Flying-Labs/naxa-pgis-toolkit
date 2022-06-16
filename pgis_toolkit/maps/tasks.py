@@ -1,4 +1,5 @@
 import os
+import time
 
 from celery import Celery, shared_task
 from rest_framework import filters, status, viewsets
@@ -19,17 +20,31 @@ from pgis_toolkit.maps.models import (
     WMSLayer,
 )
 
-from .functions import clear_dir, handleCSV, handleGeoJSON, handleKML, handleShapeFile
+from .functions import (
+    clear_dir,
+    handleCSV,
+    handleGeoJSON,
+    handleGPX,
+    handleKML,
+    handleShapeFile,
+)
 
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UploadVectorLayer(layer_id,request_data):
-    print("entered UploadVectorLayer")
+    print("entered UploadVectorLayer",layer_id)
     errors=[]
     dir = MEDIA_ROOT+"/geofiles/"
     try:
-        layer_instance=Layer.objects.get(id=layer_id)
-        layer_file_instance=LayerFile.objects.get(layer=layer_id)
+        layer_file_instance=None
+        tries=1
+        while tries<3:
+            if Layer.objects.filter(id=layer_id).exists() and LayerFile.objects.filter(layer=layer_id).exists():
+                layer_file_instance=LayerFile.objects.get(layer=layer_id)
+                break
+            time.sleep(3)
+        if not layer_file_instance:
+            return 'Error Occured from UploadVectorLayer: couldnot save/extract upoaded file', None
 
         '''Knowing file extension'''
         path_split = os.path.splitext(layer_file_instance.file.name)
@@ -46,6 +61,8 @@ def UploadVectorLayer(layer_id,request_data):
             response = handleGeoJSON(layer_id)
         elif file_extension == ".kml":
             response = handleKML(layer_id)
+        elif file_extension == ".gpx":
+            response = handleGPX(layer_id)
         else:
             clear_dir(dir)
             return 'Error Occured: Invalid file extension', None
@@ -61,8 +78,7 @@ def UploadVectorLayer(layer_id,request_data):
         clear_dir(dir)
         Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
-        return 'Error Occured: '+ str(errors), None
-        # return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': errors})
+        return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
 
 def UpdateVectorLayer(layer_instance, request_data):

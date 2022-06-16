@@ -1,4 +1,7 @@
+from datetime import MAXYEAR
+
 from django.contrib.gis.db import models as md
+from django.contrib.gis.db.models import Extent
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -85,32 +88,24 @@ class LayerFile(DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
-class SubLayer(IsDeleted,DateTimeStamp):
-    layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
-    name=models.CharField(max_length=254)
-    order=models.PositiveIntegerField(default=0)
-    icon = models.FileField(upload_to="icons",  blank=True, null=True)
-    icon_size = models.JSONField(blank=True, null=True)
-    style = models.JSONField(default=dict, blank=True, null=True)
-
-    def __str__(self):
-        return str(self.name)
-    class Meta:
-        app_label = 'maps'
-        # ordering = ('order',)
-
 class StandardIcon(DateTimeStamp,IsDeleted):
     name=models.CharField(max_length=50,blank=True,null=True)
     icon=models.FileField(upload_to="standard_icons/",validators=[validate_std_icon_extension])
+    class Meta:
+        app_label = 'maps'
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
 
 class Vectorlayer(DateTimeStamp):
     layer=models.OneToOneField(Layer,on_delete=models.CASCADE,related_name="vector_layer")
     geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
-    bbox=ArrayField(models.FloatField(max_length=20, blank=True),
-                               default=list,
-                               size=4,
-                               blank=True, null=True
-                               )# bounding box in format minx,miny,maxx,maxy
+    # bbox=ArrayField(models.FloatField(max_length=20, blank=True),
+    #                            default=list,
+    #                            size=4,
+    #                            blank=True, null=True
+    #                            )# bounding box in format minx,miny,maxx,maxy
+    bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
     popup_fields=ArrayField(models.CharField(max_length=100, blank=True),
                                default=list,
                                size=100,
@@ -121,7 +116,7 @@ class Vectorlayer(DateTimeStamp):
     sub_layers_mapping_field=models.CharField(max_length=100,blank=True,null=True) #field name on which basis sublayer is generated
 
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
-    icon = models.FileField(upload_to="icons", blank=True, null=True) #icon for point datatype
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
     icon_size = models.JSONField(default=dict,blank=True, null=True)
     # icon_url=models.URLField(blank=True,null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_std_icon",blank=True,null=True)
@@ -161,6 +156,23 @@ class WMSLayer(DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
+
+class SubLayer(IsDeleted,DateTimeStamp):
+    layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name='sub_layer')
+    name=models.CharField(max_length=254)
+    order=models.PositiveIntegerField(default=0)
+    icon = models.FileField(upload_to="icons",  blank=True, null=True)
+    icon_size = models.JSONField(blank=True, null=True)
+    style = models.JSONField(default=dict, blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_std_icon",blank=True,null=True)
+
+    def __str__(self):
+        return str(self.name)
+    class Meta:
+        app_label = 'maps'
+        # ordering = ('order',)
+
+
 class FeatureCollection(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature")
@@ -169,6 +181,30 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
 
     class Meta:
         app_label = 'maps'
+
+    def save(self, *args, **kwargs):
+        '''Update box of vectorlayer'''
+        if self.geometry:
+            if self.geometry.geom_type=="Point":
+                coords=self.geometry.coords
+                feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+            else:
+                feature=FeatureCollection.objects.filter(id=self.id).aggregate(Extent('geometry'))
+                feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+            vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
+            layer_bbox= vector_layer_instance.bbox
+            if layer_bbox and feature_bbox:
+                if feature_bbox[0]<layer_bbox[0]:
+                    layer_bbox[0]=feature_bbox[0]
+                if feature_bbox[1]<layer_bbox[1]:
+                    layer_bbox[1]=feature_bbox[1]
+                if feature_bbox[2]>layer_bbox[2]:
+                    layer_bbox[2]=feature_bbox[2]
+                if feature_bbox[3]>layer_bbox[3]:
+                    layer_bbox[3]=feature_bbox[3]
+                vector_layer_instance.bbox=layer_bbox
+                vector_layer_instance.save()
+        super(FeatureCollection, self).save(*args, **kwargs)
 
 
 class LayerAttribute(DateTimeStamp):

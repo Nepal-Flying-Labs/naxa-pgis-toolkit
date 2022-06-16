@@ -2,6 +2,7 @@
 Base settings to build other settings files upon.
 """
 from pathlib import Path
+from datetime import timedelta
 
 import environ
 from corsheaders.defaults import default_headers
@@ -311,6 +312,15 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
+'''simple_jwt authentication'''
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    # 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=2),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    # "REFRESH_TOKEN_LIFETIME": timedelta(minutes=5),
+    'UPDATE_LAST_LOGIN': True,
+}
+
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
 # CORS_URLS_REGEX = r"^/api/.*$"
 CORS_ORIGIN_ALLOW_ALL = True
@@ -333,3 +343,5 @@ SPECTACULAR_SETTINGS = {
 # Your stuff...
 # ------------------------------------------------------------------------------
 URL = env("URL", default='')
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

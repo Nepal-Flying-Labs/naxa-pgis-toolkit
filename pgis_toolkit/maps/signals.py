@@ -1,10 +1,18 @@
+from django.contrib.gis.db.models import Extent
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from rest_framework import status
 from rest_framework.response import Response
 
 from config.settings.local import geoserver
-from pgis_toolkit.maps.models import Layer, RasterLayer, Theme, Vectorlayer, WMSLayer
+from pgis_toolkit.maps.models import (
+    FeatureCollection,
+    Layer,
+    RasterLayer,
+    Theme,
+    Vectorlayer,
+    WMSLayer,
+)
 
 
 @receiver(post_save, sender=Layer)
@@ -85,3 +93,27 @@ def pre_delete_layer(sender, instance,**kwargs):
         errors.append({'errorName': str(e), 'details': str(e)})
         print("error"+str(errors))
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
+
+
+# @receiver(post_save, sender=FeatureCollection)
+# def post_save_feature(sender, instance, created,**kwargs):
+#     print(created,"is created")
+#     '''
+#     This signal is to create an instance based on layer_type of created Layer
+#     '''
+#     errors = []
+#     try:
+#         if created:
+#             layer_instance=Layer.objects.get(id=instance.layer.id)
+#             vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
+#             if instance.geometry:
+#                 feature = instance.aggregate(Extent('geometry'))
+#                 bbox = feature['geometry__extent']
+#                 print(bbox,"boox from signal")
+#                 print(vector_layer_instance.bbox,"boox from vector layer")
+#             return Response(status=status.HTTP_200_OK, data={"Message": "Extent Successfully updated"})
+#     except Exception as e:
+#         errors.append({'errorName': str(e), 'details': str(e)})
+#         print(f'error occure: {errors} ')
+#         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
