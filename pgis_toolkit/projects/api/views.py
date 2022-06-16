@@ -86,7 +86,7 @@ def delete_project(project_id):
 
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.active.all()
-    http_method_names = ['get', 'post', 'patch']
+    http_method_names = ['get', 'patch']
     default_serializer_class = ProjectSerializer
     serializer_classes = {
         'list': ProjectListSerializer,
@@ -97,94 +97,94 @@ class ProjectViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-    def create(self, request, *args, **kwargs):
-        errors = []
-        try:
-            request.data._mutable = True
-            request_dict = request.data
-            request_keys = request_dict.keys()
-            '''retrieveing country'''
-            country = request_dict['country']
-            request_dict.pop('country')
-            '''retrieving state'''
-            state = request_dict['state']
-            request_dict.pop('state')
+    # def create(self, request, *args, **kwargs):
+    #     errors = []
+    #     try:
+    #         request.data._mutable = True
+    #         request_dict = request.data
+    #         request_keys = request_dict.keys()
+    #         '''retrieveing country'''
+    #         country = request_dict['country']
+    #         request_dict.pop('country')
+    #         '''retrieving state'''
+    #         state = request_dict['state']
+    #         request_dict.pop('state')
 
-            serializer = ProjectSerializer(data=request_dict)
-            if serializer.is_valid():
-                created_object = serializer.save()
-                ''''handle country and state'''
-                created_object.country.set(json.loads(country))
-                created_object.state.set(json.loads(state))
-                created_object.save()
-                '''check location file'''
-                file_input = False
-                if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
-                    file_input = True
-                    file_type_list = ['Shapefile', 'GeoJSON']
-                    if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
-                        return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
+    #         serializer = ProjectSerializer(data=request_dict)
+    #         if serializer.is_valid():
+    #             created_object = serializer.save()
+    #             ''''handle country and state'''
+    #             created_object.country.set(json.loads(country))
+    #             created_object.state.set(json.loads(state))
+    #             created_object.save()
+    #             '''check location file'''
+    #             file_input = False
+    #             if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
+    #                 file_input = True
+    #                 file_type_list = ['Shapefile', 'GeoJSON']
+    #                 if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
+    #                     return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
 
-                '''Location file as Shapfile'''
-                if file_input == True:
-                    file_type = request_dict['file_type']
-                    file = str(request_dict['file'])
-                    split_tup = os.path.splitext(file)
-                    file_extension = split_tup[1]
-                    if file_type == "Shapefile":
-                        if file_extension == ".zip":
-                            response = handleProjectShapeFile(
-                                created_object.id)
-                            if response == "successful":
-                                # create_theme(created_object.id)
-                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                            else:
-                                delete_project(created_object.id)
-                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            delete_project(created_object.id)
-                            return Response({'message': "Please provide commpressed .zip file"},
-                                            status=status.HTTP_400_BAD_REQUEST)
+    #             '''Location file as Shapfile'''
+    #             if file_input == True:
+    #                 file_type = request_dict['file_type']
+    #                 file = str(request_dict['file'])
+    #                 split_tup = os.path.splitext(file)
+    #                 file_extension = split_tup[1]
+    #                 if file_type == "Shapefile":
+    #                     if file_extension == ".zip":
+    #                         response = handleProjectShapeFile(
+    #                             created_object.id)
+    #                         if response == "successful":
+    #                             # create_theme(created_object.id)
+    #                             return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+    #                         else:
+    #                             delete_project(created_object.id)
+    #                             return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+    #                     else:
+    #                         delete_project(created_object.id)
+    #                         return Response({'message': "Please provide commpressed .zip file"},
+    #                                         status=status.HTTP_400_BAD_REQUEST)
 
-                        '''Location file as GeoJSON'''
-                    elif file_type == "GeoJSON":
-                        if file_extension == ".geojson":
-                            response = handleProjectGeoJSON(created_object.id)
-                            if response == "successful":
-                                # create_theme(created_object.id)
-                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                            else:
-                                delete_project(created_object.id)
-                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                        else:
-                            delete_project(created_object.id)
-                            return Response({'message': "Please provide valid .geojson file"},
-                                            status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
+    #                     '''Location file as GeoJSON'''
+    #                 elif file_type == "GeoJSON":
+    #                     if file_extension == ".geojson":
+    #                         response = handleProjectGeoJSON(created_object.id)
+    #                         if response == "successful":
+    #                             # create_theme(created_object.id)
+    #                             return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+    #                         else:
+    #                             delete_project(created_object.id)
+    #                             return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+    #                     else:
+    #                         delete_project(created_object.id)
+    #                         return Response({'message': "Please provide valid .geojson file"},
+    #                                         status=status.HTTP_400_BAD_REQUEST)
+    #                 else:
+    #                     return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
 
-                else:
-                    '''Location as wkt from Custom Draw on map'''
-                    if 'location_wkt' not in request_keys or request_dict['location_wkt'] == "":
-                        delete_project(created_object.id)
-                        return Response(data={'message': 'No wkt of project location'}, status=status.HTTP_400_BAD_REQUEST)
+    #             else:
+    #                 '''Location as wkt from Custom Draw on map'''
+    #                 if 'location_wkt' not in request_keys or request_dict['location_wkt'] == "":
+    #                     delete_project(created_object.id)
+    #                     return Response(data={'message': 'No wkt of project location'}, status=status.HTTP_400_BAD_REQUEST)
 
-                    wkt_list = json.loads(request.data['location_wkt'])
-                    for geom in wkt_list:
-                        ProjectLocationFeatureCollection.objects.create(project=created_object,
-                                                                        geometry=GEOSGeometry(geom))
-                    # create_theme(created_object.id)
-                    return Response(status=200, data={'Message': 'Object Successfully Created', 'data': serializer.data,
-                                                        'object_id': created_object.id})
-            else:
-                for er in serializer._errors:
-                    errors.append(
-                        {'errorName': er, 'details': serializer._errors[er]})
-                return Response(status=status.HTTP_400_BAD_REQUEST,
-                                data={'message': 'Error Occured', 'error': errors})
+    #                 wkt_list = json.loads(request.data['location_wkt'])
+    #                 for geom in wkt_list:
+    #                     ProjectLocationFeatureCollection.objects.create(project=created_object,
+    #                                                                     geometry=GEOSGeometry(geom))
+    #                 # create_theme(created_object.id)
+    #                 return Response(status=200, data={'Message': 'Object Successfully Created', 'data': serializer.data,
+    #                                                     'object_id': created_object.id})
+    #         else:
+    #             for er in serializer._errors:
+    #                 errors.append(
+    #                     {'errorName': er, 'details': serializer._errors[er]})
+    #             return Response(status=status.HTTP_400_BAD_REQUEST,
+    #                             data={'message': 'Error Occured', 'error': errors})
 
-        except Exception as error:
-            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    #     except Exception as error:
+    #         return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
         project = Project.active.get(pk=pk)
@@ -272,9 +272,9 @@ class ProjectViewset(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
     def list(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
+        '''http://localhost:8000/api/projects/project/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
         paginator = CustomPageNumberPagination()
-        organization_id = request.query_params.get('organization_id', None)
+        organization_id = request.query_params.get('organization', None)
         queryset = self.queryset
         '''filter by organization id'''
         if organization_id and organization_id != "":
