@@ -366,37 +366,37 @@ class UserViewSet(viewsets.ModelViewSet):
     #     except Exception as e:
     #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-    def list(self, request, *args, **kwargs):
-        '''
-        Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
-        For other roles, User can have multiple roles with different organizations but must have single role within each organization.
-        http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
-        '''
-        try:
-            paginator = CustomPageNumberPagination()
-            if not request.user.is_authenticated:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-            request_dict = request.query_params
-            request_keys = request_dict.keys()
-            '''removing the requesting user roles from userrole queryset'''
-            queryset = UserRole.active.exclude(user__id=request.user.id)
-            '''checking if the requesting user has a role assigned'''
-            if not UserRole.active.filter(user__id=request.user.id).exists():
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
-            '''filtering queryset for web app administrator'''
-            if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-                queryset = queryset
-                group_by_list = ['organization', 'project']               
+#     def list(self, request, *args, **kwargs):
+#         '''
+#         Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
+#         For other roles, User can have multiple roles with different organizations but must have single role within each organization.
+#         http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
+#         '''
+#         try:
+#             paginator = CustomPageNumberPagination()
+#             if not request.user.is_authenticated:
+#                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+#             request_dict = request.query_params
+#             request_keys = request_dict.keys()
+#             '''removing the requesting user roles from userrole queryset'''
+#             queryset = UserRole.active.exclude(user__id=request.user.id)
+#             '''checking if the requesting user has a role assigned'''
+#             if not UserRole.active.filter(user__id=request.user.id).exists():
+#                 return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+#             user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
+#             '''filtering queryset for web app administrator'''
+#             if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+#                 queryset = queryset
+#                 group_by_list = ['organization', 'project']               
 
-   ################################################
-            '''Paginate Queryset'''
-            paginated_queryset = paginator.paginate_queryset(queryset, request)
-            serializer = UserListSerializer(
-                paginated_queryset, many=True, context={"request": request})
-            return paginator.get_paginated_response(data=serializer.data)
-        except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+#    ################################################
+#             '''Paginate Queryset'''
+#             paginated_queryset = paginator.paginate_queryset(queryset, request)
+#             serializer = UserListSerializer(
+#                 paginated_queryset, many=True, context={"request": request})
+#             return paginator.get_paginated_response(data=serializer.data)
+#         except Exception as e:
+#             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
     
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):    

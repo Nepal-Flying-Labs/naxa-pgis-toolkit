@@ -10,7 +10,7 @@ import fiona
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -67,23 +67,34 @@ class OrganizationViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        paginator = CustomPageNumberPagination()
-        if not UserRole.objects.filter(user__id=request.user.id).exists():
-            return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-        userrole_qs = UserRole.objects.filter(user__id=request.user.id)
-        queryset = self.queryset
-        if userrole_qs.first().group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-            queryset = queryset
-        else:
-            user_org_list = userrole_qs.values_list('organization__id', flat=True)
-            queryset = queryset.filter(id__in=user_org_list)
-        search_key = request.query_params.get('search_key', None)
-        order_by = request.query_params.get('order_by', None)
-        queryset = queryset.filter(name__icontains=search_key) if search_key and search_key != "" else queryset
-        queryset = queryset.order_by(order_by) if order_by and order_by != "" else queryset
-        paginated_queryset = paginator.paginate_queryset(queryset, request)
-        serializer = self.get_serializer(paginated_queryset, many=True, context={})
-        return paginator.get_paginated_response(data=serializer.data)
+        try:
+            paginator = CustomPageNumberPagination()
+            if not UserRole.objects.filter(user__id=request.user.id).exists():
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            userrole_qs = UserRole.objects.filter(user__id=request.user.id)
+            queryset = self.queryset
+            if userrole_qs.first().group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+                queryset = queryset
+            else:
+                user_org_list = userrole_qs.values_list('organization__id', flat=True)
+                queryset = queryset.filter(id__in=user_org_list)
+            search_key = request.query_params.get('search', None)
+            order_by = request.query_params.get('ordering', None)
+            queryset = queryset.filter(name__icontains=search_key) if search_key and search_key != "" else queryset
+            if order_by and order_by != "":
+                if order_by == 'projects':
+                    queryset = queryset.annotate(count=Count('ProjectOrganization')).order_by('count')
+                elif order_by == '-projects':
+                    queryset = queryset.annotate(count=Count('ProjectOrganization')).order_by('-count')
+                else:
+                    queryset = queryset.order_by(order_by)
+            else:
+                queryset = queryset
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=str(e))
 
 '''delets a project object'''
 def delete_project(project_id):
