@@ -30,6 +30,7 @@ from pgis_toolkit.projects.models import (
     Project,
     ProjectLocationFeatureCollection, Document, RequestDemo
 )
+from pgis_toolkit.users.models import UserRole
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -37,6 +38,8 @@ from pgis_toolkit.projects.utils.handleProjectLocation import (
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
+import environ
+env = environ.Env()
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
@@ -65,9 +68,18 @@ class OrganizationViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         paginator = CustomPageNumberPagination()
+        if not UserRole.objects.filter(user__id=request.user.id).exists():
+            return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+        userrole_qs = UserRole.objects.filter(user__id=request.user.id)
+        queryset = self.queryset
+        if userrole_qs.first().group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+            queryset = queryset
+        else:
+            user_org_list = userrole_qs.values_list('organization__id', flat=True)
+            queryset = queryset.filter(id__in=user_org_list)
         search_key = request.query_params.get('search_key', None)
         order_by = request.query_params.get('order_by', None)
-        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key != "" else self.queryset
+        queryset = queryset.filter(name__icontains=search_key) if search_key and search_key != "" else queryset
         queryset = queryset.order_by(order_by) if order_by and order_by != "" else queryset
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True, context={})

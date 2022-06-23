@@ -273,6 +273,99 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
+    # def list(self, request, *args, **kwargs):
+    #     '''
+    #     Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
+    #     For other roles, User can have multiple roles with different organizations but must have single role within each organization.
+    #     http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
+    #     '''
+    #     try:
+    #         paginator = CustomPageNumberPagination()
+    #         if not request.user.is_authenticated:
+    #             return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+    #         request_dict = request.query_params
+    #         request_keys = request_dict.keys()
+    #         '''removing the request user from user queryset'''
+    #         queryset = self.queryset.exclude(id=request.user.id)
+    #         '''checking if the requesting user has a role assigned'''
+    #         if not UserRole.active.filter(user__id=request.user.id).exists():
+    #             return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+    #         user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
+    #         organizaiton = None
+    #         '''filtering queryset for web app administrator'''
+    #         if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+    #             queryset = queryset
+    #         elif 'organization' in request_keys and request_dict['organization'] != "":
+    #             organization = request_dict['organization']
+    #             '''making organization compulsory and checking if any role of the request exists for the given organization'''
+    #             if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
+    #                 user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
+    #             else:
+    #                 return Response(data={'message': 'No any user role of the requesting user found for the organizaiton!'}, status=status.HTTP_400_BAD_REQUEST)
+    #             '''filtering queryset according to the role of the user in the organization'''
+    #             if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
+    #                 org_user_ids = UserRole.active.filter(organization__id=organizaiton).values_list('user__id', flat=True)
+    #                 queryset = queryset.filter(id__in=org_user_ids)
+    #                 '''filtering queryset according to users in a project'''
+    #             elif 'project' in request_keys and request_dict['project'] != "":                    
+    #                 project = request_dict['project']
+    #                 if user_role_instance.group.id == int(env('PROJECT_MANAGER')):                   
+    #                     project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
+    #                     queryset = queryset.filter(id__in=project_user_ids)
+    #                     '''filtering queryset in a project of the same role i.e. data collector'''
+    #                 elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):                    
+    #                     group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
+    #                     queryset = queryset.filter(id__in=group_user_ids)
+    #                 else:
+    #                     '''return empty queryset when no any role is validated '''
+    #                     queryset = None
+    #             else:
+    #                 return Response(data={'message': 'Params project is required!'}, status=status.HTTP_400_BAD_REQUEST)
+    #         else:
+    #             return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
+
+    #         '''Search'''
+    #         if 'search_key' in request_keys and request_dict['search_key'] != '':
+    #             searched_queryset = None
+    #             search_fields = ['full_name', 'contact', 'email']
+    #             filter_kwargs = {}
+    #             for field in search_fields:
+    #                 filter_kwargs[field+'__icontains'] = request_dict['search_key']
+    #             list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
+    #             queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
+                
+    #         '''Sorting'''
+    #         if 'order_by' in request_keys and request_dict['order_by'] != '':
+    #             queryset = queryset.order_by(request_dict['order_by'] )
+
+    #         '''Group by'''
+    #         if 'group_by' in request_keys and request_dict['group_by'] != '':
+    #             # user_role_qs = UserRole.active.all()
+    #             # query = user_role_qs.query
+    #             # query.group_by = [request_dict['group_by']]
+    #             # qs = QuerySet(query=query, model=UserRole)
+    #             # print(qs, "is queryset")
+    #             # user_ids = list(qs.values_list('id', flat=True))
+    #             # queryset = queryset.filter(id__in=user_ids)
+
+    #             group_by = request_dict['group_by']
+    #             if group_by == "project":
+    #                 user_ids = list(queryset.values_list('id', flat=True))
+    #                 user_role_qs = UserRole.active.filter(user__id__in=user_ids)
+    #                 project_list = list(user_role_qs.values_list('project', flat=True).distinct())
+    #                 data_dict = {}
+    #                 for project in project_list:
+    #                     project_name = Project.active.get(id=project).name
+    #                     data_dict[project_name] = user_role_qs.filter(project__id=project).values('user__image_thumbnail', 'user__full_name', 'project__name', 'group__name')
+    #                 return Response(data_dict, status=status.HTTP_200_OK)
+    #         '''Paginate Queryset'''
+    #         paginated_queryset = paginator.paginate_queryset(queryset, request)
+    #         serializer = UserListSerializer(
+    #             paginated_queryset, many=True, context={"request": request})
+    #         return paginator.get_paginated_response(data=serializer.data)
+    #     except Exception as e:
+    #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
     def list(self, request, *args, **kwargs):
         '''
         Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
@@ -285,79 +378,18 @@ class UserViewSet(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             request_dict = request.query_params
             request_keys = request_dict.keys()
-            '''removing the request user from user queryset'''
-            queryset = self.queryset.exclude(id=request.user.id)
+            '''removing the requesting user roles from userrole queryset'''
+            queryset = UserRole.active.exclude(user__id=request.user.id)
             '''checking if the requesting user has a role assigned'''
             if not UserRole.active.filter(user__id=request.user.id).exists():
                 return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
-            organizaiton = None
             '''filtering queryset for web app administrator'''
             if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
                 queryset = queryset
-            elif 'organization' in request_keys and request_dict['organization'] != "":
-                organization = request_dict['organization']
-                '''making organization compulsory and checking if any role of the request exists for the given organization'''
-                if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
-                    user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
-                else:
-                    return Response(data={'message': 'No any user role of the requesting user found for the organizaiton!'}, status=status.HTTP_400_BAD_REQUEST)
-                '''filtering queryset according to the role of the user in the organization'''
-                if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
-                    org_user_ids = UserRole.active.filter(organization__id=organizaiton).values_list('user__id', flat=True)
-                    queryset = queryset.filter(id__in=org_user_ids)
-                    '''filtering queryset according to users in a project'''
-                elif 'project' in request_keys and request_dict['project'] != "":                    
-                    project = request_dict['project']
-                    if user_role_instance.group.id == int(env('PROJECT_MANAGER')):                   
-                        project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
-                        queryset = queryset.filter(id__in=project_user_ids)
-                        '''filtering queryset in a project of the same role i.e. data collector'''
-                    elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):                    
-                        group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
-                        queryset = queryset.filter(id__in=group_user_ids)
-                    else:
-                        '''return empty queryset when no any role is validated '''
-                        queryset = None
-                else:
-                    return Response(data={'message': 'Params project is required!'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
+                group_by_list = ['organization', 'project']               
 
-            '''Search'''
-            if 'search_key' in request_keys and request_dict['search_key'] != '':
-                searched_queryset = None
-                search_fields = ['full_name', 'contact', 'email']
-                filter_kwargs = {}
-                for field in search_fields:
-                    filter_kwargs[field+'__icontains'] = request_dict['search_key']
-                list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
-                queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
-                
-            '''Sorting'''
-            if 'order_by' in request_keys and request_dict['order_by'] != '':
-                queryset = queryset.order_by(request_dict['order_by'] )
-
-            '''Group by'''
-            if 'group_by' in request_keys and request_dict['group_by'] != '':
-                # user_role_qs = UserRole.active.all()
-                # query = user_role_qs.query
-                # query.group_by = [request_dict['group_by']]
-                # qs = QuerySet(query=query, model=UserRole)
-                # print(qs, "is queryset")
-                # user_ids = list(qs.values_list('id', flat=True))
-                # queryset = queryset.filter(id__in=user_ids)
-
-                group_by = request_dict['group_by']
-                if group_by == "project":
-                    user_ids = list(queryset.values_list('id', flat=True))
-                    user_role_qs = UserRole.active.filter(user__id__in=user_ids)
-                    project_list = list(user_role_qs.values_list('project', flat=True).distinct())
-                    data_dict = {}
-                    for project in project_list:
-                        project_name = Project.active.get(id=project).name
-                        data_dict[project_name] = user_role_qs.filter(project__id=project).values('user__image_thumbnail', 'user__full_name', 'project__name', 'group__name')
-                    return Response(data_dict, status=status.HTTP_200_OK)
+   ################################################
             '''Paginate Queryset'''
             paginated_queryset = paginator.paginate_queryset(queryset, request)
             serializer = UserListSerializer(
