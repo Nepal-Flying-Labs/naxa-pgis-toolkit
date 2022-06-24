@@ -45,7 +45,7 @@ class UserAdmin(admin.ModelAdmin):
     search_fields = ("full_name",)
 
 class UserRoleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'organization', 'group', 'project', 'active')
+    list_display = ('id', 'is_deleted', 'user', 'organization', 'group', 'project', 'active')
     search_fields = ('id', 'user')
     list_filter = ('organization', 'group', 'project', 'active')
 
