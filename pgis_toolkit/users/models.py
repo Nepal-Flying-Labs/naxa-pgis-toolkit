@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
+
 # class User(AbstractUser):
 #     """
 #     Default custom user model for PGIS toolkit.
@@ -70,7 +71,7 @@ class UserRole(IsDeleted):
 
     def __str__(self):
         return f'{self.user}, {self.organization}, {self.group}'
-        
+
 '''Model to store required information to verify and identify user for registration using the email invite approach'''
 class PreliminaryUser(IsDeleted):
     email = models.EmailField(max_length=254, unique=True)
@@ -78,6 +79,6 @@ class PreliminaryUser(IsDeleted):
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
     email_verification_token = models.UUIDField()
-    
+
     class Meta:
         app_label = 'users'

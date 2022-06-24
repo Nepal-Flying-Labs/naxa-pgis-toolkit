@@ -1,37 +1,40 @@
-import uuid
 import json
-from functools import reduce
 import operator
+import uuid
+from functools import reduce
 from itertools import groupby
 
 from django.contrib.auth import get_user_model
-from rest_framework import status
-from rest_framework.decorators import action, permission_classes
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
-from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
-from rest_framework import status, viewsets
-from rest_framework.response import Response
 from django.contrib.auth.models import Group
-from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-from config.settings import base as settings
 from django.db.models import Q
 from django.db.models.query import QuerySet
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from rest_framework import status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet
 
+from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
-from .serializers import UserSerializer, UserListSerializer, PreliminaryUserSerializer, UserRoleSerializer
+from .serializers import (
+    PreliminaryUserSerializer,
+    UserListSerializer,
+    UserRoleSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 
 import environ
+
 env = environ.Env()
 
 # class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -105,7 +108,7 @@ class PreliminaryUserAPIView(APIView):
                 #     '''creating new group object'''
                 #     group_instance = Group.objects.create(name='Project Manager')
                 #     request.data['group'] = group_instance.id
-                request.data['group'] = int(env('PROJECT_MANAGER'))       
+                request.data['group'] = int(env('PROJECT_MANAGER'))
             '''create multiple or single preliminary user instances'''
             created_object_list = []
             for email in email_list:
@@ -161,7 +164,7 @@ class PreliminaryUserVerificationAPIView(APIView):
             '''checking whether the user is already registered'''
             if User.active.filter(email=preliminary_user_instance.email).exists():
                 data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
-                data_dict['user_created'] = True 
+                data_dict['user_created'] = True
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
                 if user_role_serializer.is_valid():
@@ -197,7 +200,7 @@ class UserViewSet(viewsets.ModelViewSet):
         created_object = None
         user_role_obj = None
         try:
-            verify_url = settings.URL + '/api/users/email_verify/?token='     
+            verify_url = settings.URL + '/api/users/email_verify/?token='
             serializer = UserSerializer(data=request.data)
             if serializer.is_valid():
                 created_object = serializer.save()
@@ -244,7 +247,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     '''deleting PreliminaryUser instance since the user is now registered!'''
                     preliminary_user_instance.delete()
                     return Response(data={'message': 'User Successfully Registered. Please proceed to login.'}, status=status.HTTP_200_OK)
-                else:               
+                else:
                     return Response(data={'message': 'User Successfully Registered. To activate your account, verfiy by the link sent to your email.'}, status=status.HTTP_200_OK)
             else:
                 for er in serializer._errors:
@@ -255,7 +258,7 @@ class UserViewSet(viewsets.ModelViewSet):
             if created_object:
                 User.active.get(id=created_object.id).delete()
             if user_role_obj:
-                UserRole.objects.get(id=user_role_obj.id).delete()            
+                UserRole.objects.get(id=user_role_obj.id).delete()
             errors.append({"error": str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "User Not Registered", "Error": errors})
 
@@ -307,13 +310,13 @@ class UserViewSet(viewsets.ModelViewSet):
     #                 org_user_ids = UserRole.active.filter(organization__id=organizaiton).values_list('user__id', flat=True)
     #                 queryset = queryset.filter(id__in=org_user_ids)
     #                 '''filtering queryset according to users in a project'''
-    #             elif 'project' in request_keys and request_dict['project'] != "":                    
+    #             elif 'project' in request_keys and request_dict['project'] != "":
     #                 project = request_dict['project']
-    #                 if user_role_instance.group.id == int(env('PROJECT_MANAGER')):                   
+    #                 if user_role_instance.group.id == int(env('PROJECT_MANAGER')):
     #                     project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
     #                     queryset = queryset.filter(id__in=project_user_ids)
     #                     '''filtering queryset in a project of the same role i.e. data collector'''
-    #                 elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):                    
+    #                 elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):
     #                     group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
     #                     queryset = queryset.filter(id__in=group_user_ids)
     #                 else:
@@ -333,7 +336,7 @@ class UserViewSet(viewsets.ModelViewSet):
     #                 filter_kwargs[field+'__icontains'] = request_dict['search_key']
     #             list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
     #             queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
-                
+
     #         '''Sorting'''
     #         if 'order_by' in request_keys and request_dict['order_by'] != '':
     #             queryset = queryset.order_by(request_dict['order_by'] )
@@ -387,7 +390,7 @@ class UserViewSet(viewsets.ModelViewSet):
 #             '''filtering queryset for web app administrator'''
 #             if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
 #                 queryset = queryset
-#                 group_by_list = ['organization', 'project']               
+#                 group_by_list = ['organization', 'project']
 
 #    ################################################
 #             '''Paginate Queryset'''
@@ -397,9 +400,9 @@ class UserViewSet(viewsets.ModelViewSet):
 #             return paginator.get_paginated_response(data=serializer.data)
 #         except Exception as e:
 #             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
-    
+
 '''Verify self registered user using token sent to their mail and activate their account.'''
-class EmailConfirmationAPIView(APIView):    
+class EmailConfirmationAPIView(APIView):
     permission_classes = [AllowAny]
     '''http://localhost:8000/api/users/email_verify/?token=5f53cbfd-de7b-45d9-b90a-5c364be8b0a9'''
     def post(self, request, *args, **kwargs):

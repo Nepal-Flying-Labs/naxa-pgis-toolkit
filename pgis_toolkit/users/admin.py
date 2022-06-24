@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 # from pgis_toolkit.users.forms import UserAdminChangeForm, UserAdminCreationForm
 
 User = get_user_model()
-from .models import UserRole, PreliminaryUser
+from .models import PreliminaryUser, UserRole
 
 # @admin.register(User)
 # class UserAdmin(auth_admin.UserAdmin):

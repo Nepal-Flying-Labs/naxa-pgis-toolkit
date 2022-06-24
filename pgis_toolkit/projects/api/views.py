@@ -6,39 +6,42 @@ import tempfile
 import zipfile
 from functools import reduce
 
+import environ
 import fiona
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
-from django.db.models import Q, Count
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
     DefaultTheme,
+    Document,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
     OrganizationCategory,
     Project,
-    ProjectLocationFeatureCollection, Document, RequestDemo
+    ProjectLocationFeatureCollection,
+    RequestDemo,
 )
-from pgis_toolkit.users.models import UserRole
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
 )
+from pgis_toolkit.users.models import UserRole
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
-import environ
 env = environ.Env()
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
@@ -299,7 +302,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
-            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)       
+            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         '''http://localhost:8000/api/projects/project/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
@@ -612,7 +615,7 @@ class DocumentViewset(viewsets.ModelViewSet):
     }
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def create(self, request, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/'''
         try:
@@ -630,7 +633,7 @@ class DocumentViewset(viewsets.ModelViewSet):
         except Exception as e:
             Document.objects.get(id=created_object.id).delete()
             return Response(data='Error: '+str(e))
-    
+
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/2/'''
         try:
@@ -704,7 +707,7 @@ class RequestDemoViewset(viewsets.ModelViewSet):
     queryset = RequestDemo.objects.all()
     serializer_class = RequestDemoSerializer
     http_method_names = ['get', 'post']
-    
+
     def get_permissions(self):
         if self.action == 'list' or self.action == 'retrieve':
             permission_classes = [IsAuthenticated]

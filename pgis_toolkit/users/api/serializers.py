@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
+
 User = get_user_model()
 
 

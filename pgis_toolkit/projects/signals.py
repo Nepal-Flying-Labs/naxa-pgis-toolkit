@@ -1,16 +1,19 @@
+from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-
-from config.settings import base as settings
-
 from rest_framework import status
 from rest_framework.response import Response
 
-from pgis_toolkit.projects.models import DefaultTheme, Document, RequestDemo, RequestDemoAlert
-from pgis_toolkit.maps.models import Theme, Project
+from config.settings import base as settings
+from pgis_toolkit.maps.models import Project, Theme
+from pgis_toolkit.projects.models import (
+    DefaultTheme,
+    Document,
+    RequestDemo,
+    RequestDemoAlert,
+)
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
 
