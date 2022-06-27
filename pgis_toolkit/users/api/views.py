@@ -73,10 +73,12 @@ class PreliminaryUserAPIView(APIView):
                 return Response(data={'message': 'Params email is missing!'}, status=status.HTTP_400_BAD_REQUEST)
             email_list = json.loads(email_list)
             organization_name = request.data.pop('organization_name', None)
+            project_name = request.data.pop('project_name', None)
             group = request.data.get('group', None)
-            if not group or not Group.objects.filter(id=group).exists():
-                return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
-            project_name = None
+            organization = request.data.get('organization', None)
+            project = request.data.get('project', None)
+            created_object_list = []
+            project_instance, organization_instance = None, None
             if organization_name:
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
@@ -92,12 +94,13 @@ class PreliminaryUserAPIView(APIView):
                 #     group_instance = Group.objects.create(name='Organization Admin')
                 #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
-            else:
-                project_name = request.data.pop('project_name', None)
+            elif project_name:
+                # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
                     return Response(data={'message': 'Params project_name and organization are required!'}, status=status.HTTP_400_BAD_REQUEST)
-                organization = request.data.get('organization')
+                if not organization or not Organization.active.filter(id=organization).exists():
+                    return Response(data={'message': 'Valid Organization params is compulsory for a project related role!'}, status=status.HTTP_400_BAD_REQUEST)
                 organization_instance = Organization.active.get(id=organization)
                 if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_instance)).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
@@ -111,8 +114,24 @@ class PreliminaryUserAPIView(APIView):
                 #     group_instance = Group.objects.create(name='Project Manager')
                 #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('PROJECT_MANAGER'))
+            else:
+                '''checking for already existing organization and projects'''
+                if not group or not Group.objects.filter(id=group).exists():
+                    return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
+                if group == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
+                    request.data.pop('organization', None)
+                    request.data.pop('project', None)
+                elif group == int(env('ORGANIZATION_ADMIN')):
+                    request.data.pop('project', None)
+                    if not organization or not Organization.active.filter(id=organization).exists():
+                        return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
+                elif group == int(env('PROJECT_MANAGER')) or group == int(env('DATA_COLLECTOR')):
+                    if not project or not Project.active.filter(id=project).exists():
+                        return Response(data={'message': 'Valid Organization params is compulsory for a project related role!'}, status=status.HTTP_400_BAD_REQUEST)
+                        project_instance = Project.active.get(id=project)
+                    request['organization'] = project_instance.organization.id if project_instance.organization else request['organization']
             '''create multiple or single preliminary user instances'''
-            created_object_list = []
+            # created_object_list = []
             for email in email_list:
                 request.data['email'] = email
                 request.data['email_verification_token'] = uuid.uuid4()
@@ -122,7 +141,7 @@ class PreliminaryUserAPIView(APIView):
                     created_object_list.append(created_object)
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'You have been invited as {created_object.group} in USAFIRI mapping platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI mapping platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
                     }
                     template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
@@ -139,9 +158,9 @@ class PreliminaryUserAPIView(APIView):
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
             return Response(data={'message': 'Email Invitation Successful!'}, status=status.HTTP_200_OK)
         except Exception as e:
-            if organization_name:
+            if organization_instance:
                 organization_instance.delete()
-            if project_name:
+            if project_instance:
                 project_instance.delete()
             # group_instance.delete()
             for obj in created_object_list:
@@ -300,7 +319,7 @@ class UserViewSet(viewsets.ModelViewSet):
     #         if not UserRole.active.filter(user__id=request.user.id).exists():
     #             return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
     #         user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
-    #         organizaiton = None
+    #         organization = None
     #         '''filtering queryset for web app administrator'''
     #         if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
     #             queryset = queryset
@@ -310,10 +329,10 @@ class UserViewSet(viewsets.ModelViewSet):
     #             if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
     #                 user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
     #             else:
-    #                 return Response(data={'message': 'No any user role of the requesting user found for the organizaiton!'}, status=status.HTTP_400_BAD_REQUEST)
+    #                 return Response(data={'message': 'No any user role of the requesting user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
     #             '''filtering queryset according to the role of the user in the organization'''
     #             if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
-    #                 org_user_ids = UserRole.active.filter(organization__id=organizaiton).values_list('user__id', flat=True)
+    #                 org_user_ids = UserRole.active.filter(organization__id=organization).values_list('user__id', flat=True)
     #                 queryset = queryset.filter(id__in=org_user_ids)
     #                 '''filtering queryset according to users in a project'''
     #             elif 'project' in request_keys and request_dict['project'] != "":
