@@ -2,11 +2,13 @@ from rest_framework import serializers
 
 from pgis_toolkit.projects.models import (
     DefaultTheme,
+    Document,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
     OrganizationCategory,
-    Project, Document, RequestDemo
+    Project,
+    RequestDemo,
 )
 
 
@@ -158,7 +160,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = '__all__'
-    
+
 class RequestDemoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestDemo

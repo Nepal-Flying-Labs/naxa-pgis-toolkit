@@ -1,5 +1,6 @@
-from django.utils.translation import ugettext_lazy as _
 from datetime import date
+
+from django.utils.translation import ugettext_lazy as _
 
 LAYER_TYPE_CHOICES=(("Raster",_("Raster")),("Vector",_('Vector')),('WMS',_('WMS')))
 GEOMETRY_TYPE_CHOICES=(

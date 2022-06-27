@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.projects.api.views import (
     DefaultThemeViewset,
+    DocumentViewset,
     LayerTemplateAttributeViewset,
     LayerTemplateUploadAPIView,
     LayerTemplateViewset,
@@ -10,8 +11,9 @@ from pgis_toolkit.projects.api.views import (
     OrganizationViewset,
     ProjectLocationVectorTileQuerySet,
     ProjectViewset,
-    layer_template_download,DocumentViewset, document_download,
-    RequestDemoViewset
+    RequestDemoViewset,
+    document_download,
+    layer_template_download,
 )
 
 router = DefaultRouter()

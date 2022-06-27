@@ -1,7 +1,13 @@
-from django.urls import path, include
-from rest_framework_simplejwt import views as jwt_views
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from .views import PreliminaryUserAPIView, PreliminaryUserVerificationAPIView, UserViewSet, EmailConfirmationAPIView
+from rest_framework_simplejwt import views as jwt_views
+
+from .views import (
+    EmailConfirmationAPIView,
+    PreliminaryUserAPIView,
+    PreliminaryUserVerificationAPIView,
+    UserViewSet,
+)
 
 router = DefaultRouter()
 router.register(r'user', UserViewSet, basename='user')

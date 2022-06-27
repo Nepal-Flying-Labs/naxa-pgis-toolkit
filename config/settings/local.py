@@ -1,7 +1,7 @@
-from .base import *  # noqa
-from .base import env
 from geo.Geoserver import Geoserver
 
+from .base import *  # noqa
+from .base import env
 
 # GENERAL
 # ------------------------------------------------------------------------------
