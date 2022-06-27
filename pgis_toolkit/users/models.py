@@ -3,6 +3,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from config.settings.base import URL
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
@@ -57,6 +58,11 @@ class User(IsDeleted, AbstractUser):
         # if self.password:
         #     self.password=make_password(self.password)
         super(User, self).save(*args, **kwargs)
+
+    # @property
+    # def get_image_thumbnail(self):
+    #     return f'{URL}{self.image_thumbnail.url}' if self.image_thumbnail else None
+
 
 class UserRole(IsDeleted):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
