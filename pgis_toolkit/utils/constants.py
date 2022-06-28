@@ -50,3 +50,8 @@ PUBLISHED_MONTH_CHOICES = (
 )
 
 CURRENT_YEAR = int(date.today().year)
+
+STATUS_CHOICES = (
+    ('Pending', _('Pending')),
+    ('Expired', _('Expired'))
+)
