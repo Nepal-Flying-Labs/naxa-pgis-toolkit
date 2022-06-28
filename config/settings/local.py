@@ -1,3 +1,4 @@
+from celery.schedules import crontab
 from geo.Geoserver import Geoserver
 
 from .base import *  # noqa
@@ -65,6 +66,20 @@ INSTALLED_APPS += ["django_extensions"]  # noqa F405
 geoserver = Geoserver(env("GEOSERVER_ADDRESS", default='http://localhost:8080/geoserver'),
                       username=env("GEOSERVER_USERNAME", default='admin'),
                       password=env("GEOSERVER_PASSWORD", default='geoserver'))
-CELERY_IMPORTS = ['pgis_toolkit.maps.tasks']
+CELERY_IMPORTS = ['pgis_toolkit.maps.tasks', 'pgis_toolkit.users.tasks']
 CELERY_RESULT_BACKEND = 'django-db'
-CELERY_TIMEZONE = 'Asia/Kathmandu'
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TIMEZONE = 'CET'
+
+CELERY_TASK_ROUTES = {
+    # 'core.tasks.add': {'queue': 'pccims'},
+    'pgis_toolkit.users.tasks.check_token_expiration': {'queue': 'default'},
+}
+
+CELERY_BEAT_SCHEDULE = {
+    'check_token_expiration': {
+        'task': 'pgis_toolkit.users.tasks.check_token_expiration',
+        'schedule': crontab(minute='*/1'),  # execute every 5 minutes
+        'options': {'queue': 'default'}
+    },
+}
