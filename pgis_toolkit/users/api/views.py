@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
@@ -27,6 +27,7 @@ from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
+    PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
     UserListSerializer,
     UserRoleSerializer,
@@ -180,9 +181,9 @@ class PreliminaryUserVerificationAPIView(APIView):
             token = request.query_params.get('token', None)
             if not token:
                 return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
-            if not PreliminaryUser.objects.filter(email_verification_token=token).exists():
-                return Response(data={'message': 'PreliminaryUser matching queryset does not exists!'}, status=status.HTTP_400_BAD_REQUEST)
-            preliminary_user_instance = PreliminaryUser.objects.get(email_verification_token=token)
+            if not PreliminaryUser.objects.filter(Q(email_verification_token=token) | Q(status='Pending')).exists():
+                return Response(data={'message': 'PreliminaryUser matching queryset does not exists or your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
+            preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) | Q(status='Pending'))
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)
             '''checking whether the user is already registered'''
@@ -235,7 +236,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 email = serializer.validated_data.get('email')
                 token = serializer.validated_data.get('email_verification_token')
                 '''Activating account of users from email invitaion'''
-                if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token)).exists():
+                if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token) & Q(status='Pending')).exists():
                     preliminary_user_instance = PreliminaryUser.objects.get(Q(email=email) & Q(email_verification_token=token))
                     if preliminary_user_instance.email_verification_token:
                         email_verified = True
@@ -469,3 +470,12 @@ class EmailConfirmationAPIView(APIView):
             return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''Email Invited User Status Table'''
+class PreliminaryUserListView(generics.ListAPIView):
+    queryset = PreliminaryUser.active.all()
+    serializer_class = PreliminaryUserListSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['organization', 'project', 'group', 'status']
+    search_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name']
+    ordering_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name', 'last_updated']

@@ -45,6 +45,23 @@ class PreliminaryUserSerializer(serializers.ModelSerializer):
         model = PreliminaryUser
         fields = '__all__'
 
+class PreliminaryUserListSerializer(serializers.ModelSerializer):
+    organization = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    group = serializers.SerializerMethodField()
+    class Meta:
+        model = PreliminaryUser
+        fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+
+    def get_organization(self, instance):
+        return instance.organization.name if instance.organization else None
+
+    def get_project(self, instance):
+        return instance.project.name if instance.project else None
+
+    def get_group(self, instance):
+        return instance.group.name if instance.group else None
+
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserRole
