@@ -94,7 +94,7 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     # "ordered_model",
     'celery',
-    # 'django_celery_beat',
+    'django_celery_beat',
     'django_celery_results'
 ]
 

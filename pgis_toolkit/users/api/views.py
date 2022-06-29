@@ -180,9 +180,9 @@ class PreliminaryUserVerificationAPIView(APIView):
             token = request.query_params.get('token', None)
             if not token:
                 return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
-            if not PreliminaryUser.objects.filter(email_verification_token=token).exists():
-                return Response(data={'message': 'PreliminaryUser matching queryset does not exists!'}, status=status.HTTP_400_BAD_REQUEST)
-            preliminary_user_instance = PreliminaryUser.objects.get(email_verification_token=token)
+            if not PreliminaryUser.objects.filter(Q(email_verification_token=token) | Q(status='Pending')).exists():
+                return Response(data={'message': 'PreliminaryUser matching queryset does not exists or your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
+            preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) | Q(status='Pending'))
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)
             '''checking whether the user is already registered'''
@@ -235,7 +235,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 email = serializer.validated_data.get('email')
                 token = serializer.validated_data.get('email_verification_token')
                 '''Activating account of users from email invitaion'''
-                if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token)).exists():
+                if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token) & Q(status='Pending')).exists():
                     preliminary_user_instance = PreliminaryUser.objects.get(Q(email=email) & Q(email_verification_token=token))
                     if preliminary_user_instance.email_verification_token:
                         email_verified = True

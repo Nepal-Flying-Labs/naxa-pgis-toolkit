@@ -68,7 +68,7 @@ geoserver = Geoserver(env("GEOSERVER_ADDRESS", default='http://localhost:8080/ge
                       password=env("GEOSERVER_PASSWORD", default='geoserver'))
 CELERY_IMPORTS = ['pgis_toolkit.maps.tasks', 'pgis_toolkit.users.tasks']
 CELERY_RESULT_BACKEND = 'django-db'
-CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_DEFAULT_QUEUE = 'default'
 CELERY_TIMEZONE = 'CET'
 
 CELERY_TASK_ROUTES = {
@@ -79,7 +79,7 @@ CELERY_TASK_ROUTES = {
 CELERY_BEAT_SCHEDULE = {
     'check_token_expiration': {
         'task': 'pgis_toolkit.users.tasks.check_token_expiration',
-        'schedule': crontab(minute='*/1'),  # execute every 5 minutes
+        'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
         'options': {'queue': 'default'}
     },
 }
