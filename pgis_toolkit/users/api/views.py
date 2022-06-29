@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
@@ -27,6 +27,7 @@ from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
+    PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
     UserListSerializer,
     UserRoleSerializer,
@@ -469,3 +470,12 @@ class EmailConfirmationAPIView(APIView):
             return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''Email Invited User Status Table'''
+class PreliminaryUserListView(generics.ListAPIView):
+    queryset = PreliminaryUser.active.all()
+    serializer_class = PreliminaryUserListSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['organization', 'project', 'group', 'status']
+    search_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name']
+    ordering_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name', 'last_updated']

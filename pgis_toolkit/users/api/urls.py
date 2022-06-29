@@ -5,6 +5,7 @@ from rest_framework_simplejwt import views as jwt_views
 from .views import (
     EmailConfirmationAPIView,
     PreliminaryUserAPIView,
+    PreliminaryUserListView,
     PreliminaryUserVerificationAPIView,
     UserViewSet,
 )
@@ -21,6 +22,6 @@ urlpatterns = [
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
     path('preliminary_user_create/', PreliminaryUserAPIView.as_view(), name='preliminary_user_create'),
     path('preliminary_user_verify/', PreliminaryUserVerificationAPIView.as_view(), name='preliminary_user_verify'),
-    path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify')
-
+    path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify'),
+    path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),
 ]
