@@ -83,3 +83,9 @@ class UserGroupPermissionsSerializer(serializers.ModelSerializer):
                 data.append(q['name'])
             return data
         return data
+
+
+class UserGroupListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = ('id', 'name')

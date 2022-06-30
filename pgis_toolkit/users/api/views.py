@@ -29,6 +29,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    UserGroupListSerializer,
     UserGroupPermissionsSerializer,
     UserListSerializer,
     UserRoleSerializer,
@@ -503,3 +504,12 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(status=status.HTTP_200_OK, data={"permissions": result})
         except Exception as error:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+
+'''users group list'''
+@api_view(['GET'])
+def user_group_list(request):
+    if not request.user.is_authenticated:
+        return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+    group_qs = Group.objects.all()
+    serializer = UserGroupListSerializer(group_qs, many=True)
+    return Response(data=serializer.data, status=status.HTTP_200_OK)
