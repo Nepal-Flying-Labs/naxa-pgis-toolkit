@@ -7,12 +7,13 @@ from .views import (
     PreliminaryUserAPIView,
     PreliminaryUserListView,
     PreliminaryUserVerificationAPIView,
+    UserPermissionViewSet,
     UserViewSet,
 )
 
 router = DefaultRouter()
 router.register(r'user', UserViewSet, basename='user')
-
+router.register(r'permissions', UserPermissionViewSet, basename="permissions")
 
 app_name = "users"
 urlpatterns = [

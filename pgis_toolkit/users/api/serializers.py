@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from rest_framework import serializers
 
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
@@ -66,3 +67,19 @@ class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserRole
         fields = '__all__'
+
+class UserGroupPermissionsSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Group
+        fields = ['permissions']
+
+    def get_permissions(self, obj):
+        if obj.permissions:
+            data = []
+            qs = obj.permissions.all().values('name')
+            for q in qs:
+                data.append(q['name'])
+            return data
+        return data

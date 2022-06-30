@@ -29,6 +29,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    UserGroupPermissionsSerializer,
     UserListSerializer,
     UserRoleSerializer,
     UserSerializer,
@@ -479,3 +480,26 @@ class PreliminaryUserListView(generics.ListAPIView):
     filterset_fields = ['organization', 'project', 'group', 'status']
     search_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name']
     ordering_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name', 'last_updated']
+
+'''user group permissions'''
+class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        try:
+            if not request.user.is_authenticated:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+            group_ids = UserRole.active.filter(user__id=request.user.id).values_list('group__id', flat=True)
+            queryset = Group.objects.filter(pk__in=group_ids)
+            serializer = UserGroupPermissionsSerializer(
+                queryset, many=True)
+            raw_data = serializer.data
+            permissions_list = []
+            for data in raw_data:
+                permissions_list += data['permissions']
+            def addition(n):
+                return n.lower().replace(" ", "_")
+            result = map(addition, permissions_list)
+            return Response(status=status.HTTP_200_OK, data={"permissions": result})
+        except Exception as error:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
