@@ -29,6 +29,8 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    UserGroupListSerializer,
+    UserGroupPermissionsSerializer,
     UserListSerializer,
     UserRoleSerializer,
     UserSerializer,
@@ -234,7 +236,7 @@ class UserViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 created_object = serializer.save()
                 email = serializer.validated_data.get('email')
-                token = serializer.validated_data.get('email_verification_token')
+                token = request.data.get('email_verification_token')
                 '''Activating account of users from email invitaion'''
                 if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token) & Q(status='Pending')).exists():
                     preliminary_user_instance = PreliminaryUser.objects.get(Q(email=email) & Q(email_verification_token=token))
@@ -414,7 +416,7 @@ class UserViewSet(viewsets.ModelViewSet):
             user_role_list = userrole_qs.values_list('group__id', flat=True)
             '''filtering queryset for web app administrator'''
             if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                queryset = queryset
+                queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
             elif 'organization' in request_keys and request_dict['organization'] != "":
                 organization = request_dict['organization']
                 '''exclude all the pgis web administrator user roles'''
@@ -479,3 +481,35 @@ class PreliminaryUserListView(generics.ListAPIView):
     filterset_fields = ['organization', 'project', 'group', 'status']
     search_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name']
     ordering_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name', 'last_updated']
+
+'''user group permissions'''
+class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        try:
+            if not request.user.is_authenticated:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+            group_ids = UserRole.active.filter(user__id=request.user.id).values_list('group__id', flat=True)
+            queryset = Group.objects.filter(pk__in=group_ids)
+            serializer = UserGroupPermissionsSerializer(
+                queryset, many=True)
+            raw_data = serializer.data
+            permissions_list = []
+            for data in raw_data:
+                permissions_list += data['permissions']
+            def addition(n):
+                return n.lower().replace(" ", "_")
+            result = map(addition, permissions_list)
+            return Response(status=status.HTTP_200_OK, data={"permissions": result})
+        except Exception as error:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+
+'''users group list'''
+@api_view(['GET'])
+def user_group_list(request):
+    if not request.user.is_authenticated:
+        return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+    group_qs = Group.objects.all()
+    serializer = UserGroupListSerializer(group_qs, many=True)
+    return Response(data=serializer.data, status=status.HTTP_200_OK)

@@ -7,12 +7,14 @@ from .views import (
     PreliminaryUserAPIView,
     PreliminaryUserListView,
     PreliminaryUserVerificationAPIView,
+    UserPermissionViewSet,
     UserViewSet,
+    user_group_list,
 )
 
 router = DefaultRouter()
 router.register(r'user', UserViewSet, basename='user')
-
+router.register(r'permissions', UserPermissionViewSet, basename="permissions")
 
 app_name = "users"
 urlpatterns = [
@@ -24,4 +26,6 @@ urlpatterns = [
     path('preliminary_user_verify/', PreliminaryUserVerificationAPIView.as_view(), name='preliminary_user_verify'),
     path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify'),
     path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),
+    path('user_group/', user_group_list, name='user_group'),
+
 ]
