@@ -234,7 +234,7 @@ class UserViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 created_object = serializer.save()
                 email = serializer.validated_data.get('email')
-                token = serializer.validated_data.get('email_verification_token')
+                token = request.data.get('email_verification_token')
                 '''Activating account of users from email invitaion'''
                 if PreliminaryUser.objects.filter(Q(email=email) & Q(email_verification_token=token) & Q(status='Pending')).exists():
                     preliminary_user_instance = PreliminaryUser.objects.get(Q(email=email) & Q(email_verification_token=token))
@@ -414,7 +414,7 @@ class UserViewSet(viewsets.ModelViewSet):
             user_role_list = userrole_qs.values_list('group__id', flat=True)
             '''filtering queryset for web app administrator'''
             if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                queryset = queryset
+                queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
             elif 'organization' in request_keys and request_dict['organization'] != "":
                 organization = request_dict['organization']
                 '''exclude all the pgis web administrator user roles'''
