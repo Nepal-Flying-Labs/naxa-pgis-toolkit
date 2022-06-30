@@ -242,3 +242,29 @@ class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
     class Meta:
         app_label = 'maps'
         unique_together = (("layer_template", "name"),)
+
+class ProjectStyle(DateTimeStamp,IsDeleted):
+    project=models.ForeignKey(Project,on_delete=models.CASCADE)
+    name=models.CharField(max_length=50)
+
+    class Meta:
+        app_label = 'maps'
+
+class LayerStyle(DateTimeStamp,IsDeleted):
+    project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
+    layer=models.ForeignKey(Layer,on_delete=models.CASCADE)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
+    icon_size = models.JSONField(default=dict,blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+class SubLayerStyle(DateTimeStamp,IsDeleted):
+    project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
+    sub_layer=models.ForeignKey(SubLayer,on_delete=models.CASCADE)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
+    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    class Meta:
+        app_label = 'maps'

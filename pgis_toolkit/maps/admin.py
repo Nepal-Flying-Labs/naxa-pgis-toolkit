@@ -66,10 +66,17 @@ class ProjectLayerTemplateAttributeAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name', 'alias')
     list_filter = ('layer_template', 'data_type')
 
-
-
 class StandardIconAdmin(admin.ModelAdmin):
     list_display = ('id','name', 'icon', 'is_deleted','uploaded_date','last_updated')
+
+class ProjectStyleAdmin(admin.ModelAdmin):
+    list_display = ('id','name', 'project', 'is_deleted','uploaded_date','last_updated')
+
+class LayerStyleAdmin(admin.ModelAdmin):
+    list_display = ('id','layer', 'project_style', 'is_deleted','uploaded_date','last_updated')
+
+class SubLayerStyleAdmin(admin.ModelAdmin):
+    list_display = ('id','sub_layer', 'project_style', 'is_deleted','uploaded_date','last_updated')
 
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
@@ -85,3 +92,6 @@ admin.site.register(FeatureCollection,FeatureCollectionAdmin)
 admin.site.register(ProjectsLayerTemplate,ProjectLayerTemplateAdmin)
 admin.site.register(ProjectsLayerTemplateAttribute,ProjectLayerTemplateAttributeAdmin)
 admin.site.register(StandardIcon,StandardIconAdmin)
+admin.site.register(ProjectStyle,ProjectStyleAdmin)
+admin.site.register(LayerStyle,LayerStyleAdmin)
+admin.site.register(SubLayerStyle,SubLayerStyleAdmin)
