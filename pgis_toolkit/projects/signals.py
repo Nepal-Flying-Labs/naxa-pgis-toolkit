@@ -57,19 +57,19 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
         if created:
             '''sending response to the user requesting demo'''
             data = {
-                'paragraph_1': 'Thank you for taking interest in USAFIRI mapping tool. We will look on our availability and inform you the timings of the demo.',
+                'paragraph_1': 'Thank you for requesting a demo. We\'ll get in touch with you soon.',
             }
             template = 'email/email_request_demo.html'
             html_message = render_to_string(template, data)
             message = strip_tags(html_message)
-            subject = 'Succesful Request for Demo, USAFIRI'
+            subject = 'Re: USAFIRI | Request For Demo'
             from_email = settings.EMAIL_HOST_USER
             recipient_list = [instance.email]
             send_mail(subject, message, from_email, recipient_list,
                     html_message=html_message, fail_silently=False)
             '''informing the concerned team members of USAFIRI that a demo is requested.'''
             data = {
-                'paragraph_1': f'This is to inform you that Mr./Mrs. {instance.full_name} has requested for a demo of USAFIRI mapping tool. Credentials of the requesting user is as follows: \
+                'paragraph_1': f'This is to inform you that Mr./Mrs. {instance.full_name} has requested for a demo of USAFIRI tool. Credentials of the requesting user is as follows: \
                 \nName: {instance.full_name} \
                 \nEmail: {instance.email} \
                 \nPhone: {instance.phone} \
@@ -79,7 +79,7 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
             template = 'email/email_request_demo.html'
             html_message = render_to_string(template, data)
             message = strip_tags(html_message)
-            subject = 'Request for Demo'
+            subject = 'Re: USAFIRI | Request For Demo'
             from_email = settings.EMAIL_HOST_USER
             recipient_list = RequestDemoAlert.objects.values_list('email', flat=True)
             send_mail(subject, message, from_email, recipient_list,
