@@ -482,25 +482,57 @@ class PreliminaryUserListView(generics.ListAPIView):
     search_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name']
     ordering_fields = ['id', 'email', 'organization__name', 'project__name', 'group__name', 'last_updated']
 
-'''user group permissions'''
 class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
+    '''user permissions'''
+    # def list(self, request, *args, **kwargs):
+    #     try:
+    #         if not request.user.is_authenticated:
+    #             return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+    #         group_ids = UserRole.active.filter(user__id=request.user.id).values_list('group__id', flat=True)
+    #         queryset = Group.objects.filter(pk__in=group_ids)
+    #         serializer = UserGroupPermissionsSerializer(
+    #             queryset, many=True)
+    #         raw_data = serializer.data
+    #         permissions_list = []
+    #         for data in raw_data:
+    #             permissions_list += data['permissions']
+    #         def addition(n):
+    #             return n.lower().replace(" ", "_")
+    #         result = map(addition, permissions_list)
+    #         return Response(status=status.HTTP_200_OK, data={"permissions": result})
+    #     except Exception as error:
+    #         return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+
+    '''user group permissions'''
+    '''http://localhost:8000/api/users/permissions/?organization=&project=2'''
     def list(self, request, *args, **kwargs):
         try:
             if not request.user.is_authenticated:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-            group_ids = UserRole.active.filter(user__id=request.user.id).values_list('group__id', flat=True)
-            queryset = Group.objects.filter(pk__in=group_ids)
+            userrole_qs = UserRole.active.filter(user__id=request.user.id)
+            group_ids = userrole_qs.values_list('group__id', flat=True)
+            queryset = None
+            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                queryset = Group.objects.get(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+            elif 'organization' in request.query_params and request.query_params['organization'] != "":
+                userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
+                group_ids = userrole_qs.values_list('group__id', flat=True)
+                if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                    queryset = Group.objects.get(pk=int(env('ORGANIZATION_ADMIN')))
+            elif 'project' in request.query_params and request.query_params['project'] != "":
+                userrole_qs = userrole_qs.filter(project__id=request.query_params['project'])
+                '''a user has a single role in a particular project'''
+                queryset = Group.objects.get(pk=userrole_qs[0].group.id)
+            if queryset == None:
+                return Response(data={'message': 'organization or project params or user role not found!'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = UserGroupPermissionsSerializer(
-                queryset, many=True)
-            raw_data = serializer.data
-            permissions_list = []
-            for data in raw_data:
-                permissions_list += data['permissions']
-            def addition(n):
-                return n.lower().replace(" ", "_")
-            result = map(addition, permissions_list)
+                queryset, many=False)
+            permissions_list = serializer.data['permissions']
+            def modify(perm):
+                return perm.lower().replace(" ", "_")
+            result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": result})
         except Exception as error:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})

@@ -671,7 +671,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 reduce(operator.or_, list_of_Q)) if search_fields else queryset
         ''''order_by'''
-        order_by = request.query_params.get('ordering, None)
+        order_by = request.query_params.get('ordering', None)
         if order_by:
             if 'id' in order_by:
                 queryset = queryset.order_by(order_by)
