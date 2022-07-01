@@ -660,7 +660,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
             return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
         queryset = self.queryset.filter(layer__id=layer_id)
         '''search_key'''
-        search_key = request.query_params.get('search_key', None)
+        search_key = request.query_params.get('search', None)
         if search_key:
             search_fields = list(queryset.first().attributes.keys())
             filter_kwargs = {}
@@ -671,7 +671,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 reduce(operator.or_, list_of_Q)) if search_fields else queryset
         ''''order_by'''
-        order_by = request.query_params.get('order_by', None)
+        order_by = request.query_params.get('ordering, None)
         if order_by:
             if 'id' in order_by:
                 queryset = queryset.order_by(order_by)
