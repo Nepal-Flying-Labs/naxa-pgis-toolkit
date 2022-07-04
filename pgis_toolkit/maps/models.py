@@ -256,6 +256,8 @@ class LayerStyle(DateTimeStamp,IsDeleted):
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
     icon_size = models.JSONField(default=dict,blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_style_std_icon",blank=True,null=True)
+
 
     class Meta:
         app_label = 'maps'
@@ -266,5 +268,7 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
     icon_size = models.JSONField(default=dict,blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_style_std_icon",blank=True,null=True)
+
     class Meta:
         app_label = 'maps'

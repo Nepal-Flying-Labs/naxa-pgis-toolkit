@@ -12,6 +12,7 @@ from celery.result import AsyncResult
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
+from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
@@ -28,11 +29,14 @@ from pgis_toolkit.maps.models import (
     Layer,
     LayerFile,
     LayerGroup,
+    LayerStyle,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
+    ProjectStyle,
     RasterLayer,
     StandardIcon,
     SubLayer,
+    SubLayerStyle,
     Theme,
     Vectorlayer,
     WMSLayer,
@@ -76,6 +80,7 @@ class StandardIconViewset(viewsets.ModelViewSet):
     queryset = StandardIcon.active.all()
     http_method_names = ['get']
     serializer_class = StandardIconListSerializer
+
 
 
 @api_view(['GET'])
@@ -147,6 +152,111 @@ def project_layers(request,id):
             theme_item={"id":theme.id,'name':theme.name,'description':theme.description,'group':group_list,'layer':layer_list}
             theme_list.append(theme_item)
         return Response(theme_list)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+def get_style_detail(layer_id,sublayer_id,project_style):
+    icon,icon_size,style,std_icon=None,None,None,None
+    if sublayer_id:
+        if project_style=="default":
+            style_instance=SubLayerStyle.objects.filter(layer=layer_id,project_style=None)
+        else:
+            style_instance=SubLayerStyle.objects.filter(layer=layer_id,project_style=project_style)
+    else:
+        if project_style=="default":
+            style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+        else:
+            style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=project_style)
+    if style_instance.exists():
+        icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
+        std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
+        icon=icon_url
+        std_icon=std_icon_url
+        icon_size=style_instance[0].icon_size
+        style=style_instance[0].style
+    return icon,icon_size,style,std_icon
+
+@api_view(['GET'])
+def project_theme_layers(request):
+    '''
+    layers list under project theme
+    http://0.0.0.0:8000/api/maps/project_theme_layers/?theme=<id>&project_style=default
+    This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
+    '''
+    try:
+        theme_id=request.query_params.get("theme",None)
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
+        if not theme_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
+        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme=theme_id)
+        layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
+        group_list=[]
+        group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
+        for group in group_qs:
+            group_layer_list=[]
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
+            for layer in group_layer_qs:
+                layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
+                if layer.layer_type=="Vector":
+                    icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                    # print(icon,icon_size,style,std_icon)
+                    layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+                    # layer_detail_instance=layer.vector_layer
+                    # icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                    # std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
+                    # layer_item['icon']=icon_url
+                    # layer_item['std_icon']=std_icon_url
+                    # layer_item['icon_size']=layer_detail_instance.icon_size
+                    # layer_item['style']=layer_detail_instance.style
+                    layer_item['icon']=icon
+                    layer_item['std_icon']=std_icon
+                    layer_item['icon_size']=icon_size
+                    layer_item['style']=style
+
+                # elif layer.layer_type=="Raster":
+                #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
+                # elif layer.layer_type=="WMS":
+                #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+                group_layer_list.append(layer_item)
+            group_item={"id":group.id,"name":group.name,'layer':group_layer_list}
+            group_list.append(group_item)
+        layer_list=[]
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
+
+        for layer in layer_qs:
+            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
+            if layer.layer_type=="Vector":
+                layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+                sub_layer_list=[]
+                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
+                # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
+                for sub_layer in sub_layer_qs:
+                    icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
+                    # icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
+                    # std_icon_url=env("URL")+sub_layer.std_icon.icon.url if sub_layer.std_icon else None
+                    # sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'std_icon':std_icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
+                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
+                    sub_layer_list.append(sub_layer_item)
+
+                icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                # icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
+                # std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
+                layer_item['icon']=icon
+                layer_item['std_icon']=std_icon
+                layer_item['icon_size']=icon_size,
+                layer_item['style']=style
+                layer_item['sub_layer']=sub_layer_list
+            # elif layer.layer_type=="Raster":
+            #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
+            # elif layer.layer_type=="WMS":
+            #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+            layer_list.append(layer_item)
+        theme_item={'group':group_list,'layer':layer_list}
+        # theme_list.append(theme_item)
+        return Response(theme_item,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
@@ -379,13 +489,15 @@ class ThemeViewset(viewsets.ModelViewSet):
     '''
     Viewset for Theme instance.
     '''
-    queryset = Theme.active.all()
+    queryset = Theme.active.all().order_by('order')
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ThemeSerializer
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_fields = ('project', )
 
     serializer_classes = {
         'list': ThemeListSerializer,
-        'retrieve': ThemeSerializer
+        # 'retrieve': ThemeSerializer
     }
 
     def get_serializer_class(self):

@@ -42,7 +42,7 @@ class ThemeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme
         # fields = '__all__'
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted','project','order')
 
 class ThemeSerializer(serializers.ModelSerializer):
     class Meta:
