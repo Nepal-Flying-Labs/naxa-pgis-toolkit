@@ -271,12 +271,10 @@ class UserViewSet(viewsets.ModelViewSet):
                 request.data['user'] = created_object.id
                 if not 'project' in request.data.keys():
                     request.data['project'] = None
-                print(request.data, "is request data")
                 user_role_serializer = UserRoleSerializer(data=request.data)
                 if user_role_serializer.is_valid():
                     user_role_obj = user_role_serializer.save()
                 else:
-                    print('user role serializer error')
                     for er in user_role_serializer._errors:
                         errors.append({"errorName": er, "details": serializer._errors[er][0]})
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
@@ -290,7 +288,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 else:
                     return Response(data={'message': 'User Successfully Registered. To activate your account, verfiy by the link sent to your email.'}, status=status.HTTP_200_OK)
             else:
-                print('user serializer error')
                 for er in serializer._errors:
                     errors.append(
                         {"errorName": er, "details": serializer._errors[er][0]})
@@ -412,8 +409,8 @@ class UserViewSet(viewsets.ModelViewSet):
         http://localhost:8000/api/users/user/?organization=&project=&group=&ordering=&search=
         '''
         try:
-            if not request.user.is_authenticated:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+            # if not request.user.is_authenticated:
+            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             request_dict = request.query_params
             request_keys = request_dict.keys()
             '''removing the requesting user roles from userrole queryset'''
@@ -421,7 +418,7 @@ class UserViewSet(viewsets.ModelViewSet):
             '''checking if the requesting user has a role assigned'''
             if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
                 return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(user__id=request.user.id)
+            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
             user_role_list = userrole_qs.values_list('group__id', flat=True)
             '''filtering queryset for web app administrator'''
             if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
@@ -465,6 +462,8 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+    # def retrieve()
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
