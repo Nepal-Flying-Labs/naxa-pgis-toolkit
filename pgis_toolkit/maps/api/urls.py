@@ -9,6 +9,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     LayerVectorTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
+    ProjectStyleViewset,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
@@ -16,11 +17,13 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     import_template,
     layer_download,
     project_layers,
+    project_theme_layers,
     reorder,
 )
 
 router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
+router.register(r'project_style', ProjectStyleViewset, basename='project_style')
 router.register(r'standard_icon', StandardIconViewset, basename='standard_icon')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
@@ -28,9 +31,11 @@ router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 app_name = "projects"
+
 urlpatterns = [
     path('', include(router.urls)),
     path('project_layers/<int:id>/', project_layers, name='project_layers'),
+    path('project_theme_layers/', project_theme_layers, name='project_theme_layers'),
     path('layer/', LayerAPIView.as_view(), name='layer'),
     path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
     path('get_layer_upload_task_response/', get_layer_upload_task_response),

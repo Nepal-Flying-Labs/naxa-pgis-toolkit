@@ -8,11 +8,6 @@ class LayerSerializer(serializers.ModelSerializer):
         model = Layer
         fields = '__all__'
 
-class StandardIconListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StandardIcon
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
-
 class LayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
@@ -28,21 +23,20 @@ class VectorLayerSerializer(serializers.ModelSerializer):
         model = Vectorlayer
         fields = '__all__'
 
-class RasterLayerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RasterLayer
-        fields = '__all__'
-
 class VectorLayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vectorlayer
         exclude=('geom_type','bbox','geoserver_workspace','geoserver_layer_name')
 
+class RasterLayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RasterLayer
+        fields = '__all__'
+
 class ThemeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theme
-        # fields = '__all__'
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted','project','order')
 
 class ThemeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -82,8 +76,7 @@ class FeatureCollectionSerializer(serializers.ModelSerializer):
 class LayerGroupListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerGroup
-        # fields = '__all__'
-        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted','theme','order')
 
 class LayerGroupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -109,3 +102,18 @@ class ProjectsLayerTemplateAttributeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectsLayerTemplateAttribute
         fields = '__all__'
+
+class ProjectStyleListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectStyle
+        fields = '__all__'
+
+class ProjectStyleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectStyle
+        fields = ['id','name']
+
+class StandardIconListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StandardIcon
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
