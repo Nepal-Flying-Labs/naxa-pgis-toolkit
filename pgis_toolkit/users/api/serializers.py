@@ -21,6 +21,11 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = '__all__'
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ('password',)
+
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()
     class Meta:

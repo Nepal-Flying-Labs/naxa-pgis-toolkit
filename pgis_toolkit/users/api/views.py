@@ -30,6 +30,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    UserDetailSerializer,
     UserGroupListSerializer,
     UserGroupPermissionsSerializer,
     UserListSerializer,
@@ -463,7 +464,10 @@ class UserViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-    # def retrieve()
+    def retrieve(self, request, pk, *args, **kwargs):
+        user_instance = User.active.get(pk=pk)
+        serializer = UserDetailSerializer(user_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
