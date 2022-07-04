@@ -24,11 +24,13 @@ from rest_framework.viewsets import GenericViewSet
 from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
+from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    UserDetailSerializer,
     UserGroupListSerializer,
     UserGroupPermissionsSerializer,
     UserListSerializer,
@@ -63,7 +65,7 @@ for project invite, organzation is required in payload.
 handles multiple email in the form: ["example@gmail.com", "example2@gmail.com"]
 '''
 class PreliminaryUserAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorizedInviter]
     '''http://localhost:8000/api/users/preliminary_user_create/'''
 
     def post(self, request, *args, **kwargs):
@@ -268,6 +270,8 @@ class UserViewSet(viewsets.ModelViewSet):
                             html_message=html_message, fail_silently=False)
                 '''create user role'''
                 request.data['user'] = created_object.id
+                if not 'project' in request.data.keys():
+                    request.data['project'] = None
                 user_role_serializer = UserRoleSerializer(data=request.data)
                 if user_role_serializer.is_valid():
                     user_role_obj = user_role_serializer.save()
@@ -276,6 +280,9 @@ class UserViewSet(viewsets.ModelViewSet):
                         errors.append({"errorName": er, "details": serializer._errors[er][0]})
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
                 if email_verified == True:
+                    '''activating the user role after verification'''
+                    user_role_obj.active = True
+                    user_role_obj.save()
                     '''deleting PreliminaryUser instance since the user is now registered!'''
                     preliminary_user_instance.delete()
                     return Response(data={'message': 'User Successfully Registered. Please proceed to login.'}, status=status.HTTP_200_OK)
@@ -403,8 +410,8 @@ class UserViewSet(viewsets.ModelViewSet):
         http://localhost:8000/api/users/user/?organization=&project=&group=&ordering=&search=
         '''
         try:
-            if not request.user.is_authenticated:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+            # if not request.user.is_authenticated:
+            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             request_dict = request.query_params
             request_keys = request_dict.keys()
             '''removing the requesting user roles from userrole queryset'''
@@ -412,7 +419,7 @@ class UserViewSet(viewsets.ModelViewSet):
             '''checking if the requesting user has a role assigned'''
             if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
                 return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(user__id=request.user.id)
+            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
             user_role_list = userrole_qs.values_list('group__id', flat=True)
             '''filtering queryset for web app administrator'''
             if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
@@ -456,6 +463,11 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+    def retrieve(self, request, pk, *args, **kwargs):
+        user_instance = User.active.get(pk=pk)
+        serializer = UserDetailSerializer(user_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
