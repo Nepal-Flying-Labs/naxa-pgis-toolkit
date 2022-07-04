@@ -39,6 +39,7 @@ from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectShapeFile,
 )
 from pgis_toolkit.users.models import UserRole
+from pgis_toolkit.users.permissions import IsTaskAuthorized
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
@@ -68,6 +69,13 @@ class OrganizationViewset(viewsets.ModelViewSet):
     pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def get_permissions(self):
+        if self.action == 'list' or self.action == 'retrieve' or self.action == 'create':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'update' or self.action == 'partial_update':
+            permission_classes = [IsTaskAuthorized]
+        return [permission() for permission in permission_classes]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -126,6 +134,13 @@ class ProjectViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def get_permissions(self):
+        if self.action == 'list' or self.action == 'retrieve' or self.action == 'create':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'update' or self.action == 'partial_update':
+            permission_classes = [IsTaskAuthorized]
+        return [permission() for permission in permission_classes]
 
     # def create(self, request, *args, **kwargs):
     #     errors = []
