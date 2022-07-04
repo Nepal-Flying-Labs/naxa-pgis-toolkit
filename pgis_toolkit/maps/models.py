@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
+from config.settings.base import env
 from pgis_toolkit.projects.models import (
     DateTimeStamp,
     IsDeleted,
@@ -250,6 +251,9 @@ class ProjectStyle(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+    def __str__(self):
+        return f'{self.id} {self.name}'
+
 class LayerStyle(DateTimeStamp,IsDeleted):
     project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE)
@@ -258,9 +262,15 @@ class LayerStyle(DateTimeStamp,IsDeleted):
     icon_size = models.JSONField(default=dict,blank=True, null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_style_std_icon",blank=True,null=True)
 
-
     class Meta:
         app_label = 'maps'
+
+    @property
+    def get_icon_url(self):
+        return f'{env("URL")}{self.icon.url}' if self.icon else None
+    @property
+    def get_std_icon_url(self):
+        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
 
 class SubLayerStyle(DateTimeStamp,IsDeleted):
     project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
@@ -272,3 +282,10 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
 
     class Meta:
         app_label = 'maps'
+
+    @property
+    def get_icon_url(self):
+        return f'{env("URL")}{self.icon.url}' if self.icon else None
+    @property
+    def get_std_icon_url(self):
+        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None

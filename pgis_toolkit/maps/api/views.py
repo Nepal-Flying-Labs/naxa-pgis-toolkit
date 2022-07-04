@@ -168,10 +168,10 @@ def get_style_detail(layer_id,sublayer_id,project_style):
         else:
             style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=project_style)
     if style_instance.exists():
-        icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
-        std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
-        icon=icon_url
-        std_icon=std_icon_url
+        # icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
+        # std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
+        icon=style_instance[0].get_icon_url
+        std_icon=style_instance[0].get_std_icon_url
         icon_size=style_instance[0].icon_size
         style=style_instance[0].style
     return icon,icon_size,style,std_icon
@@ -202,20 +202,10 @@ def project_theme_layers(request):
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
-                    # print(icon,icon_size,style,std_icon)
-                    layer_detail_instance=vector_layer_qs.get(layer=layer.id)
-                    # layer_detail_instance=layer.vector_layer
-                    # icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
-                    # std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
-                    # layer_item['icon']=icon_url
-                    # layer_item['std_icon']=std_icon_url
-                    # layer_item['icon_size']=layer_detail_instance.icon_size
-                    # layer_item['style']=layer_detail_instance.style
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['icon_size']=icon_size
                     layer_item['style']=style
-
                 # elif layer.layer_type=="Raster":
                 #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
                 # elif layer.layer_type=="WMS":
@@ -235,15 +225,9 @@ def project_theme_layers(request):
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                 for sub_layer in sub_layer_qs:
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
-                    # icon_url=env("URL")+sub_layer.icon.url if sub_layer.icon else None
-                    # std_icon_url=env("URL")+sub_layer.std_icon.icon.url if sub_layer.std_icon else None
-                    # sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon_url,'std_icon':std_icon_url,'icon_size':sub_layer.icon_size,'style':sub_layer.style}
                     sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
                     sub_layer_list.append(sub_layer_item)
-
                 icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
-                # icon_url=env("URL")+layer_detail_instance.icon.url if layer_detail_instance.icon else None
-                # std_icon_url=env("URL")+layer_detail_instance.std_icon.icon.url if layer_detail_instance.std_icon else None
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
                 layer_item['icon_size']=icon_size,
