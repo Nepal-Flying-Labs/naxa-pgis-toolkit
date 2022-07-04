@@ -144,7 +144,7 @@ class PreliminaryUserAPIView(APIView):
                     created_object_list.append(created_object)
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI mapping platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
                     }
                     template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
@@ -183,9 +183,9 @@ class PreliminaryUserVerificationAPIView(APIView):
             token = request.query_params.get('token', None)
             if not token:
                 return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
-            if not PreliminaryUser.objects.filter(Q(email_verification_token=token) | Q(status='Pending')).exists():
+            if not PreliminaryUser.objects.filter(Q(email_verification_token=token) & Q(status='Pending')).exists():
                 return Response(data={'message': 'PreliminaryUser matching queryset does not exists or your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
-            preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) | Q(status='Pending'))
+            preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) & Q(status='Pending'))
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)
             '''checking whether the user is already registered'''
