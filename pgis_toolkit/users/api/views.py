@@ -24,6 +24,7 @@ from rest_framework.viewsets import GenericViewSet
 from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
+from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
@@ -63,7 +64,7 @@ for project invite, organzation is required in payload.
 handles multiple email in the form: ["example@gmail.com", "example2@gmail.com"]
 '''
 class PreliminaryUserAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorizedInviter]
     '''http://localhost:8000/api/users/preliminary_user_create/'''
 
     def post(self, request, *args, **kwargs):
@@ -268,20 +269,28 @@ class UserViewSet(viewsets.ModelViewSet):
                             html_message=html_message, fail_silently=False)
                 '''create user role'''
                 request.data['user'] = created_object.id
+                if not 'project' in request.data.keys():
+                    request.data['project'] = None
+                print(request.data, "is request data")
                 user_role_serializer = UserRoleSerializer(data=request.data)
                 if user_role_serializer.is_valid():
                     user_role_obj = user_role_serializer.save()
                 else:
+                    print('user role serializer error')
                     for er in user_role_serializer._errors:
                         errors.append({"errorName": er, "details": serializer._errors[er][0]})
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
                 if email_verified == True:
+                    '''activating the user role after verification'''
+                    user_role_obj.active = True
+                    user_role_obj.save()
                     '''deleting PreliminaryUser instance since the user is now registered!'''
                     preliminary_user_instance.delete()
                     return Response(data={'message': 'User Successfully Registered. Please proceed to login.'}, status=status.HTTP_200_OK)
                 else:
                     return Response(data={'message': 'User Successfully Registered. To activate your account, verfiy by the link sent to your email.'}, status=status.HTTP_200_OK)
             else:
+                print('user serializer error')
                 for er in serializer._errors:
                     errors.append(
                         {"errorName": er, "details": serializer._errors[er][0]})
