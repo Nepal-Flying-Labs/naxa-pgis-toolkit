@@ -50,9 +50,9 @@ class UserRoleAdmin(admin.ModelAdmin):
     list_filter = ('organization', 'group', 'project', 'active')
 
 class PreliminaryUserAdmin(admin.ModelAdmin):
-    list_display = ('id', 'email', 'organization', 'project', 'group', 'last_updated')
+    list_display = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
     search_fields = ('id', 'email')
-    list_filter = ('organization', 'project', 'group')
+    list_filter = ('organization', 'project', 'group', 'status')
 
 
 admin.site.register(User, UserAdmin)
