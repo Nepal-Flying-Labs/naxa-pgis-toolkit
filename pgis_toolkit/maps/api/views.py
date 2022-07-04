@@ -17,6 +17,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from sequences import get_next_value
 from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
@@ -581,7 +582,9 @@ def layer_download(request):
         return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
     '''connect to database and pull required data'''
     try:
-        dir = MEDIA_ROOT+"/../mediadownload/"
+        layer_download_id = str(get_next_value(
+                sequence_name="layer_download_id", initial_value=1))
+        dir = f'{MEDIA_ROOT}/layer_download/{layer_download_id}/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
         sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
