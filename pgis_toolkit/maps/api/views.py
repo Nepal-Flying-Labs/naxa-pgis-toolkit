@@ -606,8 +606,11 @@ def layer_download(request):
             gdf.to_file(dir+layer_instance.name+".geojson", driver='GeoJSON')
             file_url = dir + f'{layer_instance.name}.geojson'
         elif output_format == "csv":
-            geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
-            gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
+            df = pandas.DataFrame(gdf)
+            df.to_csv(dir+layer_instance.name+'.csv')
+            file_url = dir + f'{layer_instance.name}.csv'
+            # geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
+            # gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
             # print(gdf.assign(geometry=gdf["geom"].apply(lambda p: p.wkt)).to_csv(), " is csv")
             file_url = dir + f'{layer_instance.name}.csv'
         elif output_format == "kml":
