@@ -63,6 +63,8 @@ from .serializers import (
     ProjectLayerTemplateSerializer,
     ProjectsLayerTemplateAttributeListSerializer,
     ProjectsLayerTemplateAttributeSerializer,
+    ProjectStyleListSerializer,
+    ProjectStyleSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
     SubLayerSerializer,
@@ -81,6 +83,30 @@ class StandardIconViewset(viewsets.ModelViewSet):
     http_method_names = ['get']
     serializer_class = StandardIconListSerializer
 
+class ProjectStyleViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for multiple project style
+    '''
+    queryset = ProjectStyle.active.all()
+    http_method_names = ['get','post','patch']
+    default_serializer_class = ProjectStyleSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
+
+    serializer_classes = {
+        'list': ProjectStyleListSerializer,
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        self.queryset = self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -328,13 +354,10 @@ class LayerAPIView(APIView):
                     '''wait untils the layer instance is created'''
                     iterate=True
                     while iterate:
-                        # print("start iterate")
                         if Layer.objects.filter(id=created_object.id).exists():
                             layer_instane=Layer.objects.get(id=created_object.id)
-                            # print(Layer.objects.filter(id=created_object.id),"existed")
                             iterate=False
                         else:
-                            # print("sleep for 3 sec")
                             time.sleep(3)
 
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
@@ -429,6 +452,8 @@ class SubLayerViewset(viewsets.ModelViewSet):
     queryset = SubLayer.objects.all()
     http_method_names = ['get', 'patch']
     default_serializer_class = SubLayerSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer', )
 
     serializer_classes = {
         'list': SubLayerListSerializer,
@@ -442,10 +467,10 @@ class SubLayerViewset(viewsets.ModelViewSet):
         layer_id = request.query_params.get('layer', None)
         if not layer_id:
             return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(layer=layer_id)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(layer=layer_id)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
@@ -455,7 +480,7 @@ def get_layer_upload_task_response(request):
     try:
         task_id = request.query_params.get('task_id', None)
         result = AsyncResult(task_id, app=app)
-        if result.ready():                     # check task state: true/false
+        if result.ready():   # check task state: true/false
             try:
                 response, layer_id = result.get()
                 if response == "successful":
@@ -476,8 +501,8 @@ class ThemeViewset(viewsets.ModelViewSet):
     queryset = Theme.active.all().order_by('order')
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ThemeSerializer
-    # filter_backends = [DjangoFilterBackend]
-    # filterset_fields = ('project', )
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
 
     serializer_classes = {
         'list': ThemeListSerializer,
@@ -539,8 +564,9 @@ class ThemeViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(queryset, many=True)
+        self.queryset=self.filter_queryset(self.queryset)
+        # queryset = self.queryset.filter(project__id=project)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
@@ -788,13 +814,15 @@ class LayerGroupViewset(viewsets.ModelViewSet):
     '''
     Viewset for LayerGroup objects.
     '''
-    queryset = LayerGroup.active.all()
+    queryset = LayerGroup.active.all().order_by('order')
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = LayerGroupSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('theme', )
 
     serializer_classes = {
         'list': LayerGroupListSerializer,
-        'retrieve': LayerGroupSerializer
+        # 'retrieve': LayerGroupSerializer
     }
 
     def get_serializer_class(self):
@@ -847,8 +875,9 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         theme = request.query_params.get('theme', None)
         if not theme:
             return Response(data={'message': 'params theme is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(theme__id=theme)
-        serializer = self.get_serializer(queryset, many=True)
+        self.queryset=self.filter_queryset(self.queryset)
+        # queryset = self.queryset.filter(theme__id=theme)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
@@ -858,6 +887,8 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectLayerTemplateSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
 
     serializer_classes = {
         'list': ProjectLayerTemplateListSerializer,
@@ -874,8 +905,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(project__id=project)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
@@ -934,6 +966,8 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     queryset = ProjectsLayerTemplateAttribute.objects.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer_template', )
 
     serializer_classes = {
         'list': ProjectsLayerTemplateAttributeListSerializer,
@@ -950,8 +984,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         layer_template = request.query_params.get('layer_template', None)
         if not layer_template:
             return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(layer_template__id=layer_template)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(layer_template__id=layer_template)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
