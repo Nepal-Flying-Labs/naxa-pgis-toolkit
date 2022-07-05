@@ -21,6 +21,11 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = '__all__'
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ('password',)
+
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()
     class Meta:
@@ -36,9 +41,9 @@ class UserListSerializer(serializers.ModelSerializer):
         # representation['image_thumbnail'] = instance.user.get_image_thumbnail
         representation['contact'] = instance.user.contact
         representation['email'] = instance.user.email
-        representation['organization'] = instance.organization.name
-        representation['project'] = instance.project.name
-        representation['group'] = instance.group.name
+        representation['organization'] = instance.organization.name if instance.organization else None
+        representation['project'] = instance.project.name if instance.project else None
+        representation['group'] = instance.group.name if instance.group else None
         return representation
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
