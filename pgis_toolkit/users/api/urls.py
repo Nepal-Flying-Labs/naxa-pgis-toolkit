@@ -3,10 +3,13 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt import views as jwt_views
 
 from .views import (
+    ChangePasswordView,
     EmailConfirmationAPIView,
+    ForgotPasswordEmailView,
     PreliminaryUserAPIView,
     PreliminaryUserListView,
     PreliminaryUserVerificationAPIView,
+    ResetPasswordView,
     UserPermissionViewSet,
     UserViewSet,
     user_group_list,
@@ -27,5 +30,7 @@ urlpatterns = [
     path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify'),
     path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),
     path('user_group/', user_group_list, name='user_group'),
-
+    path('forgot_password_email/', ForgotPasswordEmailView.as_view(), name='password_reset_email'),
+    path('reset_password/', ResetPasswordView.as_view(), name='password_reset'),
+    path('change_password/', ChangePasswordView.as_view(), name='password_change'),
 ]

@@ -557,3 +557,79 @@ def user_group_list(request):
     group_qs = Group.objects.all()
     serializer = UserGroupListSerializer(group_qs, many=True)
     return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+'''Send email to the user when forgot password button is clicked.'''
+class ForgotPasswordEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            reset_url = settings.URL + '/api/users/reset_password/?token='
+            username_or_email = request.data.get('username_or_email')
+            if User.active.filter(Q(username=username_or_email) | Q(email=username_or_email)).exists():
+                profile = User.active.filter(Q(username=username_or_email) | Q(email=username_or_email))
+                if profile[0].email == username_or_email or profile[0].username == username_or_email:
+                    user = profile[0]
+                    user.email_verification_token = uuid.uuid4()
+                    user.save()
+                    '''email invitation'''
+                    data = {
+                    'paragraph_1': f'Click in the link to reset your password: {reset_url}{user.email_verification_token}',
+                    }
+                    template = 'email/email_request_demo.html'
+                    html_message = render_to_string(template, data)
+                    message = strip_tags(html_message)
+                    subject = 'Password Reset Verification, USAFIRI'
+                    from_email = settings.EMAIL_HOST_USER
+                    recipient_list = [user.email]
+                    send_mail(subject, message, from_email, recipient_list,
+                            html_message=html_message, fail_silently=False)
+                    return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''Reset password from the reset link sent to email'''
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            email_verification_token = self.request.query_params.get('token')
+            password1 = request.data.get("new_password1")
+            password2 = request.data.get("new_password2")
+            if password1 == password2:
+                if User.active.filter(email_verification_token=email_verification_token).exists():
+                    profile = User.active.filter(
+                        email_verification_token=email_verification_token)
+                    user = profile[0]
+                    user.set_password(password1)
+                    # user.email_verification_token = ''  # change
+                    user.save()
+                    return Response(status=status.HTTP_200_OK, data={"message": "Password reset successful. Please Login!"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Invalid token!"})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''change password'''
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        old_password = request.data["old_password"]
+        new_password1 = request.data["new_password1"]
+        new_password2 = request.data["new_password2"]
+        '''validating old password'''
+        user = User.active.get(id=request.user.id)
+        check_old_password = user.check_password(old_password)
+        if check_old_password:
+            if new_password1 == new_password2:
+                user.set_password(new_password1)
+                # user.is_password_changed = True
+                user.save()
+                return Response({'message': 'Password Change Succesful!'})
+            else:
+                return Response({"message": "New passwords don't match!"})
+        else:
+            return Response({"message": "Your old password is wrong!"})
