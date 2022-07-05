@@ -559,12 +559,12 @@ def user_group_list(request):
     return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 '''Send email to the user when forgot password button is clicked.'''
-class ResetPasswordEmailView(APIView):
+class ForgotPasswordEmailView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         try:
-            reset_url = settings.URL + '/api/users/forgot_password/?token='
+            reset_url = settings.URL + '/api/users/reset_password/?token='
             username_or_email = request.data.get('username_or_email')
             if User.active.filter(Q(username=username_or_email) | Q(email=username_or_email)).exists():
                 profile = User.active.filter(Q(username=username_or_email) | Q(email=username_or_email))
@@ -586,5 +586,28 @@ class ResetPasswordEmailView(APIView):
                             html_message=html_message, fail_silently=False)
                     return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''Reset password from the reset link sent to email'''
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            email_verification_token = self.request.query_params.get('token')
+            password1 = request.data.get("new_password1")
+            password2 = request.data.get("new_password2")
+            if password1 == password2:
+                if User.active.filter(email_verification_token=email_verification_token).exists():
+                    profile = User.active.filter(
+                        email_verification_token=email_verification_token)
+                    user = profile[0]
+                    user.set_password(password1)
+                    # user.email_verification_token = ''  # change
+                    user.save()
+                    return Response(status=status.HTTP_200_OK, data={"message": "Password reset successful. Please Login!"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Invalid token!"})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
