@@ -557,3 +557,34 @@ def user_group_list(request):
     group_qs = Group.objects.all()
     serializer = UserGroupListSerializer(group_qs, many=True)
     return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+'''Send email to the user when forgot password button is clicked.'''
+class ResetPasswordEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            reset_url = settings.URL + '/api/users/forgot_password/?token='
+            username_or_email = request.data.get('username_or_email')
+            if User.active.filter(Q(username=username_or_email) | Q(email=username_or_email)).exists():
+                profile = User.active.filter(Q(username=username_or_email) | Q(email=username_or_email))
+                if profile[0].email == username_or_email or profile[0].username == username_or_email:
+                    user = profile[0]
+                    user.email_verification_token = uuid.uuid4()
+                    user.save()
+                    '''email invitation'''
+                    data = {
+                    'paragraph_1': f'Click in the link to reset your password: {reset_url}{user.email_verification_token}',
+                    }
+                    template = 'email/email_request_demo.html'
+                    html_message = render_to_string(template, data)
+                    message = strip_tags(html_message)
+                    subject = 'Password Reset Verification, USAFIRI'
+                    from_email = settings.EMAIL_HOST_USER
+                    recipient_list = [user.email]
+                    send_mail(subject, message, from_email, recipient_list,
+                            html_message=html_message, fail_silently=False)
+                    return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
