@@ -611,3 +611,25 @@ class ResetPasswordView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+
+'''change password'''
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        old_password = request.data["old_password"]
+        new_password1 = request.data["new_password1"]
+        new_password2 = request.data["new_password2"]
+        '''validating old password'''
+        user = User.active.get(id=request.user.id)
+        check_old_password = user.check_password(old_password)
+        if check_old_password:
+            if new_password1 == new_password2:
+                user.set_password(new_password1)
+                # user.is_password_changed = True
+                user.save()
+                return Response({'message': 'Password Change Succesful!'})
+            else:
+                return Response({"message": "New passwords don't match!"})
+        else:
+            return Response({"message": "Your old password is wrong!"})
