@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -15,6 +16,9 @@ from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
     LayerFile,
+    LayerStyle,
+    ProjectStyle,
+    StandardIcon,
     SubLayer,
     Vectorlayer,
     WMSLayer,
@@ -94,6 +98,25 @@ def UpdateVectorLayer(layer_instance, request_data):
                 errors.append(
                     {'errorName': er, 'details': vector_layer_serializer._errors[er][0]})
             return errors
+
+        '''Save vector layer style'''
+        project_style=None if request_data['project_style']=="default" else request_data['project_style']
+        style_qs=LayerStyle.objects.filter(layer=layer_instance.id,project_style=project_style)
+
+        if style_qs.exists():
+            layerstyle_instance=style_qs[0]
+        else:
+            project_style_instance=ProjectStyle.active.get(id=project_style) if project_style else None
+            layerstyle_instance=LayerStyle.objects.create(layer=layer_instance,project_style=project_style_instance)
+        if 'icon' in request_data.keys():
+            layerstyle_instance.icon=request_data['icon']
+        if 'icon_size' in request_data.keys():
+            layerstyle_instance.icon_size=json.loads(request_data['icon_size'])
+        if 'style' in request_data.keys():
+            layerstyle_instance.style=json.loads(request_data['style'])
+        if 'std_icon' in request_data.keys():
+            layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon'])
+        layerstyle_instance.save()
 
         if "sub_layers_mapping_field" in request_data.keys() and "sub_layers_mapping_field" !="":
             sub_layers_mapping_field=request_data['sub_layers_mapping_field']

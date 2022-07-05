@@ -419,6 +419,11 @@ class LayerAPIView(APIView):
                 layer_type = layer_instance.layer_type
                 '''handle Vector layer update'''
                 if layer_type == "Vector":
+                    project_style="default"
+                    if "project_style" in request_dict and request_dict['project_style']!='' and request_dict['project_style']!='default':
+                        project_style=request_dict['project_style']
+                    request_dict._mutable=True
+                    request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
                         return Response(data={'message':response},status=200)
@@ -471,6 +476,50 @@ class SubLayerViewset(viewsets.ModelViewSet):
         self.queryset=self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def partial_update(self, request, pk=None):
+        errors=[]
+        try:
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            # name = request_dict['name'] if 'name' in request_keys else None
+            sub_layer_instance=SubLayer.active.get(pk=pk)
+            project_style="default"
+            if "project_style" in request_dict and request_dict['project_style']!='' and request_dict['project_style']!='default':
+                project_style=request_dict['project_style']
+            request_dict._mutable=True
+            request_dict['project_style']=project_style
+
+            serializer = self.get_serializer(sub_layer_instance, data=request_dict, partial=True)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                project_style=None if request_dict['project_style']=="default" else request_dict['project_style']
+                style_qs=SubLayerStyle.objects.filter(sub_layer=sub_layer_instance.id,project_style=project_style)
+
+                if style_qs.exists():
+                    sub_layer_style_instance=style_qs[0]
+                else:
+                    project_style_instance=ProjectStyle.active.get(id=project_style) if project_style else None
+                    sub_layer_style_instance=SubLayerStyle.objects.create(sub_layer=sub_layer_instance,project_style=project_style_instance)
+                if 'icon' in request_dict.keys():
+                    sub_layer_style_instance.icon=request_dict['icon']
+                if 'icon_size' in request_dict.keys():
+                    sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
+                if 'style' in request_dict.keys():
+                    sub_layer_style_instance.style=json.loads(request_dict['style'])
+                if 'std_icon' in request_dict.keys():
+                    sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon'])
+                sub_layer_style_instance.save()
+                return Response(data={"message":"successful"},status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+
 
 @api_view(['GET'])
 def get_layer_upload_task_response(request):

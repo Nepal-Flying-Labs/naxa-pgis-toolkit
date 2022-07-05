@@ -106,12 +106,12 @@ class ProjectsLayerTemplateAttributeSerializer(serializers.ModelSerializer):
 class ProjectStyleListSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectStyle
-        fields = '__all__'
+        fields = ['id','name']
 
 class ProjectStyleSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectStyle
-        fields = ['id','name']
+        fields = '__all__'
 
 class StandardIconListSerializer(serializers.ModelSerializer):
     class Meta:
