@@ -27,6 +27,7 @@ from pgis_toolkit.maps.functions import advance_filter_data, clear_dir
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
+    LayerAttribute,
     LayerFile,
     LayerGroup,
     LayerStyle,
@@ -55,6 +56,8 @@ from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 from .serializers import (
     FeatureCollectionListSerializer,
     FeatureCollectionSerializer,
+    LayerAttributeListSerializer,
+    LayerAttributeSerializer,
     LayerGroupListSerializer,
     LayerGroupSerializer,
     LayerSerializer,
@@ -104,6 +107,31 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        self.queryset = self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+class LayerAttributeViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for multiple project style
+    '''
+    queryset = LayerAttribute.objects.all()
+    http_method_names = ['get','post','patch']
+    default_serializer_class = LayerAttributeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer', )
+
+    serializer_classes = {
+        'list': LayerAttributeListSerializer,
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
         self.queryset = self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)

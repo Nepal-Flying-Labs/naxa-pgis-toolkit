@@ -1,3 +1,4 @@
+from attr import fields
 from rest_framework import serializers
 
 from pgis_toolkit.maps.models import *
@@ -117,3 +118,12 @@ class StandardIconListSerializer(serializers.ModelSerializer):
     class Meta:
         model = StandardIcon
         exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+class LayerAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerAttribute
+        exclude = ('uploaded_date', 'last_updated')
+
+class LayerAttributeListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LayerAttribute
+        fields=['id','name','alias']
