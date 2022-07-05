@@ -30,6 +30,7 @@ class SubLayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted','layer', 'name', 'order')
     search_fields = ('id', 'name','layer__id')
     list_filter = ('is_deleted', 'layer')
+    readonly_fields=['name',]
 
 class VectorLayerAdmin(admin.ModelAdmin):
     list_display = ('id','layer','geom_type','geoserver_workspace','geoserver_layer_name')
