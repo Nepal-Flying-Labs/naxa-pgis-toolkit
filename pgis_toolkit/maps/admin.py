@@ -25,6 +25,13 @@ class LayerAttributeAdmin(admin.ModelAdmin):
     list_display = ('id','layer', 'name', 'alias','data_type', 'length','precision','unit')
     search_fields = ('id','layer__id','name','alias','data_type',)
     list_filter = ('data_type',)
+    readonly_fields=['name','layer']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 class SubLayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted','layer', 'name', 'order')

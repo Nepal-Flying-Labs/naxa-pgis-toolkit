@@ -5,6 +5,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     AdvanceFilterVectorTileQuerySet,
     FeatureCollectionViewset,
     LayerAPIView,
+    LayerAttributeViewset,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
@@ -30,6 +31,7 @@ router.register(r'feature_collection', FeatureCollectionViewset, basename='featu
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
+router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
 app_name = "projects"
 
 urlpatterns = [
