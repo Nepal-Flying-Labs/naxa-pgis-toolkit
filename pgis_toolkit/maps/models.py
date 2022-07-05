@@ -32,7 +32,7 @@ class Theme(IsDeleted,DateTimeStamp):
     description=models.TextField(blank=True,null=True)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
 
@@ -42,7 +42,7 @@ class LayerGroup(IsDeleted,DateTimeStamp):
     order=models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
         unique_together = (("theme", "name"),)
@@ -58,7 +58,7 @@ class Layer(IsDeleted,DateTimeStamp):
     is_osm_layer=models.BooleanField(default=False)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
 
@@ -132,7 +132,7 @@ class Vectorlayer(DateTimeStamp):
         max_length=250, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.layer};id-{self.id}'
+        return f'{self.id} {self.layer}'
     class Meta:
         app_label = 'maps'
 
@@ -168,7 +168,7 @@ class SubLayer(IsDeleted,DateTimeStamp):
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_std_icon",blank=True,null=True)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
         # ordering = ('order',)
@@ -236,6 +236,9 @@ class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
     project=models.ForeignKey(Project,on_delete=models.CASCADE)
     class Meta:
         app_label = 'maps'
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
 
 
 class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
