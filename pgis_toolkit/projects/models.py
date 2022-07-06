@@ -144,7 +144,7 @@ class Project(IsDeleted,DateTimeStamp):
         app_label = 'projects'
 
     def __str__(self):
-        return f'{self.name}'
+        return f'{self.id} {self.name}'
 
     def clean(self):
         """

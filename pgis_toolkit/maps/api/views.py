@@ -11,6 +11,7 @@ import pandas
 from celery.result import AsyncResult
 from django.db.models import Q
 from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
@@ -23,7 +24,7 @@ from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app
-from pgis_toolkit.maps.functions import advance_filter_data, clear_dir
+from pgis_toolkit.maps.functions import advance_filter_data, clear_dir, get_style_detail
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
@@ -70,6 +71,7 @@ from .serializers import (
     ProjectStyleSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
+    SubLayerRetrieveSerializer,
     SubLayerSerializer,
     SubLayerUpdateSerializer,
     ThemeListSerializer,
@@ -209,26 +211,34 @@ def project_layers(request,id):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
-def get_style_detail(layer_id,sublayer_id,project_style):
-    icon,icon_size,style,std_icon=None,None,None,None
-    if sublayer_id:
-        if project_style=="default":
-            style_instance=SubLayerStyle.objects.filter(layer=layer_id,project_style=None)
-        else:
-            style_instance=SubLayerStyle.objects.filter(layer=layer_id,project_style=project_style)
-    else:
-        if project_style=="default":
-            style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
-        else:
-            style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=project_style)
-    if style_instance.exists():
-        # icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
-        # std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
-        icon=style_instance[0].get_icon_url
-        std_icon=style_instance[0].get_std_icon_url
-        icon_size=style_instance[0].icon_size
-        style=style_instance[0].style
-    return icon,icon_size,style,std_icon
+# def get_style_detail(layer_id,sublayer_id,project_style):
+#     icon,icon_size,style,std_icon=None,None,None,None
+#     if sublayer_id:
+#         if project_style=="default":
+#             style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=None)
+#             if not style_instance.exists():
+#                 style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#         else:
+#             style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=project_style)
+#             if not style_instance.exists():
+#                 style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=None)
+#                 if not style_instance.exists():
+#                     style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#     else:
+#         if project_style=="default":
+#             style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#         else:
+#             style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=project_style)
+#             if not style_instance.exists():
+#                 style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#     if style_instance.exists():
+#         # icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
+#         # std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
+#         icon=style_instance[0].get_icon_url
+#         std_icon=style_instance[0].get_std_icon_url
+#         icon_size=style_instance[0].icon_size
+#         style=style_instance[0].style
+#     return icon,icon_size,style,std_icon
 
 @api_view(['GET'])
 def project_theme_layers(request):
@@ -490,6 +500,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
     serializer_classes = {
         'list': SubLayerListSerializer,
+        'retrieve': SubLayerRetrieveSerializer,
         'partial_update':SubLayerUpdateSerializer
     }
 
@@ -498,12 +509,23 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         layer_id = request.query_params.get('layer', None)
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
         if not layer_id:
             return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
         # queryset = self.queryset.filter(layer=layer_id)
         self.queryset=self.filter_queryset(self.queryset)
-        serializer = self.get_serializer(self.queryset, many=True)
+        serializer = self.get_serializer(self.queryset, many=True,context={"project_style":project_style,"layer_id":layer_id})
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
+        sub_layer = get_object_or_404(self.queryset, pk=pk)
+        serializer = self.get_serializer(sub_layer,context={"project_style":project_style,"layer_id":sub_layer.layer.id})
+        return Response(serializer.data)
 
     def partial_update(self, request, pk=None):
         errors=[]
@@ -536,7 +558,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 if 'style' in request_dict.keys():
                     sub_layer_style_instance.style=json.loads(request_dict['style'])
                 if 'std_icon' in request_dict.keys():
-                    sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon'])
+                    sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
                 sub_layer_style_instance.save()
                 return Response(data={"message":"successful"},status=200)
             else:

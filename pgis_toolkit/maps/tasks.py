@@ -115,7 +115,7 @@ def UpdateVectorLayer(layer_instance, request_data):
         if 'style' in request_data.keys():
             layerstyle_instance.style=json.loads(request_data['style'])
         if 'std_icon' in request_data.keys():
-            layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon'])
+            layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
         layerstyle_instance.save()
 
         if "sub_layers_mapping_field" in request_data.keys() and "sub_layers_mapping_field" !="":

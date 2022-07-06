@@ -79,12 +79,15 @@ class StandardIconAdmin(admin.ModelAdmin):
 
 class ProjectStyleAdmin(admin.ModelAdmin):
     list_display = ('id','name', 'project', 'is_deleted','uploaded_date','last_updated')
+    list_filter = ('project',)
 
 class LayerStyleAdmin(admin.ModelAdmin):
     list_display = ('id','layer', 'project_style', 'is_deleted','uploaded_date','last_updated')
+    list_filter = ('project_style__project',)
 
 class SubLayerStyleAdmin(admin.ModelAdmin):
     list_display = ('id','sub_layer', 'project_style', 'is_deleted','uploaded_date','last_updated')
+    list_filter = ('project_style__project',)
 
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
