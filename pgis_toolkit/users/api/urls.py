@@ -11,6 +11,7 @@ from .views import (
     PreliminaryUserVerificationAPIView,
     ResetPasswordView,
     UserPermissionViewSet,
+    UserRoleUpdateView,
     UserViewSet,
     user_group_list,
 )
@@ -33,4 +34,6 @@ urlpatterns = [
     path('forgot_password_email/', ForgotPasswordEmailView.as_view(), name='password_reset_email'),
     path('reset_password/', ResetPasswordView.as_view(), name='password_reset'),
     path('change_password/', ChangePasswordView.as_view(), name='password_change'),
+    path('userrole_update/<int:pk>/', UserRoleUpdateView.as_view(), name='update_userrole'),
+    # path('deactivate/', DeactivateUserRoleView.as_view(), name='deactivate_userrole'),
 ]
