@@ -1,6 +1,7 @@
 from attr import fields
 from rest_framework import serializers
 
+from pgis_toolkit.maps.functions import get_style_detail
 from pgis_toolkit.maps.models import *
 
 
@@ -52,12 +53,30 @@ class SubLayerSerializer(serializers.ModelSerializer):
 class SubLayerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubLayer
-        fields = ('id',"name")
+        fields = ('id',"name",'order')
+
+
+class SubLayerRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubLayer
+        fields = ('id',"name",'order')
+
+    def to_representation(self, instance):
+        representation = super(SubLayerRetrieveSerializer,self).to_representation(instance)
+        layer_id=self.context.get('layer_id')
+        project_style=self.context.get('project_style')
+        icon,icon_size,style,std_icon=get_style_detail(layer_id,instance.id,project_style)
+        representation['icon']=icon
+        representation['std_icon']=std_icon
+        representation['icon_size']=icon_size
+        representation['style']=style
+        return representation
+
 
 class SubLayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubLayer
-        fields = ('id','order','icon','icon_size','style')
+        fields = ('id','order','icon','icon_size','style','std_icon')
 
 class FeatureCollectionListSerializer(serializers.ModelSerializer):
     class Meta:
