@@ -24,7 +24,7 @@ from rest_framework.viewsets import GenericViewSet
 from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
-from pgis_toolkit.users.permissions import IsAuthorizedInviter
+from pgis_toolkit.users.permissions import IsAuthorizedInviter, IsTaskAuthorized
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
@@ -633,3 +633,26 @@ class ChangePasswordView(APIView):
                 return Response({"message": "New passwords don't match!"})
         else:
             return Response({"message": "Your old password is wrong!"})
+
+
+'''activate/deactivate/delete user role'''
+class UserRoleUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk, *args, **kwargs):
+        try:
+            errors=[]
+            if not UserRole.active.filter(pk=pk).exists():
+                return Response(data={'message': 'User Role not found!'}, status=status.HTTP_400_BAD_REQUEST)
+            user_role = UserRole.active.get(pk=pk)
+            serializer = UserRoleSerializer(user_role, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {"errorName": er, "details": serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
