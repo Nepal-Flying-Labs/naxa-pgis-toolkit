@@ -57,9 +57,12 @@ class SubLayerListSerializer(serializers.ModelSerializer):
 
 
 class SubLayerRetrieveSerializer(serializers.ModelSerializer):
+    theme = serializers.SerializerMethodField()
+    layer = serializers.SerializerMethodField()
+
     class Meta:
         model = SubLayer
-        fields = ('id',"name",'order')
+        fields = ('id',"name",'order','theme','layer')
 
     def to_representation(self, instance):
         representation = super(SubLayerRetrieveSerializer,self).to_representation(instance)
@@ -71,6 +74,16 @@ class SubLayerRetrieveSerializer(serializers.ModelSerializer):
         representation['icon_size']=icon_size
         representation['style']=style
         return representation
+
+    def get_theme(self, instance):
+        try:
+            return instance.layer.theme.id
+        except:
+            return None
+
+    def get_layer(self, instance):
+            return instance.layer.id if instance.layer else None
+
 
 
 class SubLayerUpdateSerializer(serializers.ModelSerializer):
