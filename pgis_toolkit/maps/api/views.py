@@ -464,7 +464,7 @@ class LayerAPIView(APIView):
                     request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
@@ -478,6 +478,7 @@ class LayerAPIView(APIView):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
+                    return Response(data={'message':response,"id":serializer.data['id']},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -560,7 +561,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 if 'std_icon' in request_dict.keys():
                     sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
                 sub_layer_style_instance.save()
-                return Response(data={"message":"successful"},status=200)
+                return Response(data={"message":"successful","id":serializer.data['id']},status=200)
             else:
                 for er in serializer._errors:
                     errors.append(
