@@ -464,7 +464,7 @@ class LayerAPIView(APIView):
                     request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response,"id":serializer.data['id']},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
@@ -561,7 +561,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 if 'std_icon' in request_dict.keys():
                     sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
                 sub_layer_style_instance.save()
-                return Response(data={"message":"successful","id":serializer.data['id']},status=200)
+                return Response(data={"message":"successful","id":serializer.data['id'],'layer':sub_layer_instance.layer.id,'theme':sub_layer_instance.layer.theme.id},status=200)
             else:
                 for er in serializer._errors:
                     errors.append(
