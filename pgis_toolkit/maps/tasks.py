@@ -98,9 +98,10 @@ def UpdateVectorLayer(layer_instance, request_data):
         if vector_layer_serializer.is_valid():
             vector_layer_serializer.save()
         else:
+
             for er in vector_layer_serializer._errors:
                 errors.append(
-                    {'errorName': er, 'details': vector_layer_serializer._errors[er][0]})
+                    {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
             return errors
 
         '''Save vector layer style'''
@@ -122,8 +123,17 @@ def UpdateVectorLayer(layer_instance, request_data):
             layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
         layerstyle_instance.save()
 
-        if "sub_layers_mapping_field" in request_data.keys() and "sub_layers_mapping_field" !="":
+        if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
             sub_layers_mapping_field=request_data['sub_layers_mapping_field']
+            # with transaction.atomic():
+            #     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+            #     con = create_engine(db_connection_url)
+            #     sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id=344 and sub_layer_id=86"
+            #     sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
+            #     # print(sql)
+            #     '''extracting extent'''
+            #     # total_bounds = sub_layer_gdf.total_bounds
+            #     print(sub_layer_gdf,"sub_layer_gdf")
 
             '''deleting sub layer instance if exists'''
             SubLayer.objects.filter(layer=layer_instance.id).delete()
@@ -154,12 +164,15 @@ def UpdateVectorLayer(layer_instance, request_data):
                     with transaction.atomic():
                         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
                         con = create_engine(db_connection_url)
-                        sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE sub_layer_id={sub_layer.id}"
+                        presql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id}"
+                        presub_layer_gdf = geopandas.GeoDataFrame.from_postgis(presql, con)
+                        # print(presql,presub_layer_gdf)
+                        sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id} AND sub_layer_id={sub_layer.id}"
                         sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
                         # print(sql)
                         '''extracting extent'''
                         total_bounds = sub_layer_gdf.total_bounds
-                        # print(sub_layer_gdf,"sub_layer_gdf")
+                        # print(sub_layer_gdf,"sub_layer_gdf2222")
                         sublayer_instance.bbox = total_bounds.tolist()
                         sublayer_instance.save()
             except Exception as e:

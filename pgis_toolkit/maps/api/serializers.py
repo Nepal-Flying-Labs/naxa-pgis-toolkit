@@ -62,7 +62,7 @@ class SubLayerRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubLayer
-        fields = ('id',"name",'order','theme','layer')
+        fields = ('id',"name",'order','theme','layer','bbox')
 
     def to_representation(self, instance):
         representation = super(SubLayerRetrieveSerializer,self).to_representation(instance)
