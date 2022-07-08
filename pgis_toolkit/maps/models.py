@@ -166,6 +166,7 @@ class SubLayer(IsDeleted,DateTimeStamp):
     icon_size = models.JSONField(blank=True, null=True)
     style = models.JSONField(default=dict, blank=True, null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_std_icon",blank=True,null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
 
     def __str__(self):
         return f'{self.id} {self.name}'

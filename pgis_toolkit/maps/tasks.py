@@ -1,10 +1,14 @@
 import json
 import os
 import time
+from logging import exception
 
+import geopandas
 from celery import Celery, shared_task
+from django.db import transaction
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
+from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
 from config.settings.local import geoserver
@@ -143,6 +147,24 @@ def UpdateVectorLayer(layer_instance, request_data):
                         # feature_coll_qs.filter(id=feature.id).update(sub_layer=sublayer_instance)
                         feature.sub_layer=sublayer_instance
                         feature.save()
+            '''calculate and save bbox of sub_layer'''
+            sub_layer_qs=SubLayer.objects.filter(layer=layer_instance.id)
+            try:
+                for sub_layer in sub_layer_qs:
+                    with transaction.atomic():
+                        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+                        con = create_engine(db_connection_url)
+                        sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE sub_layer_id={sub_layer.id}"
+                        sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
+                        # print(sql)
+                        '''extracting extent'''
+                        total_bounds = sub_layer_gdf.total_bounds
+                        # print(sub_layer_gdf,"sub_layer_gdf")
+                        sublayer_instance.bbox = total_bounds.tolist()
+                        sublayer_instance.save()
+            except Exception as e:
+                print(str(e),"error in bbox calculation")
+
         return "successful"
     except Exception as e:
         return str(e)
