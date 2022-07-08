@@ -63,6 +63,8 @@ class WMSLayerAdmin(admin.ModelAdmin):
 
 class FeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer','sub_layer')
+    list_filter = ('layer', )
+    search_fields=('layer__id',)
 
 class ProjectLayerTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'geometry_type', 'project')
