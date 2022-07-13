@@ -23,7 +23,7 @@ from sequences import get_next_value
 from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
-from pgis_toolkit.celery_app import app
+from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.functions import advance_filter_data, clear_dir, get_style_detail
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -88,6 +88,8 @@ class StandardIconViewset(viewsets.ModelViewSet):
     http_method_names = ['get']
     serializer_class = StandardIconListSerializer
 
+
+
 class ProjectStyleViewset(viewsets.ModelViewSet):
     '''
     Viewset for multiple project style
@@ -106,6 +108,8 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
+        # print(request.user.get_all_permissions(),"request")
+        print(request.user_permissions.all(),"request")
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
@@ -313,11 +317,12 @@ class LayerAPIView(APIView):
     View for Layer instance
     http://0.0.0.0:8000/api/maps/layer/
     '''
-    def get_object(self, pk):
-        try:
-            return Layer.objects.get(pk=pk)
-        except Layer.DoesNotExist:
-            raise Http404
+    # def get_object(self, pk):
+    #     try:
+    #         print(Layer.active.get(pk=pk),"Layer.active.get(pk=pk)")
+    #         return Layer.active.get(pk=pk)
+    #     except Layer.DoesNotExist:
+    #         raise Http404
 
     def get(self, request, pk, format=None):
         '''
@@ -327,7 +332,11 @@ class LayerAPIView(APIView):
         try:
             if not pk:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "pk is missing"})
-            layer_instance = self.get_object(pk)
+            if not Layer.active.filter(pk=pk).exists():
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "Layer does not exists"})
+
+            # layer_instance = self.get_object(pk)
+            layer_instance = Layer.active.get(pk=pk)
             results={}
             '''layer detail'''
             layer_keys=['id','name','default_load','layer_type','is_osm_layer']
@@ -381,6 +390,11 @@ class LayerAPIView(APIView):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
+                    '''check whether celery is working or not'''
+                    is_working=get_celery_worker_status()
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Vector layer upload'''
                     if 'file' in request.FILES and request.FILES.get('file') != "":
                         layer_file_instance = LayerFile.objects.create(
@@ -398,12 +412,17 @@ class LayerAPIView(APIView):
                         else:
                             time.sleep(3)
 
+
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
 
                 elif layer_type == "Raster":
+                    is_working=get_celery_worker_status()
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Raster layer upload'''
                     if 'file' in request_dict.keys() and request_dict['file'] != "":
                         LayerFile.objects.create(file=request_dict['file'], layer=created_object)
@@ -470,6 +489,10 @@ class LayerAPIView(APIView):
 
                     '''handle Vector layer update'''
                 elif layer_type == "Raster":
+                    is_working=get_celery_worker_status()
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
                     '''handle Vector layer upload'''

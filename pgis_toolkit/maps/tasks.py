@@ -5,10 +5,11 @@ from logging import exception
 
 import geopandas
 from celery import Celery, shared_task
-from django.db import transaction
+from django.db import connection, transaction
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from config.settings.base import MEDIA_ROOT, env
 from config.settings.local import geoserver
@@ -88,6 +89,33 @@ def UploadVectorLayer(layer_id,request_data):
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
+def update_bbox(layer_instance):
+    '''calculate and save bbox of sub_layer'''
+    db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+    con = create_engine(db_connection_url)
+
+    sub_layer_qs=SubLayer.objects.filter(layer=layer_instance.id)
+    try:
+        for sub_layer in sub_layer_qs:
+            # with transaction.atomic():
+                # connection.connect()
+            time.sleep(10)
+            presql = f"SELECT id,layer_id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id}"
+            presub_layer_gdf = geopandas.GeoDataFrame.from_postgis(presql, con)
+            print(presql,presub_layer_gdf)
+            # print(len(FeatureCollection.objects.filter(layer=layer_instance.id,sub_layer=sub_layer.id)),"qs_len")
+            # FeatureCollection.objects.filter(layer=layer_instance.id).refresh_from_db()
+            sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id} AND sub_layer_id={sub_layer.id}"
+            sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
+            print(sql,"postsql")
+            '''extracting extent'''
+            print(sub_layer_gdf,"sub_layer_gdf")
+            total_bounds = sub_layer_gdf.total_bounds if sub_layer_gdf else []
+            sub_layer.bbox = total_bounds.tolist()
+            sub_layer.save()
+
+    except Exception as e:
+        print(str(e),"error in bbox calculation")
 
 def UpdateVectorLayer(layer_instance, request_data):
     try:
@@ -124,22 +152,14 @@ def UpdateVectorLayer(layer_instance, request_data):
         layerstyle_instance.save()
 
         if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
-            sub_layers_mapping_field=request_data['sub_layers_mapping_field']
             # with transaction.atomic():
-            #     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-            #     con = create_engine(db_connection_url)
-            #     sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id=344 and sub_layer_id=86"
-            #     sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
-            #     # print(sql)
-            #     '''extracting extent'''
-            #     # total_bounds = sub_layer_gdf.total_bounds
-            #     print(sub_layer_gdf,"sub_layer_gdf")
-
+            sub_layers_mapping_field=request_data['sub_layers_mapping_field']
             '''deleting sub layer instance if exists'''
             SubLayer.objects.filter(layer=layer_instance.id).delete()
 
             '''creating sub layers'''
             feature_coll_qs=FeatureCollection.objects.filter(layer=layer_instance.id)
+            feature_coll_qs.update(sub_layer=None)
             sublayer_name_list = []
 
             for feature in feature_coll_qs:
@@ -154,30 +174,11 @@ def UpdateVectorLayer(layer_instance, request_data):
                 )
                 for feature in feature_coll_qs:
                     if(feature.attributes[sub_layers_mapping_field] == sub_layer_name):
-                        # feature_coll_qs.filter(id=feature.id).update(sub_layer=sublayer_instance)
+                        # with transaction.atomic():
                         feature.sub_layer=sublayer_instance
                         feature.save()
-            '''calculate and save bbox of sub_layer'''
-            sub_layer_qs=SubLayer.objects.filter(layer=layer_instance.id)
-            try:
-                for sub_layer in sub_layer_qs:
-                    with transaction.atomic():
-                        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-                        con = create_engine(db_connection_url)
-                        presql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id}"
-                        presub_layer_gdf = geopandas.GeoDataFrame.from_postgis(presql, con)
-                        # print(presql,presub_layer_gdf)
-                        sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id} AND sub_layer_id={sub_layer.id}"
-                        sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
-                        # print(sql)
-                        '''extracting extent'''
-                        total_bounds = sub_layer_gdf.total_bounds
-                        # print(sub_layer_gdf,"sub_layer_gdf2222")
-                        sublayer_instance.bbox = total_bounds.tolist()
-                        sublayer_instance.save()
-            except Exception as e:
-                print(str(e),"error in bbox calculation")
-
+                        # print(feature.sub_layer,"after save")
+            update_bbox(layer_instance)
         return "successful"
     except Exception as e:
         return str(e)
