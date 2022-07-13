@@ -390,11 +390,13 @@ class LayerAPIView(APIView):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
+                    print("is_vector")
                     '''check whether celery is working or not'''
                     is_working=get_celery_worker_status()
+                    print(is_working,"is_working")
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
-                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Vector layer upload'''
                     if 'file' in request.FILES and request.FILES.get('file') != "":
                         layer_file_instance = LayerFile.objects.create(
@@ -410,9 +412,10 @@ class LayerAPIView(APIView):
                             layer_instane=Layer.objects.get(id=created_object.id)
                             iterate=False
                         else:
+                            print("sleeep time")
                             time.sleep(3)
 
-
+                    print("reached here123")
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
@@ -422,7 +425,7 @@ class LayerAPIView(APIView):
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
-                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Raster layer upload'''
                     if 'file' in request_dict.keys() and request_dict['file'] != "":
                         LayerFile.objects.create(file=request_dict['file'], layer=created_object)
@@ -492,7 +495,7 @@ class LayerAPIView(APIView):
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
-                        Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
                     '''handle Vector layer upload'''
