@@ -83,9 +83,9 @@ class UserGroupPermissionsSerializer(serializers.ModelSerializer):
     def get_permissions(self, obj):
         if obj.permissions:
             data = []
-            qs = obj.permissions.all().values('name')
+            qs = obj.permissions.all().values('codename')
             for q in qs:
-                data.append(q['name'])
+                data.append(q['codename'])
             return data
         return data
 
