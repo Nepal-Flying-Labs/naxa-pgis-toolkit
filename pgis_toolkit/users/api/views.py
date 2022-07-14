@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import groupby
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db.models.query import QuerySet
@@ -181,6 +181,7 @@ class PreliminaryUserVerificationAPIView(APIView):
     '''http://localhost:8000/api/users/preliminary_user_verify?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
     permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
+        errors=[]
         try:
             token = request.query_params.get('token', None)
             if not token:
@@ -194,6 +195,28 @@ class PreliminaryUserVerificationAPIView(APIView):
             if User.active.filter(email=preliminary_user_instance.email).exists():
                 data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
                 data_dict['user_created'] = True
+
+                '''Restrict if any role of user within project or organization already exists'''
+                if data_dict['project']:
+                    user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
+                    if user_role.exists():
+                        project_name=Project.objects.get(id=data_dict['project']).name
+                        group_id=user_role.first().group.id
+                        group_name=Group.objects.get(id=group_id).name
+                        '''delete PreliminaryUserInstance once the job is done'''
+                        preliminary_user_instance.delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in project '{project_name}' as a {group_name} already exists"})
+
+                elif data_dict['organization']:
+                    user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
+                    if user_role.exists():
+                        org_name=Organization.objects.get(id=data_dict['organization']).name
+                        group_id=user_role.first().group.id
+                        group_name=Group.objects.get(id=group_id).name
+                        '''delete PreliminaryUserInstance once the job is done'''
+                        preliminary_user_instance.delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
                 if user_role_serializer.is_valid():
@@ -268,7 +291,9 @@ class UserViewSet(viewsets.ModelViewSet):
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
                             html_message=html_message, fail_silently=False)
+
                 '''create user role'''
+                request.data._mutable=True
                 request.data['user'] = created_object.id
                 if not 'project' in request.data.keys():
                     request.data['project'] = None
@@ -521,29 +546,48 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
     '''http://localhost:8000/api/users/permissions/?organization=&project=2'''
     def list(self, request, *args, **kwargs):
         try:
+            def modify(perm):
+                return perm.lower().replace(" ", "_")
             if not request.user.is_authenticated:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             userrole_qs = UserRole.active.filter(user__id=request.user.id)
             group_ids = userrole_qs.values_list('group__id', flat=True)
             queryset = None
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            if request.user.is_superuser:
+                perm_qs=Permission.objects.all().values('name')
+                permissions_list=[]
+                for q in perm_qs:
+                    permissions_list.append(q['name'])
+                result = map(modify, permissions_list)
+                return Response(status=status.HTTP_200_OK, data={"permissions": result})
+
+            elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 queryset = Group.objects.get(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+
             elif 'organization' in request.query_params and request.query_params['organization'] != "":
                 userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
                 group_ids = userrole_qs.values_list('group__id', flat=True)
                 if int(env('ORGANIZATION_ADMIN')) in group_ids:
                     queryset = Group.objects.get(pk=int(env('ORGANIZATION_ADMIN')))
+
             elif 'project' in request.query_params and request.query_params['project'] != "":
-                userrole_qs = userrole_qs.filter(project__id=request.query_params['project'])
-                '''a user has a single role in a particular project'''
-                queryset = Group.objects.get(pk=userrole_qs[0].group.id)
+                project_id=request.query_params['project']
+                organization_id=Project.active.get(id=project_id).organization.id
+
+                userrole_qs = userrole_qs.filter(organization__id=organization_id)
+                group_ids = userrole_qs.values_list('group__id', flat=True)
+                if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                    queryset = Group.objects.get(pk=int(env('ORGANIZATION_ADMIN')))
+                else:
+                    userrole_qs = userrole_qs.filter(project__id=project_id)
+                    '''a user has a single role in a particular project'''
+                    queryset = Group.objects.get(pk=userrole_qs[0].group.id) if userrole_qs.exists() else None
             if queryset == None:
-                return Response(data={'message': 'organization or project params or user role not found!'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'permissions':[]}, status=200)
+                # return Response(data={'message': 'organization or project params or user role not found!'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = UserGroupPermissionsSerializer(
                 queryset, many=False)
             permissions_list = serializer.data['permissions']
-            def modify(perm):
-                return perm.lower().replace(" ", "_")
             result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": result})
         except Exception as error:
