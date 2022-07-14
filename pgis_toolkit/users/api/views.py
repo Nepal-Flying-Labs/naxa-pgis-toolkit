@@ -553,17 +553,28 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = None
             if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 queryset = Group.objects.get(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+
             elif 'organization' in request.query_params and request.query_params['organization'] != "":
                 userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
                 group_ids = userrole_qs.values_list('group__id', flat=True)
                 if int(env('ORGANIZATION_ADMIN')) in group_ids:
                     queryset = Group.objects.get(pk=int(env('ORGANIZATION_ADMIN')))
+
             elif 'project' in request.query_params and request.query_params['project'] != "":
-                userrole_qs = userrole_qs.filter(project__id=request.query_params['project'])
-                '''a user has a single role in a particular project'''
-                queryset = Group.objects.get(pk=userrole_qs[0].group.id)
+                project_id=request.query_params['project']
+                organization_id=Project.active.get(id=project_id).organization.id
+
+                userrole_qs = userrole_qs.filter(organization__id=organization_id)
+                group_ids = userrole_qs.values_list('group__id', flat=True)
+                if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                    queryset = Group.objects.get(pk=int(env('ORGANIZATION_ADMIN')))
+                else:
+                    userrole_qs = userrole_qs.filter(project__id=project_id)
+                    '''a user has a single role in a particular project'''
+                    queryset = Group.objects.get(pk=userrole_qs[0].group.id) if userrole_qs.exists() else None
             if queryset == None:
-                return Response(data={'message': 'organization or project params or user role not found!'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'permissions':[]}, status=200)
+                # return Response(data={'message': 'organization or project params or user role not found!'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = UserGroupPermissionsSerializer(
                 queryset, many=False)
             permissions_list = serializer.data['permissions']
