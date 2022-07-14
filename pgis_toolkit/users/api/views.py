@@ -70,6 +70,7 @@ class PreliminaryUserAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         errors=[]
+        project_instance, organization_instance = None, None
         try:
             verify_url = settings.URL + '/api/users/preliminary_user_verify/?token='
             request.data._mutable = True
@@ -83,7 +84,6 @@ class PreliminaryUserAPIView(APIView):
             organization = request.data.get('organization', None)
             project = request.data.get('project', None)
             created_object_list = []
-            project_instance, organization_instance = None, None
             if organization_name:
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
