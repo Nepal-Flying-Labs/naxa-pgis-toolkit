@@ -25,7 +25,9 @@ class IsTaskAuthorized(BasePermission):
             pk = url[-1]
             userrole_qs = UserRole.active.filter(user__id=request.user.id, active=True)
             group_ids = userrole_qs.values_list('group__id', flat=True)
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            if request.user.is_superuser:
+                return True
+            elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 return True
             elif 'organization' in url and pk:
                 userrole_qs = userrole_qs.filter(organization__id=pk)
@@ -34,13 +36,14 @@ class IsTaskAuthorized(BasePermission):
                     return True
             elif 'project' in url and pk:
                 userrole_qs = userrole_qs.filter(project__id=int(pk))
-                '''a user has a single role in a particular project'''
-                group_instance = Group.objects.get(pk=userrole_qs[0].group.id)
-                if group_instance.id == int(env('PROJECT_MANAGER')):
-                    return True
+                if userrole_qs.exists():
+                    '''a user has a single role in a particular project'''
+                    group_instance = Group.objects.get(pk=userrole_qs[0].group.id)
+                    if group_instance.id == int(env('PROJECT_MANAGER')):
+                        return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check Error. Details:", str(e))
+            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
             return False
 
 class IsAuthorizedInviter(BasePermission):

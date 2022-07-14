@@ -181,6 +181,7 @@ class PreliminaryUserVerificationAPIView(APIView):
     '''http://localhost:8000/api/users/preliminary_user_verify?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
     permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
+        errors=[]
         try:
             token = request.query_params.get('token', None)
             if not token:
@@ -194,6 +195,28 @@ class PreliminaryUserVerificationAPIView(APIView):
             if User.active.filter(email=preliminary_user_instance.email).exists():
                 data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
                 data_dict['user_created'] = True
+
+                '''Restrict if any role of user within project or organization already exists'''
+                if data_dict['project']:
+                    user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
+                    if user_role.exists():
+                        project_name=Project.objects.get(id=data_dict['project']).name
+                        group_id=user_role.first().group.id
+                        group_name=Group.objects.get(id=group_id).name
+                        '''delete PreliminaryUserInstance once the job is done'''
+                        preliminary_user_instance.delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in project '{project_name}' as a {group_name} already exists"})
+
+                elif data_dict['organization']:
+                    user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
+                    if user_role.exists():
+                        org_name=Organization.objects.get(id=data_dict['organization']).name
+                        group_id=user_role.first().group.id
+                        group_name=Group.objects.get(id=group_id).name
+                        '''delete PreliminaryUserInstance once the job is done'''
+                        preliminary_user_instance.delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
                 if user_role_serializer.is_valid():

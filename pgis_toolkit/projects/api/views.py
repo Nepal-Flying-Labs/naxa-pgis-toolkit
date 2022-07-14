@@ -136,10 +136,10 @@ class ProjectViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def get_permissions(self):
-        if self.action == 'list' or self.action == 'retrieve' or self.action == 'create':
+        if self.action == 'list':
             permission_classes = [IsAuthenticated]
-        elif self.action == 'update' or self.action == 'partial_update':
-            permission_classes = [IsTaskAuthorized]
+        elif self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
+            permission_classes = [IsAuthenticated,IsTaskAuthorized]
         return [permission() for permission in permission_classes]
 
     # def create(self, request, *args, **kwargs):
