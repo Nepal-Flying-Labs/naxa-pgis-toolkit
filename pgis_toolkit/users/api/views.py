@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import groupby
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db.models.query import QuerySet
@@ -546,12 +546,22 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
     '''http://localhost:8000/api/users/permissions/?organization=&project=2'''
     def list(self, request, *args, **kwargs):
         try:
+            def modify(perm):
+                return perm.lower().replace(" ", "_")
             if not request.user.is_authenticated:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             userrole_qs = UserRole.active.filter(user__id=request.user.id)
             group_ids = userrole_qs.values_list('group__id', flat=True)
             queryset = None
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            if request.user.is_superuser:
+                perm_qs=Permission.objects.all().values('name')
+                permissions_list=[]
+                for q in perm_qs:
+                    permissions_list.append(q['name'])
+                result = map(modify, permissions_list)
+                return Response(status=status.HTTP_200_OK, data={"permissions": result})
+
+            elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 queryset = Group.objects.get(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
 
             elif 'organization' in request.query_params and request.query_params['organization'] != "":
@@ -578,8 +588,6 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             serializer = UserGroupPermissionsSerializer(
                 queryset, many=False)
             permissions_list = serializer.data['permissions']
-            def modify(perm):
-                return perm.lower().replace(" ", "_")
             result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": result})
         except Exception as error:
