@@ -268,7 +268,9 @@ class UserViewSet(viewsets.ModelViewSet):
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
                             html_message=html_message, fail_silently=False)
+
                 '''create user role'''
+                request.data._mutable=True
                 request.data['user'] = created_object.id
                 if not 'project' in request.data.keys():
                     request.data['project'] = None
