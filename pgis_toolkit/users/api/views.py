@@ -546,20 +546,20 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
     '''http://localhost:8000/api/users/permissions/?organization=&project=2'''
     def list(self, request, *args, **kwargs):
         try:
-            def modify(perm):
-                return perm.lower().replace(" ", "_")
+            # def modify(perm):
+            #     return perm.lower().replace(" ", "_")
             if not request.user.is_authenticated:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
             userrole_qs = UserRole.active.filter(user__id=request.user.id)
             group_ids = userrole_qs.values_list('group__id', flat=True)
             queryset = None
             if request.user.is_superuser:
-                perm_qs=Permission.objects.all().values('name')
+                perm_qs=Permission.objects.all().values('codename')
                 permissions_list=[]
                 for q in perm_qs:
-                    permissions_list.append(q['name'])
-                result = map(modify, permissions_list)
-                return Response(status=status.HTTP_200_OK, data={"permissions": result})
+                    permissions_list.append(q['codename'])
+                # result = map(modify, permissions_list)
+                return Response(status=status.HTTP_200_OK, data={"permissions": permissions_list})
 
             elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 queryset = Group.objects.get(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
@@ -588,8 +588,8 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             serializer = UserGroupPermissionsSerializer(
                 queryset, many=False)
             permissions_list = serializer.data['permissions']
-            result = map(modify, permissions_list)
-            return Response(status=status.HTTP_200_OK, data={"permissions": result})
+            # result = map(modify, permissions_list)
+            return Response(status=status.HTTP_200_OK, data={"permissions": permissions_list})
         except Exception as error:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
 
