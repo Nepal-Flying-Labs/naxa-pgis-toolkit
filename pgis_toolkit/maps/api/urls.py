@@ -26,6 +26,7 @@ router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'project_style', ProjectStyleViewset, basename='project_style')
 router.register(r'standard_icon', StandardIconViewset, basename='standard_icon')
+router.register(r'layer', LayerAPIView, basename='layer')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
@@ -38,8 +39,8 @@ urlpatterns = [
     path('', include(router.urls)),
     path('project_layers/<int:id>/', project_layers, name='project_layers'),
     path('project_theme_layers/', project_theme_layers, name='project_theme_layers'),
-    path('layer/', LayerAPIView.as_view(), name='layer'),
-    path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
+    # path('layer/', LayerAPIView.as_view(), name='layer'),
+    # path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
     path('get_layer_upload_task_response/', get_layer_upload_task_response),
     path('reorder/',reorder, name='reorder'),
     path('layer_vectortile/<int:z>/<int:x>/<int:y>/', LayerVectorTileQuerySet.as_view(), name='layer_vectortile'),
