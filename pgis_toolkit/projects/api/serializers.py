@@ -170,4 +170,11 @@ class DocumentListSerializer(serializers.ModelSerializer):
         exclude=('uploaded_date','last_updated', 'project')
 
 class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = '__all__'
+
+class RequestDemoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RequestDemo
         fields = '__all__'
