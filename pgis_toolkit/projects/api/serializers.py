@@ -23,8 +23,10 @@ class OrganizationCategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        if self.partial and OrganizationCategory.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
-            raise serializers.ValidationError('Organization Category name must be unique')
+        if self.partial:
+            if 'name' in data.keys() and OrganizationCategory.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+                raise serializers.ValidationError('Organization Category name must be unique')
+            return data
         elif OrganizationCategory.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Organization Category name must be unique')
         return data
@@ -45,8 +47,10 @@ class OrganizationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        if self.partial and Organization.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
-            raise serializers.ValidationError('Organization name must be unique')
+        if self.partial:
+            if 'name' in data.keys() and Organization.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+                raise serializers.ValidationError('Organization name must be unique')
+            return data
         elif Organization.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Organization name must be unique')
         return data
@@ -96,8 +100,10 @@ class DefaultThemeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        if self.partial and DefaultTheme.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
-            raise serializers.ValidationError('Default Theme name must be unique')
+        if self.partial:
+            if 'name' in data.keys() and DefaultTheme.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+                raise serializers.ValidationError('Default Theme name must be unique')
+            return data
         elif DefaultTheme.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Default Theme name must be unique')
         return data
@@ -116,8 +122,9 @@ class LayerTemplateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # Raise a Validation error if template name is not unique
         if self.partial:
-            if LayerTemplate.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+            if 'name' in data.keys() and LayerTemplate.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
                 raise serializers.ValidationError('Layer template name must be unique')
+            return data
         elif LayerTemplate.active.filter(name=data['name']).exists():
             raise serializers.ValidationError('Layer template name must be unique')
         return data
@@ -137,11 +144,17 @@ class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
         Make sure proper fields are added
         """
         # Raise a Validation error if field name within layer is not unique
+        keys = data.keys()
         if self.partial:
-            if LayerTemplateAttribute.objects.exclude(id=self.instance.id).filter(layer_template=data['layer_template'],name=data['name']).exists():
-                raise serializers.ValidationError('Layer template name must be unique')
+            if 'layer_template' in keys and 'name' in keys and LayerTemplateAttribute.objects.exclude(id=self.instance.id).filter(layer_template=data['layer_template'],name=data['name']).exists():
+                raise serializers.ValidationError('Attribute name must be unique for a layer template.')
+            elif 'layer_template' in keys and LayerTemplateAttribute.objects.exclude(id=self.instance.id).filter(layer_template=data['layer_template'],name=self.instance.name).exists():
+                raise serializers.ValidationError('Attribute name must be unique for a layer template.')
+            elif 'name' in keys and LayerTemplateAttribute.objects.exclude(id=self.instance.id).filter(layer_template=self.instance.layer_template,name=data['name']).exists():
+                raise serializers.ValidationError('Attribute name must be unique for a layer template.')
+            return data
         elif LayerTemplateAttribute.objects.filter(layer_template=data['layer_template'],name=data['name']).exists():
-            raise serializers.ValidationError('Layer template name must be unique')
+            raise serializers.ValidationError('Attribute name must be unique for a layer template.')
 
         if (data['data_type']=="str" or data['data_type']=="int") and not data['length']:
             # Raise a Validation error if length is empty when data_type equal to text or integer.
@@ -157,11 +170,4 @@ class DocumentListSerializer(serializers.ModelSerializer):
         exclude=('uploaded_date','last_updated', 'project')
 
 class DocumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Document
-        fields = '__all__'
-
-class RequestDemoSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RequestDemo
         fields = '__all__'
