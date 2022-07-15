@@ -897,7 +897,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
     Viewset for FeatureCollection innstance
     '''
     queryset = FeatureCollection.active.all()
-    http_method_names = ['get']
+    http_method_names = ['get', 'retrieve', 'patch', 'post']
     default_serializer_class = FeatureCollectionSerializer
     serializer_classes = {
         'list': FeatureCollectionListSerializer,
@@ -934,6 +934,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         paginated_queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(paginated_queryset, many=True, context={})
         return paginator.get_paginated_response(data=serializer.data)
+
 
 
 class LayerGroupViewset(viewsets.ModelViewSet):
