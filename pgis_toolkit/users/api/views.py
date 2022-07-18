@@ -167,7 +167,12 @@ class PreliminaryUserAPIView(APIView):
                     for obj in created_object_list:
                         obj.delete()
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
-            return Response(data={'message': 'Email Invitation Successful!'}, status=status.HTTP_200_OK)
+            if organization_instance:
+                return Response(data={'message': 'Email Invitation Successful!', 'organization': organization_instance.id}, status=status.HTTP_200_OK)
+            elif project_instance:
+                return Response(data={'message': 'Email Invitation Successful!', 'project': project_instance.id}, status=status.HTTP_200_OK)
+            else:
+                return Response(data={'message': 'Email Invitation Successful!'}, status=status.HTTP_200_OK)
         except Exception as e:
             if organization_instance:
                 organization_instance.delete()
