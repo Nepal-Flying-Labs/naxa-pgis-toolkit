@@ -9,6 +9,7 @@ import fiona
 import geopandas
 import pandas
 from celery.result import AsyncResult
+from django.contrib.auth.models import Group
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -43,6 +44,7 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
+from pgis_toolkit.maps.permissions import LayerPermission
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -108,8 +110,6 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        # print(request.user.get_all_permissions(),"request")
-        print(request.user_permissions.all(),"request")
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
@@ -312,7 +312,11 @@ def project_theme_layers(request):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
-class LayerAPIView(APIView):
+class LayerAPIView(viewsets.ModelViewSet):
+    queryset = Layer.active.all()
+    http_method_names=['get','post', 'patch']
+    permission_classes=[LayerPermission]
+    serializer_class=LayerSerializer
     '''
     View for Layer instance
     http://0.0.0.0:8000/api/maps/layer/
@@ -324,11 +328,13 @@ class LayerAPIView(APIView):
     #     except Layer.DoesNotExist:
     #         raise Http404
 
-    def get(self, request, pk, format=None):
+    def retrieve(self, request, pk=None):
+
         '''
         This action is to retrieve the layer detail
         http://0.0.0.0:8000/api/maps/layer/<layer_id>/
         '''
+        # print(Group.objects.get(id=2).permissions.all().first().codename,"requestsssssssssssssssssssssss")
         try:
             if not pk:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "pk is missing"})
@@ -367,7 +373,7 @@ class LayerAPIView(APIView):
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occurred', 'error': str(e)})
 
-    def post(self, request, format=None):
+    def create(self, request, *args, **kwargs):
         errors=[]
         try:
             request_dict = request.data
@@ -463,7 +469,7 @@ class LayerAPIView(APIView):
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
-    def patch(self, request, pk=None):
+    def partial_update(self, request, pk=None):
         errors=[]
         try:
             request_dict = request.data
@@ -524,6 +530,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
     default_serializer_class = SubLayerSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )
+    # permission_classes=[LayerPermission]
 
     serializer_classes = {
         'list': SubLayerListSerializer,
