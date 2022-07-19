@@ -1,8 +1,8 @@
 from attr import fields
 from rest_framework import serializers
 
-from pgis_toolkit.maps.functions import get_style_detail
 from pgis_toolkit.maps.models import *
+from pgis_toolkit.maps.utils.project_style import get_style_detail
 
 
 class LayerSerializer(serializers.ModelSerializer):
