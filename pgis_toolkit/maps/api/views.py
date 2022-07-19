@@ -44,7 +44,7 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-from pgis_toolkit.maps.permissions import LayerPermission
+from pgis_toolkit.maps.permissions import LayerPermission, SubLayerPermission
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -312,7 +312,7 @@ def project_theme_layers(request):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
-class LayerAPIView(viewsets.ModelViewSet):
+class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
     http_method_names=['get','post', 'patch']
     permission_classes=[LayerPermission]
@@ -530,7 +530,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
     default_serializer_class = SubLayerSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )
-    # permission_classes=[LayerPermission]
+    permission_classes=[SubLayerPermission]
 
     serializer_classes = {
         'list': SubLayerListSerializer,
