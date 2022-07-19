@@ -5,7 +5,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import BasePermission
 
-from pgis_toolkit.maps.models import FeatureCollection, Layer, SubLayer, Theme
+from pgis_toolkit.maps.models import (
+    FeatureCollection,
+    Layer,
+    LayerGroup,
+    SubLayer,
+    Theme,
+)
 from pgis_toolkit.projects.models import Organization, Project
 from pgis_toolkit.users.models import UserRole
 
@@ -138,6 +144,95 @@ class FeatureCollectionPermission(BasePermission):
                 elif action=="partial_update" and "change_featurecollection" in permission_list:
                     return True
                 elif action=="retrieve" and "view_featurecollection" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            return False
+
+class ThemePermission(BasePermission):
+    """
+    Permission check for sublayer model
+    """
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            if action =="list":
+                project_id=request.query_params.get("project")
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action=="create":
+                project_id=request.data.get("project",None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update']:
+                theme_id=request.resolver_match.kwargs.get('pk')
+
+                project_id= Theme.objects.get(id=theme_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
+                permission_list=[data['codename'] for data in permission_qs]
+                if action=="list" and "view_theme" in permission_list:
+                    return True
+                elif action=="create" and "add_theme" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_theme" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_theme" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            return False
+
+
+class LayerGroupPermission(BasePermission):
+    """
+    Permission check for layer model
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            print(action,"action")
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                theme_id=request.query_params.get("theme")
+                project_id=Theme.objects.get(id=theme_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action in ['retrieve','partial_update']:
+                layer_group_id=request.resolver_match.kwargs.get('pk')
+                project_id=LayerGroup.objects.get(id=layer_group_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action=="create":
+                theme_id=request.data.get("theme",None)
+                project_id=Theme.active.get(id=theme_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
+                permission_list=[data['codename'] for data in permission_qs]
+                if action=="list" and "view_layergroup" in permission_list:
+                    return True
+                elif action=="create" and "add_layergroup" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_layergroup" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_layergroup" in permission_list:
                     return True
             return False
         except Exception as e:
