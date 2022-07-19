@@ -46,8 +46,10 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    LayerGroupPermission,
     LayerPermission,
     SubLayerPermission,
+    ThemePermission,
 )
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
@@ -640,7 +642,7 @@ class ThemeViewset(viewsets.ModelViewSet):
     default_serializer_class = ThemeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
-
+    permission_classes=[ThemePermission]
     serializer_classes = {
         'list': ThemeListSerializer,
         # 'retrieve': ThemeSerializer
@@ -959,6 +961,7 @@ class LayerGroupViewset(viewsets.ModelViewSet):
     default_serializer_class = LayerGroupSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('theme', )
+    permission_classes=[LayerGroupPermission]
 
     serializer_classes = {
         'list': LayerGroupListSerializer,
