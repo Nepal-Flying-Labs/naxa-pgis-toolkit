@@ -44,7 +44,11 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-from pgis_toolkit.maps.permissions import LayerPermission
+from pgis_toolkit.maps.permissions import (
+    FeatureCollectionPermission,
+    LayerPermission,
+    SubLayerPermission,
+)
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -312,7 +316,7 @@ def project_theme_layers(request):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
-class LayerAPIView(viewsets.ModelViewSet):
+class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
     http_method_names=['get','post', 'patch']
     permission_classes=[LayerPermission]
@@ -530,7 +534,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
     default_serializer_class = SubLayerSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )
-    # permission_classes=[LayerPermission]
+    permission_classes=[SubLayerPermission]
 
     serializer_classes = {
         'list': SubLayerListSerializer,
@@ -910,13 +914,15 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         'list': FeatureCollectionListSerializer,
         'retrieve': FeatureCollectionSerializer
     }
+    permission_classes=[FeatureCollectionPermission]
+
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
     pagination_class = CustomPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         paginator = CustomPageNumberPagination()
-        layer_id = request.query_params.get('layer_id', None)
+        layer_id = request.query_params.get('layer', None)
         if not layer_id:
             return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
         queryset = self.queryset.filter(layer__id=layer_id)

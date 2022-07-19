@@ -4,10 +4,10 @@ from rest_framework.routers import DefaultRouter
 from pgis_toolkit.maps.api.views import (  # ReorderView,
     AdvanceFilterVectorTileQuerySet,
     FeatureCollectionViewset,
-    LayerAPIView,
     LayerAttributeViewset,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
+    LayerViewSet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectStyleViewset,
@@ -26,7 +26,7 @@ router = DefaultRouter()
 router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'project_style', ProjectStyleViewset, basename='project_style')
 router.register(r'standard_icon', StandardIconViewset, basename='standard_icon')
-router.register(r'layer', LayerAPIView, basename='layer')
+router.register(r'layer', LayerViewSet, basename='layer')
 router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
