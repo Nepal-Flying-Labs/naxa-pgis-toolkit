@@ -34,7 +34,7 @@ class LayerAttributeAdmin(admin.ModelAdmin):
         return False
 
 class SubLayerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted','layer', 'name', 'order')
+    list_display = ('id', 'is_deleted','layer', 'name', 'order','bbox')
     search_fields = ('id', 'name','layer__id')
     list_filter = ('is_deleted', 'layer')
     readonly_fields=['name',]

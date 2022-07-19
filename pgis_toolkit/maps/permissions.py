@@ -21,6 +21,7 @@ class LayerPermission(BasePermission):
     def has_permission(self, request, view):
         try:
             action = view.action
+            print(action,"action")
             user_id=request.user.id
             if request.user.is_superuser:
                 return True

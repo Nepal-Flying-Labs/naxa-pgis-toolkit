@@ -170,6 +170,11 @@ class SubLayer(IsDeleted,DateTimeStamp):
 
     def __str__(self):
         return f'{self.id} {self.name}'
+
+    def refresh(obj):
+        """ Reload an object from the database """
+        return obj.__class__._default_manager.get(pk=obj.pk)
+
     class Meta:
         app_label = 'maps'
         # ordering = ('order',)
@@ -184,6 +189,10 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+    def refresh(obj):
+        """ Reload an object from the database """
+        return obj.__class__._default_manager.get(pk=obj.pk)
+
     def save(self, *args, **kwargs):
         '''Update box of vectorlayer'''
         try:
@@ -194,21 +203,54 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                 else:
                     feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
                     feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+
                 vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
                 layer_bbox= vector_layer_instance.bbox
+
+                sub_layer_instance=SubLayer.objects.get(id=self.sub_layer.id) if self.sub_layer else None
+                sub_layer_bbox= sub_layer_instance.bbox if sub_layer_instance else None
+
                 if layer_bbox and feature_bbox:
                     if feature_bbox[0]<layer_bbox[0]:
                         layer_bbox[0]=feature_bbox[0]
-                    if feature_bbox[1]<layer_bbox[1]:
+
+                    elif feature_bbox[1]<layer_bbox[1]:
                         layer_bbox[1]=feature_bbox[1]
-                    if feature_bbox[2]>layer_bbox[2]:
+
+                    elif feature_bbox[2]>layer_bbox[2]:
                         layer_bbox[2]=feature_bbox[2]
-                    if feature_bbox[3]>layer_bbox[3]:
+
+                    elif feature_bbox[3]>layer_bbox[3]:
                         layer_bbox[3]=feature_bbox[3]
+
+                    # else:
+                    #     print("no case satisfies")
                     vector_layer_instance.bbox=layer_bbox
                 elif feature_bbox:
                     vector_layer_instance.bbox=feature_bbox
+
+                if sub_layer_bbox and feature_bbox:
+                    if sub_layer_bbox[0] < layer_bbox[0]:
+                        sub_layer_bbox[0]=feature_bbox[0]
+
+                    elif sub_layer_bbox[1] < layer_bbox[1]:
+                        sub_layer_bbox[1]= feature_bbox[1]
+
+                    elif sub_layer_bbox[2] > layer_bbox[2]:
+                        sub_layer_bbox[2]=feature_bbox[2]
+
+                    elif sub_layer_bbox[3]>layer_bbox[3]:
+                        sub_layer_bbox[3]=feature_bbox[3]
+
+                    # else:
+                    #     print("sub no case satisfies")
+                    sub_layer_instance.bbox=sub_layer_bbox
+                elif feature_bbox:
+                    sub_layer_instance.bbox=feature_bbox
+                '''save bbox'''
                 vector_layer_instance.save()
+                if sub_layer_instance:
+                    sub_layer_instance.save()
         except Exception as e:
             print(f'error in def save of feature collection: {str(e)}')
         super(FeatureCollection, self).save(*args, **kwargs)

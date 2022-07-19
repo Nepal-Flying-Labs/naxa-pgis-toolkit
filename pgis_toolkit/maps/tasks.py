@@ -89,6 +89,8 @@ def UploadVectorLayer(layer_id,request_data):
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
+
+'''not in use'''
 def update_bbox(layer_instance):
     '''calculate and save bbox of sub_layer'''
     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
@@ -97,13 +99,14 @@ def update_bbox(layer_instance):
     sub_layer_qs=SubLayer.objects.filter(layer=layer_instance.id)
     try:
         for sub_layer in sub_layer_qs:
+
             # with transaction.atomic():
                 # connection.connect()
-            time.sleep(10)
+            # time.sleep(10)
             presql = f"SELECT id,layer_id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id}"
             presub_layer_gdf = geopandas.GeoDataFrame.from_postgis(presql, con)
             print(presql,presub_layer_gdf)
-            # print(len(FeatureCollection.objects.filter(layer=layer_instance.id,sub_layer=sub_layer.id)),"qs_len")
+            print(FeatureCollection.objects.filter(layer=layer_instance.id,sub_layer=sub_layer.id).values_list('sub_layer'),"qs_len")
             # FeatureCollection.objects.filter(layer=layer_instance.id).refresh_from_db()
             sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id} AND sub_layer_id={sub_layer.id}"
             sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
@@ -158,7 +161,7 @@ def UpdateVectorLayer(layer_instance, request_data):
             SubLayer.objects.filter(layer=layer_instance.id).delete()
 
             '''creating sub layers'''
-            feature_coll_qs=FeatureCollection.objects.filter(layer=layer_instance.id)
+            feature_coll_qs=FeatureCollection.active.filter(layer=layer_instance.id)
             feature_coll_qs.update(sub_layer=None)
             sublayer_name_list = []
 
@@ -178,7 +181,7 @@ def UpdateVectorLayer(layer_instance, request_data):
                         feature.sub_layer=sublayer_instance
                         feature.save()
                         # print(feature.sub_layer,"after save")
-            update_bbox(layer_instance)
+            # update_bbox(layer_instance)
         return "successful"
     except Exception as e:
         return str(e)
