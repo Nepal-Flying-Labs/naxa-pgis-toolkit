@@ -44,7 +44,11 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-from pgis_toolkit.maps.permissions import LayerPermission, SubLayerPermission
+from pgis_toolkit.maps.permissions import (
+    FeatureCollectionPermission,
+    LayerPermission,
+    SubLayerPermission,
+)
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -910,13 +914,15 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         'list': FeatureCollectionListSerializer,
         'retrieve': FeatureCollectionSerializer
     }
+    permission_classes=[FeatureCollectionPermission]
+
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
     pagination_class = CustomPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         paginator = CustomPageNumberPagination()
-        layer_id = request.query_params.get('layer_id', None)
+        layer_id = request.query_params.get('layer', None)
         if not layer_id:
             return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
         queryset = self.queryset.filter(layer__id=layer_id)

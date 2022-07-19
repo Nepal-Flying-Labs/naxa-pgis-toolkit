@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import BasePermission
 
-from pgis_toolkit.maps.models import Layer, SubLayer, Theme
+from pgis_toolkit.maps.models import FeatureCollection, Layer, SubLayer, Theme
 from pgis_toolkit.projects.models import Organization, Project
 from pgis_toolkit.users.models import UserRole
 
@@ -95,6 +95,49 @@ class SubLayerPermission(BasePermission):
                 elif action=="partial_update" and "change_sublayer" in permission_list:
                     return True
                 elif action=="retrieve" and "view_sublayer" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            return False
+
+class FeatureCollectionPermission(BasePermission):
+    """
+    Permission check for sublayer model
+    """
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            if action =="list":
+                layer_id=request.query_params.get("layer")
+                project_id=Layer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action=="create":
+                layer_id=request.data.get("layer",None)
+                project_id=Layer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update']:
+                feature_id=request.resolver_match.kwargs.get('pk')
+                project_id= FeatureCollection.objects.get(id=feature_id).layer.theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
+                permission_list=[data['codename'] for data in permission_qs]
+                if action=="list" and "view_featurecollection" in permission_list:
+                    return True
+                elif action=="create" and "add_featurecollection" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_featurecollection" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_featurecollection" in permission_list:
                     return True
             return False
         except Exception as e:
