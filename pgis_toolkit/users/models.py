@@ -57,8 +57,8 @@ class User(IsDeleted, AbstractUser):
             if not make_thumbnail(self.image, self.image_thumbnail):
                 raise Exception(
                     'Could not create thumbnail- is the file type is valid')
-        if self.password:
-            self.password=make_password(self.password)
+        # if self.password:
+        #     self.password=make_password(self.password)
         super(User, self).save(*args, **kwargs)
 
     # @property
@@ -83,7 +83,7 @@ class UserRole(IsDeleted):
 '''Model to store required information to verify and identify user for registration using the email invite approach'''
 class PreliminaryUser(IsDeleted, DateTimeStamp):
     email = models.EmailField(max_length=254, unique=True)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, blank=True, null=True)
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
     email_verification_token = models.UUIDField()
