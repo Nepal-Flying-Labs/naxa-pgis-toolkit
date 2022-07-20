@@ -62,6 +62,7 @@ class OrganizationViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = OrganizationSerializer
+    permission_classes = [IsAuthenticated, IsTaskAuthorized]
     serializer_classes = {
         'list': OrganizationListSerializer,
         'retrieve': OrganizationSerializer
@@ -70,12 +71,12 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-    def get_permissions(self):
-        if self.action == 'list' or self.action == 'retrieve' or self.action == 'create':
-            permission_classes = [IsAuthenticated]
-        elif self.action == 'update' or self.action == 'partial_update':
-            permission_classes = [IsTaskAuthorized]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     if self.action == 'list' or self.action == 'retrieve':
+    #         permission_classes = [IsAuthenticated]
+    #     elif self.action == 'update' or self.action == 'partial_update' or self.action == 'create':
+    #         permission_classes = [IsTaskAuthorized]
+    #     return [permission() for permission in permission_classes]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -125,6 +126,7 @@ def delete_project(project_id):
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.active.all()
     http_method_names = ['get', 'patch']
+    permission_classes = [IsAuthenticated,IsTaskAuthorized]
     default_serializer_class = ProjectSerializer
     serializer_classes = {
         'list': ProjectListSerializer,
@@ -135,12 +137,12 @@ class ProjectViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-    def get_permissions(self):
-        if self.action == 'list':
-            permission_classes = [IsAuthenticated]
-        elif self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
-            permission_classes = [IsAuthenticated,IsTaskAuthorized]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     if self.action == 'list':
+    #         permission_classes = [IsAuthenticated]
+    #     elif self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
+    #         permission_classes = [IsAuthenticated,IsTaskAuthorized]
+    #     return [permission() for permission in permission_classes]
 
     # def create(self, request, *args, **kwargs):
     #     errors = []
