@@ -21,7 +21,21 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
 
-
 @app.task(bind=True)
 def debug_task(self):
     print('Request: {0!r}'.format(self.request))
+
+
+'''Detect whether Celery is available and running'''
+def get_celery_worker_status():
+    try:
+        insp = app.control.inspect()
+        nodes = insp.stats()
+        if not nodes:
+            return "error: celery is not running"
+            # raise Exception("celery is not running.")
+        return "working"
+        # logger.error("celery workers are: {}".format(nodes))
+        # return nodes
+    except Exception as e:
+        return "error: celery is not running"

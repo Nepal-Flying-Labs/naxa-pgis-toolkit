@@ -9,32 +9,47 @@ import fiona
 import geopandas
 import pandas
 from celery.result import AsyncResult
+from django.contrib.auth.models import Group
 from django.db.models import Q
 from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
+from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from sequences import get_next_value
 from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
-from pgis_toolkit.celery_app import app
-from pgis_toolkit.maps.functions import advance_filter_data, clear_dir
+from pgis_toolkit.celery_app import app, get_celery_worker_status
+from pgis_toolkit.maps.functions import advance_filter_data, clear_dir, get_style_detail
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
+    LayerAttribute,
     LayerFile,
     LayerGroup,
+    LayerStyle,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
+    ProjectStyle,
     RasterLayer,
     StandardIcon,
     SubLayer,
+    SubLayerStyle,
     Theme,
     Vectorlayer,
     WMSLayer,
+)
+from pgis_toolkit.maps.permissions import (
+    FeatureCollectionPermission,
+    LayerGroupPermission,
+    LayerPermission,
+    SubLayerPermission,
+    ThemePermission,
 )
 from pgis_toolkit.maps.tasks import (
     UpdateRasterLayer,
@@ -50,6 +65,8 @@ from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
 from .serializers import (
     FeatureCollectionListSerializer,
     FeatureCollectionSerializer,
+    LayerAttributeListSerializer,
+    LayerAttributeSerializer,
     LayerGroupListSerializer,
     LayerGroupSerializer,
     LayerSerializer,
@@ -58,8 +75,11 @@ from .serializers import (
     ProjectLayerTemplateSerializer,
     ProjectsLayerTemplateAttributeListSerializer,
     ProjectsLayerTemplateAttributeSerializer,
+    ProjectStyleListSerializer,
+    ProjectStyleSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
+    SubLayerRetrieveSerializer,
     SubLayerSerializer,
     SubLayerUpdateSerializer,
     ThemeListSerializer,
@@ -75,6 +95,58 @@ class StandardIconViewset(viewsets.ModelViewSet):
     queryset = StandardIcon.active.all()
     http_method_names = ['get']
     serializer_class = StandardIconListSerializer
+
+
+
+class ProjectStyleViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for multiple project style
+    '''
+    queryset = ProjectStyle.active.all()
+    http_method_names = ['get','post','patch']
+    default_serializer_class = ProjectStyleSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
+
+    serializer_classes = {
+        'list': ProjectStyleListSerializer,
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        self.queryset = self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+class LayerAttributeViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for multiple project style
+    '''
+    queryset = LayerAttribute.objects.all()
+    http_method_names = ['get','post','patch']
+    default_serializer_class = LayerAttributeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer', )
+
+    serializer_classes = {
+        'list': LayerAttributeListSerializer,
+    }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def list(self, request, *args, **kwargs):
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        self.queryset = self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -149,26 +221,134 @@ def project_layers(request,id):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
-class LayerAPIView(APIView):
+# def get_style_detail(layer_id,sublayer_id,project_style):
+#     icon,icon_size,style,std_icon=None,None,None,None
+#     if sublayer_id:
+#         if project_style=="default":
+#             style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=None)
+#             if not style_instance.exists():
+#                 style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#         else:
+#             style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=project_style)
+#             if not style_instance.exists():
+#                 style_instance=SubLayerStyle.objects.filter(sub_layer=sublayer_id,project_style=None)
+#                 if not style_instance.exists():
+#                     style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#     else:
+#         if project_style=="default":
+#             style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#         else:
+#             style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=project_style)
+#             if not style_instance.exists():
+#                 style_instance=LayerStyle.objects.filter(layer=layer_id,project_style=None)
+#     if style_instance.exists():
+#         # icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
+#         # std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
+#         icon=style_instance[0].get_icon_url
+#         std_icon=style_instance[0].get_std_icon_url
+#         icon_size=style_instance[0].icon_size
+#         style=style_instance[0].style
+#     return icon,icon_size,style,std_icon
+
+@api_view(['GET'])
+def project_theme_layers(request):
+    '''
+    layers list under project theme
+    http://0.0.0.0:8000/api/maps/project_theme_layers/?theme=<id>&project_style=default
+    This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
+    '''
+    try:
+        theme_id=request.query_params.get("theme",None)
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
+        if not theme_id:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
+        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme=theme_id)
+        layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
+        group_list=[]
+        group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
+        for group in group_qs:
+            group_layer_list=[]
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
+            for layer in group_layer_qs:
+                layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
+                if layer.layer_type=="Vector":
+                    icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                    layer_item['icon']=icon
+                    layer_item['std_icon']=std_icon
+                    layer_item['icon_size']=icon_size
+                    layer_item['style']=style
+                # elif layer.layer_type=="Raster":
+                #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
+                # elif layer.layer_type=="WMS":
+                #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+                group_layer_list.append(layer_item)
+            group_item={"id":group.id,"name":group.name,'layer':group_layer_list}
+            group_list.append(group_item)
+        layer_list=[]
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
+
+        for layer in layer_qs:
+            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
+            if layer.layer_type=="Vector":
+                layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+                sub_layer_list=[]
+                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
+                # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
+                for sub_layer in sub_layer_qs:
+                    icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
+                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
+                    sub_layer_list.append(sub_layer_item)
+                icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                layer_item['icon']=icon
+                layer_item['std_icon']=std_icon
+                layer_item['icon_size']=icon_size,
+                layer_item['style']=style
+                layer_item['sub_layer']=sub_layer_list
+            # elif layer.layer_type=="Raster":
+            #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
+            # elif layer.layer_type=="WMS":
+            #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+            layer_list.append(layer_item)
+        theme_item={'group':group_list,'layer':layer_list}
+        # theme_list.append(theme_item)
+        return Response(theme_item,status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+class LayerViewSet(viewsets.ModelViewSet):
+    queryset = Layer.active.all()
+    http_method_names=['get','post', 'patch']
+    permission_classes=[LayerPermission]
+    serializer_class=LayerSerializer
     '''
     View for Layer instance
     http://0.0.0.0:8000/api/maps/layer/
     '''
-    def get_object(self, pk):
-        try:
-            return Layer.objects.get(pk=pk)
-        except Layer.DoesNotExist:
-            raise Http404
+    # def get_object(self, pk):
+    #     try:
+    #         print(Layer.active.get(pk=pk),"Layer.active.get(pk=pk)")
+    #         return Layer.active.get(pk=pk)
+    #     except Layer.DoesNotExist:
+    #         raise Http404
 
-    def get(self, request, pk, format=None):
+    def retrieve(self, request, pk=None):
+
         '''
         This action is to retrieve the layer detail
         http://0.0.0.0:8000/api/maps/layer/<layer_id>/
         '''
+        # print(Group.objects.get(id=2).permissions.all().first().codename,"requestsssssssssssssssssssssss")
         try:
             if not pk:
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "pk is missing"})
-            layer_instance = self.get_object(pk)
+            if not Layer.active.filter(pk=pk).exists():
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "Layer does not exists"})
+
+            # layer_instance = self.get_object(pk)
+            layer_instance = Layer.active.get(pk=pk)
             results={}
             '''layer detail'''
             layer_keys=['id','name','default_load','layer_type','is_osm_layer']
@@ -199,7 +379,7 @@ class LayerAPIView(APIView):
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occurred', 'error': str(e)})
 
-    def post(self, request, format=None):
+    def create(self, request, *args, **kwargs):
         errors=[]
         try:
             request_dict = request.data
@@ -222,6 +402,13 @@ class LayerAPIView(APIView):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
+                    print("is_vector")
+                    '''check whether celery is working or not'''
+                    is_working=get_celery_worker_status()
+                    print(is_working,"is_working")
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Vector layer upload'''
                     if 'file' in request.FILES and request.FILES.get('file') != "":
                         layer_file_instance = LayerFile.objects.create(
@@ -233,21 +420,24 @@ class LayerAPIView(APIView):
                     '''wait untils the layer instance is created'''
                     iterate=True
                     while iterate:
-                        # print("start iterate")
                         if Layer.objects.filter(id=created_object.id).exists():
                             layer_instane=Layer.objects.get(id=created_object.id)
-                            # print(Layer.objects.filter(id=created_object.id),"existed")
                             iterate=False
                         else:
-                            # print("sleep for 3 sec")
+                            print("sleeep time")
                             time.sleep(3)
 
+                    print("reached here123")
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
                     # return Response(response)
                     return Response(status=200,
                                     data={'message': 'Uploading Data', 'task_id': response.task_id})
 
                 elif layer_type == "Raster":
+                    is_working=get_celery_worker_status()
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     '''handle Raster layer upload'''
                     if 'file' in request_dict.keys() and request_dict['file'] != "":
                         LayerFile.objects.create(file=request_dict['file'], layer=created_object)
@@ -285,7 +475,7 @@ class LayerAPIView(APIView):
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
 
-    def patch(self, request, pk=None):
+    def partial_update(self, request, pk=None):
         errors=[]
         try:
             request_dict = request.data
@@ -301,14 +491,23 @@ class LayerAPIView(APIView):
                 layer_type = layer_instance.layer_type
                 '''handle Vector layer update'''
                 if layer_type == "Vector":
+                    project_style="default"
+                    if "project_style" in request_dict and request_dict['project_style']!='' and request_dict['project_style']!='default':
+                        project_style=request_dict['project_style']
+                    request_dict._mutable=True
+                    request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
                     '''handle Vector layer update'''
                 elif layer_type == "Raster":
+                    is_working=get_celery_worker_status()
+                    if not is_working=="working":
+                        Layer.objects.get(id=created_object.id).delete()
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
                     '''handle Vector layer upload'''
@@ -317,6 +516,7 @@ class LayerAPIView(APIView):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
+                    return Response(data={'message':response,"id":serializer.data['id']},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -334,9 +534,13 @@ class SubLayerViewset(viewsets.ModelViewSet):
     queryset = SubLayer.objects.all()
     http_method_names = ['get', 'patch']
     default_serializer_class = SubLayerSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer', )
+    permission_classes=[SubLayerPermission]
 
     serializer_classes = {
         'list': SubLayerListSerializer,
+        'retrieve': SubLayerRetrieveSerializer,
         'partial_update':SubLayerUpdateSerializer
     }
 
@@ -345,11 +549,66 @@ class SubLayerViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         layer_id = request.query_params.get('layer', None)
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
         if not layer_id:
             return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(layer=layer_id)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(layer=layer_id)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True,context={"project_style":project_style,"layer_id":layer_id})
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        project_style=request.query_params.get("project_style")
+        if not project_style:
+            project_style="default"
+        sub_layer = get_object_or_404(self.queryset, pk=pk)
+        serializer = self.get_serializer(sub_layer,context={"project_style":project_style,"layer_id":sub_layer.layer.id})
+        return Response(serializer.data)
+
+    def partial_update(self, request, pk=None):
+        errors=[]
+        try:
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            # name = request_dict['name'] if 'name' in request_keys else None
+            sub_layer_instance=SubLayer.active.get(pk=pk)
+            project_style="default"
+            if "project_style" in request_dict and request_dict['project_style']!='' and request_dict['project_style']!='default':
+                project_style=request_dict['project_style']
+            request_dict._mutable=True
+            request_dict['project_style']=project_style
+
+            serializer = self.get_serializer(sub_layer_instance, data=request_dict, partial=True)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                project_style=None if request_dict['project_style']=="default" else request_dict['project_style']
+                style_qs=SubLayerStyle.objects.filter(sub_layer=sub_layer_instance.id,project_style=project_style)
+
+                if style_qs.exists():
+                    sub_layer_style_instance=style_qs[0]
+                else:
+                    project_style_instance=ProjectStyle.active.get(id=project_style) if project_style else None
+                    sub_layer_style_instance=SubLayerStyle.objects.create(sub_layer=sub_layer_instance,project_style=project_style_instance)
+                if 'icon' in request_dict.keys():
+                    sub_layer_style_instance.icon=request_dict['icon']
+                if 'icon_size' in request_dict.keys():
+                    sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
+                if 'style' in request_dict.keys():
+                    sub_layer_style_instance.style=json.loads(request_dict['style'])
+                if 'std_icon' in request_dict.keys():
+                    sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
+                sub_layer_style_instance.save()
+                return Response(data={"message":"successful","id":serializer.data['id'],'layer':sub_layer_instance.layer.id,'theme':sub_layer_instance.layer.theme.id},status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        except Exception as e:
+            errors.append({'errorName': str(e), 'details': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 
 @api_view(['GET'])
@@ -360,7 +619,7 @@ def get_layer_upload_task_response(request):
     try:
         task_id = request.query_params.get('task_id', None)
         result = AsyncResult(task_id, app=app)
-        if result.ready():                     # check task state: true/false
+        if result.ready():   # check task state: true/false
             try:
                 response, layer_id = result.get()
                 if response == "successful":
@@ -378,13 +637,15 @@ class ThemeViewset(viewsets.ModelViewSet):
     '''
     Viewset for Theme instance.
     '''
-    queryset = Theme.active.all()
+    queryset = Theme.active.all().order_by('order')
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ThemeSerializer
-
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
+    permission_classes=[ThemePermission]
     serializer_classes = {
         'list': ThemeListSerializer,
-        'retrieve': ThemeSerializer
+        # 'retrieve': ThemeSerializer
     }
 
     def get_serializer_class(self):
@@ -442,8 +703,9 @@ class ThemeViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(queryset, many=True)
+        self.queryset=self.filter_queryset(self.queryset)
+        # queryset = self.queryset.filter(project__id=project)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
@@ -581,7 +843,9 @@ def layer_download(request):
         return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
     '''connect to database and pull required data'''
     try:
-        dir = MEDIA_ROOT+"/../mediadownload/"
+        layer_download_id = str(get_next_value(
+                sequence_name="layer_download_id", initial_value=1))
+        dir = f'{MEDIA_ROOT}/layer_download/{layer_download_id}/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
         sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
@@ -606,8 +870,11 @@ def layer_download(request):
             gdf.to_file(dir+layer_instance.name+".geojson", driver='GeoJSON')
             file_url = dir + f'{layer_instance.name}.geojson'
         elif output_format == "csv":
-            geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
-            gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
+            df = pandas.DataFrame(gdf)
+            df.to_csv(dir+layer_instance.name+'.csv')
+            file_url = dir + f'{layer_instance.name}.csv'
+            # geopandas.io.file.fiona.drvsupport.supported_drivers['CSV'] = 'raw'
+            # gdf.to_file(dir+layer_instance.name+".csv", driver='CSV', encoding='utf-8')
             # print(gdf.assign(geometry=gdf["geom"].apply(lambda p: p.wkt)).to_csv(), " is csv")
             file_url = dir + f'{layer_instance.name}.csv'
         elif output_format == "kml":
@@ -643,24 +910,26 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
     Viewset for FeatureCollection innstance
     '''
     queryset = FeatureCollection.active.all()
-    http_method_names = ['get']
+    http_method_names = ['get', 'retrieve', 'patch', 'post']
     default_serializer_class = FeatureCollectionSerializer
     serializer_classes = {
         'list': FeatureCollectionListSerializer,
         'retrieve': FeatureCollectionSerializer
     }
+    permission_classes=[FeatureCollectionPermission]
+
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
     pagination_class = CustomPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         paginator = CustomPageNumberPagination()
-        layer_id = request.query_params.get('layer_id', None)
+        layer_id = request.query_params.get('layer', None)
         if not layer_id:
             return Response(data={'message': 'params layer_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
         queryset = self.queryset.filter(layer__id=layer_id)
         '''search_key'''
-        search_key = request.query_params.get('search_key', None)
+        search_key = request.query_params.get('search', None)
         if search_key:
             search_fields = list(queryset.first().attributes.keys())
             filter_kwargs = {}
@@ -671,7 +940,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 reduce(operator.or_, list_of_Q)) if search_fields else queryset
         ''''order_by'''
-        order_by = request.query_params.get('order_by', None)
+        order_by = request.query_params.get('ordering', None)
         if order_by:
             if 'id' in order_by:
                 queryset = queryset.order_by(order_by)
@@ -682,17 +951,21 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         return paginator.get_paginated_response(data=serializer.data)
 
 
+
 class LayerGroupViewset(viewsets.ModelViewSet):
     '''
     Viewset for LayerGroup objects.
     '''
-    queryset = LayerGroup.active.all()
+    queryset = LayerGroup.active.all().order_by('order')
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = LayerGroupSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('theme', )
+    permission_classes=[LayerGroupPermission]
 
     serializer_classes = {
         'list': LayerGroupListSerializer,
-        'retrieve': LayerGroupSerializer
+        # 'retrieve': LayerGroupSerializer
     }
 
     def get_serializer_class(self):
@@ -745,8 +1018,9 @@ class LayerGroupViewset(viewsets.ModelViewSet):
         theme = request.query_params.get('theme', None)
         if not theme:
             return Response(data={'message': 'params theme is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(theme__id=theme)
-        serializer = self.get_serializer(queryset, many=True)
+        self.queryset=self.filter_queryset(self.queryset)
+        # queryset = self.queryset.filter(theme__id=theme)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
@@ -756,6 +1030,8 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectLayerTemplateSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('project', )
 
     serializer_classes = {
         'list': ProjectLayerTemplateListSerializer,
@@ -772,8 +1048,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(project__id=project)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
@@ -832,6 +1109,8 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     queryset = ProjectsLayerTemplateAttribute.objects.all()
     http_method_names = ['get', 'post', 'patch']
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ('layer_template', )
 
     serializer_classes = {
         'list': ProjectsLayerTemplateAttributeListSerializer,
@@ -848,8 +1127,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         layer_template = request.query_params.get('layer_template', None)
         if not layer_template:
             return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(layer_template__id=layer_template)
-        serializer = self.get_serializer(queryset, many=True)
+        # queryset = self.queryset.filter(layer_template__id=layer_template)
+        self.queryset=self.filter_queryset(self.queryset)
+        serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):

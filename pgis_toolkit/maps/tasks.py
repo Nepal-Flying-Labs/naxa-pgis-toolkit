@@ -1,9 +1,15 @@
+import json
 import os
 import time
+from logging import exception
 
+import geopandas
 from celery import Celery, shared_task
+from django.db import connection, transaction
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from config.settings.base import MEDIA_ROOT, env
 from config.settings.local import geoserver
@@ -15,6 +21,9 @@ from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
     LayerFile,
+    LayerStyle,
+    ProjectStyle,
+    StandardIcon,
     SubLayer,
     Vectorlayer,
     WMSLayer,
@@ -81,6 +90,36 @@ def UploadVectorLayer(layer_id,request_data):
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
 
+# '''not in use'''
+# def update_bbox(layer_instance):
+#     '''calculate and save bbox of sub_layer'''
+#     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+#     con = create_engine(db_connection_url)
+
+#     sub_layer_qs=SubLayer.objects.filter(layer=layer_instance.id)
+#     try:
+#         for sub_layer in sub_layer_qs:
+
+#             # with transaction.atomic():
+#                 # connection.connect()
+#             # time.sleep(10)
+#             presql = f"SELECT id,layer_id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id}"
+#             presub_layer_gdf = geopandas.GeoDataFrame.from_postgis(presql, con)
+#             print(presql,presub_layer_gdf)
+#             print(FeatureCollection.objects.filter(layer=layer_instance.id,sub_layer=sub_layer.id).values_list('sub_layer'),"qs_len")
+#             # FeatureCollection.objects.filter(layer=layer_instance.id).refresh_from_db()
+#             sql = f"SELECT id,sub_layer_id,geometry AS geom FROM maps_featurecollection WHERE layer_id={layer_instance.id} AND sub_layer_id={sub_layer.id}"
+#             sub_layer_gdf = geopandas.GeoDataFrame.from_postgis(sql, con)
+#             print(sql,"postsql")
+#             '''extracting extent'''
+#             print(sub_layer_gdf,"sub_layer_gdf")
+#             total_bounds = sub_layer_gdf.total_bounds if sub_layer_gdf else []
+#             sub_layer.bbox = total_bounds.tolist()
+#             sub_layer.save()
+
+#     except Exception as e:
+#         print(str(e),"error in bbox calculation")
+
 def UpdateVectorLayer(layer_instance, request_data):
     try:
         # geoserver.create_workspace(workspace="custom_workspace")
@@ -90,19 +129,40 @@ def UpdateVectorLayer(layer_instance, request_data):
         if vector_layer_serializer.is_valid():
             vector_layer_serializer.save()
         else:
+
             for er in vector_layer_serializer._errors:
                 errors.append(
-                    {'errorName': er, 'details': vector_layer_serializer._errors[er][0]})
+                    {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
             return errors
 
-        if "sub_layers_mapping_field" in request_data.keys() and "sub_layers_mapping_field" !="":
-            sub_layers_mapping_field=request_data['sub_layers_mapping_field']
+        '''Save vector layer style'''
+        project_style=None if request_data['project_style']=="default" else request_data['project_style']
+        style_qs=LayerStyle.objects.filter(layer=layer_instance.id,project_style=project_style)
 
+        if style_qs.exists():
+            layerstyle_instance=style_qs[0]
+        else:
+            project_style_instance=ProjectStyle.active.get(id=project_style) if project_style else None
+            layerstyle_instance=LayerStyle.objects.create(layer=layer_instance,project_style=project_style_instance)
+        if 'icon' in request_data.keys():
+            layerstyle_instance.icon=request_data['icon']
+        if 'icon_size' in request_data.keys():
+            layerstyle_instance.icon_size=json.loads(request_data['icon_size'])
+        if 'style' in request_data.keys():
+            layerstyle_instance.style=json.loads(request_data['style'])
+        if 'std_icon' in request_data.keys():
+            layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
+        layerstyle_instance.save()
+
+        if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
+            # with transaction.atomic():
+            sub_layers_mapping_field=request_data['sub_layers_mapping_field']
             '''deleting sub layer instance if exists'''
             SubLayer.objects.filter(layer=layer_instance.id).delete()
 
             '''creating sub layers'''
-            feature_coll_qs=FeatureCollection.objects.filter(layer=layer_instance.id)
+            feature_coll_qs=FeatureCollection.active.filter(layer=layer_instance.id)
+            feature_coll_qs.update(sub_layer=None)
             sublayer_name_list = []
 
             for feature in feature_coll_qs:
@@ -117,9 +177,11 @@ def UpdateVectorLayer(layer_instance, request_data):
                 )
                 for feature in feature_coll_qs:
                     if(feature.attributes[sub_layers_mapping_field] == sub_layer_name):
-                        # feature_coll_qs.filter(id=feature.id).update(sub_layer=sublayer_instance)
+                        # with transaction.atomic():
                         feature.sub_layer=sublayer_instance
                         feature.save()
+                        # print(feature.sub_layer,"after save")
+            # update_bbox(layer_instance)
         return "successful"
     except Exception as e:
         return str(e)

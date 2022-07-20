@@ -1,8 +1,8 @@
 """
 Base settings to build other settings files upon.
 """
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 import environ
 from corsheaders.defaults import default_headers
@@ -94,8 +94,9 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     # "ordered_model",
     'celery',
-    # 'django_celery_beat',
-    'django_celery_results'
+    'django_celery_beat',
+    'django_celery_results',
+    'sequences.apps.SequencesConfig'
 ]
 
 LOCAL_APPS = [

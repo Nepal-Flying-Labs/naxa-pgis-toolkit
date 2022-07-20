@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
+from config.settings.base import env
 from pgis_toolkit.projects.models import (
     DateTimeStamp,
     IsDeleted,
@@ -31,7 +32,7 @@ class Theme(IsDeleted,DateTimeStamp):
     description=models.TextField(blank=True,null=True)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
 
@@ -41,7 +42,7 @@ class LayerGroup(IsDeleted,DateTimeStamp):
     order=models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
         unique_together = (("theme", "name"),)
@@ -57,7 +58,7 @@ class Layer(IsDeleted,DateTimeStamp):
     is_osm_layer=models.BooleanField(default=False)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
 
@@ -131,7 +132,7 @@ class Vectorlayer(DateTimeStamp):
         max_length=250, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.layer};id-{self.id}'
+        return f'{self.id} {self.layer}'
     class Meta:
         app_label = 'maps'
 
@@ -165,9 +166,15 @@ class SubLayer(IsDeleted,DateTimeStamp):
     icon_size = models.JSONField(blank=True, null=True)
     style = models.JSONField(default=dict, blank=True, null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_std_icon",blank=True,null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
 
     def __str__(self):
-        return str(self.name)
+        return f'{self.id} {self.name}'
+
+    def refresh(obj):
+        """ Reload an object from the database """
+        return obj.__class__._default_manager.get(pk=obj.pk)
+
     class Meta:
         app_label = 'maps'
         # ordering = ('order',)
@@ -182,28 +189,70 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+    def refresh(obj):
+        """ Reload an object from the database """
+        return obj.__class__._default_manager.get(pk=obj.pk)
+
     def save(self, *args, **kwargs):
         '''Update box of vectorlayer'''
-        if self.geometry:
-            if self.geometry.geom_type=="Point":
-                coords=self.geometry.coords
-                feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
-            else:
-                feature=FeatureCollection.objects.filter(id=self.id).aggregate(Extent('geometry'))
-                feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
-            vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
-            layer_bbox= vector_layer_instance.bbox
-            if layer_bbox and feature_bbox:
-                if feature_bbox[0]<layer_bbox[0]:
-                    layer_bbox[0]=feature_bbox[0]
-                if feature_bbox[1]<layer_bbox[1]:
-                    layer_bbox[1]=feature_bbox[1]
-                if feature_bbox[2]>layer_bbox[2]:
-                    layer_bbox[2]=feature_bbox[2]
-                if feature_bbox[3]>layer_bbox[3]:
-                    layer_bbox[3]=feature_bbox[3]
-                vector_layer_instance.bbox=layer_bbox
+        try:
+            if self.geometry:
+                if self.geometry.geom_type=="Point":
+                    coords=self.geometry.coords
+                    feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+                else:
+                    feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
+                    feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+
+                vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
+                layer_bbox= vector_layer_instance.bbox
+
+                sub_layer_instance=SubLayer.objects.get(id=self.sub_layer.id) if self.sub_layer else None
+                sub_layer_bbox= sub_layer_instance.bbox if sub_layer_instance else None
+
+                if layer_bbox and feature_bbox:
+                    if feature_bbox[0]<layer_bbox[0]:
+                        layer_bbox[0]=feature_bbox[0]
+
+                    elif feature_bbox[1]<layer_bbox[1]:
+                        layer_bbox[1]=feature_bbox[1]
+
+                    elif feature_bbox[2]>layer_bbox[2]:
+                        layer_bbox[2]=feature_bbox[2]
+
+                    elif feature_bbox[3]>layer_bbox[3]:
+                        layer_bbox[3]=feature_bbox[3]
+
+                    # else:
+                    #     print("no case satisfies")
+                    vector_layer_instance.bbox=layer_bbox
+                elif feature_bbox:
+                    vector_layer_instance.bbox=feature_bbox
+
+                if sub_layer_bbox and feature_bbox:
+                    if sub_layer_bbox[0] < layer_bbox[0]:
+                        sub_layer_bbox[0]=feature_bbox[0]
+
+                    elif sub_layer_bbox[1] < layer_bbox[1]:
+                        sub_layer_bbox[1]= feature_bbox[1]
+
+                    elif sub_layer_bbox[2] > layer_bbox[2]:
+                        sub_layer_bbox[2]=feature_bbox[2]
+
+                    elif sub_layer_bbox[3]>layer_bbox[3]:
+                        sub_layer_bbox[3]=feature_bbox[3]
+
+                    # else:
+                    #     print("sub no case satisfies")
+                    sub_layer_instance.bbox=sub_layer_bbox
+                elif feature_bbox:
+                    sub_layer_instance.bbox=feature_bbox
+                '''save bbox'''
                 vector_layer_instance.save()
+                if sub_layer_instance:
+                    sub_layer_instance.save()
+        except Exception as e:
+            print(f'error in def save of feature collection: {str(e)}')
         super(FeatureCollection, self).save(*args, **kwargs)
 
 
@@ -236,9 +285,58 @@ class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
     class Meta:
         app_label = 'maps'
 
+    def __str__(self):
+        return f'{self.id} {self.name}'
+
 
 class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
     layer_template=models.ForeignKey(ProjectsLayerTemplate,on_delete=models.CASCADE)
     class Meta:
         app_label = 'maps'
         unique_together = (("layer_template", "name"),)
+
+class ProjectStyle(DateTimeStamp,IsDeleted):
+    project=models.ForeignKey(Project,on_delete=models.CASCADE)
+    name=models.CharField(max_length=50)
+
+    class Meta:
+        app_label = 'maps'
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
+
+class LayerStyle(DateTimeStamp,IsDeleted):
+    project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
+    layer=models.ForeignKey(Layer,on_delete=models.CASCADE)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
+    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_style_std_icon",blank=True,null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+    @property
+    def get_icon_url(self):
+        return f'{env("URL")}{self.icon.url}' if self.icon else None
+    @property
+    def get_std_icon_url(self):
+        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+
+class SubLayerStyle(DateTimeStamp,IsDeleted):
+    project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
+    sub_layer=models.ForeignKey(SubLayer,on_delete=models.CASCADE)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
+    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_style_std_icon",blank=True,null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+    @property
+    def get_icon_url(self):
+        return f'{env("URL")}{self.icon.url}' if self.icon else None
+    @property
+    def get_std_icon_url(self):
+        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None

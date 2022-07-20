@@ -6,37 +6,44 @@ import tempfile
 import zipfile
 from functools import reduce
 
+import environ
 import fiona
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
     DefaultTheme,
+    Document,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
     OrganizationCategory,
     Project,
-    ProjectLocationFeatureCollection, Document, RequestDemo
+    ProjectLocationFeatureCollection,
+    RequestDemo,
 )
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
 )
+from pgis_toolkit.users.models import UserRole
+from pgis_toolkit.users.permissions import IsTaskAuthorized
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
+env = environ.Env()
 
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
@@ -63,15 +70,46 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
+    def get_permissions(self):
+        if self.action == 'list' or self.action == 'retrieve' or self.action == 'create':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'update' or self.action == 'partial_update':
+            permission_classes = [IsTaskAuthorized]
+        return [permission() for permission in permission_classes]
+
     def list(self, request, *args, **kwargs):
-        paginator = CustomPageNumberPagination()
-        search_key = request.query_params.get('search_key', None)
-        order_by = request.query_params.get('order_by', None)
-        queryset = self.queryset.filter(name__icontains=search_key) if search_key and search_key != "" else self.queryset
-        queryset = queryset.order_by(order_by) if order_by and order_by != "" else queryset
-        paginated_queryset = paginator.paginate_queryset(queryset, request)
-        serializer = self.get_serializer(paginated_queryset, many=True, context={})
-        return paginator.get_paginated_response(data=serializer.data)
+        try:
+            paginator = CustomPageNumberPagination()
+            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+            queryset = self.queryset
+            user_role_list = userrole_qs.values_list('group__id', flat=True)
+            '''filter organization list according to the role of the user.'''
+            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+                '''web app administrator can view all organization'''
+                queryset = queryset
+            else:
+                '''other user can view only the organizations they are involved in'''
+                user_org_list = userrole_qs.values_list('organization__id', flat=True)
+                queryset = queryset.filter(id__in=user_org_list)
+            search_key = request.query_params.get('search', None)
+            order_by = request.query_params.get('ordering', None)
+            queryset = queryset.filter(name__icontains=search_key) if search_key and search_key != "" else queryset
+            if order_by and order_by != "":
+                if order_by == 'projects':
+                    queryset = queryset.annotate(count=Count('ProjectOrganization')).order_by('count')
+                elif order_by == '-projects':
+                    queryset = queryset.annotate(count=Count('ProjectOrganization')).order_by('-count')
+                else:
+                    queryset = queryset.order_by(order_by)
+            else:
+                queryset = queryset
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data=str(e))
 
 '''delets a project object'''
 def delete_project(project_id):
@@ -96,6 +134,13 @@ class ProjectViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+    def get_permissions(self):
+        if self.action == 'list':
+            permission_classes = [IsAuthenticated]
+        elif self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
+            permission_classes = [IsAuthenticated,IsTaskAuthorized]
+        return [permission() for permission in permission_classes]
 
     # def create(self, request, *args, **kwargs):
     #     errors = []
@@ -187,134 +232,158 @@ class ProjectViewset(viewsets.ModelViewSet):
     #         return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
-        project = Project.active.get(pk=pk)
-        request.data._mutable = True
-        request_dict = request.data
-        request_keys = request_dict.keys()
-        country = None
-        state = None
-        '''retrieveing country'''
-        if 'country' in request_keys:
-            country = request_dict['country']
-            request_dict.pop('country')
-        '''retrieving state'''
-        if 'state' in request_keys:
-            state = request_dict['state']
-            request_dict.pop('state')
-        serializer = ProjectSerializer(
-            project, data=request_dict, partial=True)
-        if serializer.is_valid():
-            created_object = serializer.save()
-            ''''handle country and state'''
-            if country != None:
-                created_object.country.set(json.loads(country))
-            if state != None:
-                created_object.state.set(json.loads(state))
-            created_object.save()
-            project_id = project.id
-
-            '''check location file'''
-            file_input = False
-            if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
-                file_input = True
-                file_type_list = ['Shapefile', 'GeoJSON']
-                if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
-                    return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
-                file_type = request_dict['file_type']
-                file = str(request_dict["file"])
-                split_tup = os.path.splitext(file)
-                file_extension = split_tup[1]
-
-            '''Location file as Shapfile'''
-            if file_input == True:
-                if file_type == "Shapefile":
-                    if file_extension == ".zip":
-                        ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                            is_deleted=True)  # Archive existing features
-                        response = handleProjectShapeFile(project_id)
-                        if response == "successful":
-                            return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                        else:
-                            return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        return Response({'message': "Please provide commpressed .zip file"},
-                                        status=status.HTTP_400_BAD_REQUEST)
-
-                    '''Location file as Shapfile'''
-                elif file_type == "GeoJSON":
-                    if file_extension == ".geojson":
-                        ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                            is_deleted=True)  # Archive existing features
-                        response = handleProjectGeoJSON(project_id)
-                        if response == "successful":
-                            return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
-                        else:
-                            return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        return Response({'message': "Please provide valid .geojson file"},
-                                        status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                '''Location as wkt from Custom Draw on map'''
-                if 'location_wkt' in request_keys:
-                    ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                        is_deleted=True)  # Archive existing features
-                    project.file.delete(save=True)
-                    wkt_name = request_dict['location_wkt']
-                    wkt_list = json.loads(request_dict['location_wkt'])
-                    for geom in wkt_list:
-                        ProjectLocationFeatureCollection.active.create(project=project,
-                                                                        geometry=GEOSGeometry(geom))
+        try:
+            project = Project.active.get(pk=pk)
+            request.data._mutable = True
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            country = None
+            state = None
+            '''retrieveing country'''
+            if 'country' in request_keys:
+                country = request_dict['country']
+                request_dict.pop('country')
+            '''retrieving state'''
+            if 'state' in request_keys:
+                state = request_dict['state']
+                request_dict.pop('state')
             serializer = ProjectSerializer(
-                project, context={'request': request})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+                project, data=request_dict, partial=True)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                ''''handle country and state'''
+                if country != None:
+                    created_object.country.set(json.loads(country))
+                if state != None:
+                    created_object.state.set(json.loads(state))
+                created_object.save()
+                project_id = project.id
+
+                '''check location file'''
+                file_input = False
+                if 'location_type' in request_keys and request_dict['location_type'] == 'File Upload':
+                    file_input = True
+                    file_type_list = ['Shapefile', 'GeoJSON']
+                    if 'file' not in request_keys or request_dict['file'] == "" or 'file_type' not in request_keys or request_dict['file_type'] not in file_type_list:
+                        return Response(data={'message': 'No file input or file_type!'}, status=status.HTTP_400_BAD_REQUEST)
+                    file_type = request_dict['file_type']
+                    file = str(request_dict["file"])
+                    split_tup = os.path.splitext(file)
+                    file_extension = split_tup[1]
+
+                '''Location file as Shapfile'''
+                if file_input == True:
+                    if file_type == "Shapefile":
+                        if file_extension == ".zip":
+                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
+                                is_deleted=True)  # Archive existing features
+                            response = handleProjectShapeFile(project_id)
+                            if response == "successful":
+                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                            else:
+                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+                        else:
+                            return Response({'message': "Please provide commpressed .zip file"},
+                                            status=status.HTTP_400_BAD_REQUEST)
+
+                        '''Location file as Shapfile'''
+                    elif file_type == "GeoJSON":
+                        if file_extension == ".geojson":
+                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
+                                is_deleted=True)  # Archive existing features
+                            response = handleProjectGeoJSON(project_id)
+                            if response == "successful":
+                                return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                            else:
+                                return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
+                        else:
+                            return Response({'message': "Please provide valid .geojson file"},
+                                            status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        return Response({'message': "Invalid file type"}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    '''Location as wkt from Custom Draw on map'''
+                    if 'location_wkt' in request_keys:
+                        ProjectLocationFeatureCollection.active.filter(project=project_id).update(
+                            is_deleted=True)  # Archive existing features
+                        project.file.delete(save=True)
+                        wkt_name = request_dict['location_wkt']
+                        wkt_list = json.loads(request_dict['location_wkt'])
+                        for geom in wkt_list:
+                            ProjectLocationFeatureCollection.active.create(project=project,
+                                                                            geometry=GEOSGeometry(geom))
+                serializer = ProjectSerializer(
+                    project, context={'request': request})
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+        except Exception as error:
+            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         '''http://localhost:8000/api/projects/project/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
-        paginator = CustomPageNumberPagination()
-        organization_id = request.query_params.get('organization', None)
-        queryset = self.queryset
-        '''filter by organization id'''
-        if organization_id and organization_id != "":
-            if not Organization.active.filter(id=organization_id).exists():
-                return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = queryset.select_related("organization").filter(organization__id=organization_id)
-        state = request.query_params.get('state', None)
-        country = request.query_params.get('country', None)
-        polygon_wkt = request.query_params.get('polygon_wkt', None)
-        '''filter by state'''
-        if state and state != "":
-            queryset = queryset.filter(state__id=state)
-            '''filter by country or polygon wkt'''
-        elif country and country != "":
-            queryset = queryset.filter(country__id=country)
-            '''filter by polygon wkt'''
-        elif polygon_wkt and polygon_wkt != "":
-            polygon = GEOSGeometry(polygon_wkt)
-            organization_project_list = queryset.values_list('id', flat=True)
-            project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
-            project_ids = []
-            for qs in project_location_qs:
-                if qs['geometry'].within(polygon):
-                    project_ids.append(qs['project'])
-            queryset = queryset.filter(id__in=project_ids)
-        '''search by a key'''
-        search_key = request.query_params.get('search_key', None)
-        if search_key and search_key != "":
-            search_fields = ['name', 'state__name', 'country__name']
-            filter_kwargs = {}
-            for field in search_fields:
-                filter_kwargs[field+'__icontains'] = search_key
-            list_of_Q = [Q(**{key: val})
-                            for key, val in filter_kwargs.items()]
-            queryset = queryset.filter(
-                reduce(operator.or_, list_of_Q)) if search_fields else queryset
-        '''paginate queryset'''
-        paginated_queryset = paginator.paginate_queryset(queryset, request)
-        serializer = self.get_serializer(paginated_queryset, many=True)
-        return paginator.get_paginated_response(data=serializer.data)
+        try:
+            paginator = CustomPageNumberPagination()
+            organization_id = request.query_params.get('organization', None)
+            queryset = self.queryset
+            '''filter by organization id'''
+            if organization_id and organization_id != "":
+                if not Organization.active.filter(id=organization_id).exists():
+                    return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
+                queryset = queryset.select_related("organization").filter(organization__id=organization_id)
+            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+            user_role_list = userrole_qs.values_list('group__id', flat=True)
+            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+                '''all projects visible if the user has web app administrator role'''
+                queryset = queryset
+            else:
+                userrole_qs = userrole_qs.filter(organization__id=organization_id)
+                '''now retrieve a list of group the user has been into inside the organization'''
+                user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+                if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+                    '''all projects visible if the user has organization admin role amongst his roles'''
+                    queryset = queryset
+                else:
+                    '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
+                    user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
+                    queryset = queryset.filter(id__in=user_org_proj_list)
+            state = request.query_params.get('state', None)
+            country = request.query_params.get('country', None)
+            polygon_wkt = request.query_params.get('polygon_wkt', None)
+            '''filter by state'''
+            if state and state != "":
+                queryset = queryset.filter(state__id=state)
+                '''filter by country or polygon wkt'''
+            elif country and country != "":
+                queryset = queryset.filter(country__id=country)
+                '''filter by polygon wkt'''
+            elif polygon_wkt and polygon_wkt != "":
+                polygon = GEOSGeometry(polygon_wkt)
+                organization_project_list = queryset.values_list('id', flat=True)
+                project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
+                project_ids = []
+                for qs in project_location_qs:
+                    if qs['geometry'].within(polygon):
+                        project_ids.append(qs['project'])
+                queryset = queryset.filter(id__in=project_ids)
+            '''search by a key'''
+            search_key = request.query_params.get('search_key', None)
+            if search_key and search_key != "":
+                search_fields = ['name', 'state__name', 'country__name']
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs[field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            '''paginate queryset'''
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True)
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as error:
+            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
@@ -561,7 +630,7 @@ class DocumentViewset(viewsets.ModelViewSet):
     }
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-    
+
     def create(self, request, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/'''
         try:
@@ -579,7 +648,7 @@ class DocumentViewset(viewsets.ModelViewSet):
         except Exception as e:
             Document.objects.get(id=created_object.id).delete()
             return Response(data='Error: '+str(e))
-    
+
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/2/'''
         try:
@@ -653,7 +722,7 @@ class RequestDemoViewset(viewsets.ModelViewSet):
     queryset = RequestDemo.objects.all()
     serializer_class = RequestDemoSerializer
     http_method_names = ['get', 'post']
-    
+
     def get_permissions(self):
         if self.action == 'list' or self.action == 'retrieve':
             permission_classes = [IsAuthenticated]

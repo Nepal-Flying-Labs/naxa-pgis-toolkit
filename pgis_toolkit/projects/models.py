@@ -2,21 +2,22 @@ from django.conf import settings
 # from django.contrib import admin
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
-from django.utils.translation import ugettext_lazy as _
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.utils.translation import ugettext_lazy as _
 
 from pgis_toolkit.utils.constants import (
+    CURRENT_YEAR,
     DATA_TYPE_CHOICES,
     FILE_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
+    PUBLISHED_MONTH_CHOICES,
     UNIT_CHOICES,
-    PUBLISHED_MONTH_CHOICES, CURRENT_YEAR
 )
+from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
 from .utils.managers import ActiveManager
-from pgis_toolkit.utils.make_thumbnail import make_thumbnail
 
 # class Organization(models.Model):
 #     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -80,7 +81,7 @@ class Organization(IsDeleted,DateTimeStamp):
         app_label = 'projects'
 
     def __str__(self):
-        return f'{self.name}'
+        return f'{self.id} {self.name}'
 
     def clean(self):
         """
@@ -143,7 +144,7 @@ class Project(IsDeleted,DateTimeStamp):
         app_label = 'projects'
 
     def __str__(self):
-        return f'{self.name}'
+        return f'{self.id} {self.name}'
 
     def clean(self):
         """
@@ -251,6 +252,6 @@ class RequestDemo(DateTimeStamp):
 class RequestDemoAlert(models.Model):
     name = models.CharField(max_length=254, blank=True, null=True)
     email = models.EmailField(max_length=254)
-    
+
     class Meta:
         app_label = 'projects'
