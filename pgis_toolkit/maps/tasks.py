@@ -28,8 +28,8 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
+from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.layer_upload import (
-    clear_dir,
     handleCSV,
     handleGeoJSON,
     handleGPX,
