@@ -47,11 +47,11 @@ LOCALE_PATHS = [str(ROOT_DIR / "locale")]
 DATABASES = {
     'default': {
         'ENGINE':'django.contrib.gis.db.backends.postgis',
-        'NAME':'pgis_toolkit',
-        'USER':'xIDokAfQUYOjTGhErprxMHnjZTJXMloY',
-        'PASSWORD':'gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52',
-        'PORT':'5432',
-        'HOST':'postgres',
+        'NAME':env('POSTGRES_DB',default="pgis_toolkit"),
+        'USER':env('POSTGRES_USER',default='xIDokAfQUYOjTGhErprxMHnjZTJXMloY'),
+        'PASSWORD':env('POSTGRES_PASSWORD',default='gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52'),
+        'PORT':env('POSTGRES_PORT',default='5432'),
+        'HOST':env('POSTGRES_HOST',default='postgres'),
 }
 }
 
@@ -86,7 +86,7 @@ THIRD_PARTY_APPS = [
     "crispy_bootstrap5",
     "allauth",
     "allauth.account",
-    "allauth.socialaccount",
+    # "allauth.socialaccount",
     "rest_framework",
     "rest_framework.authtoken",
     'rest_framework_simplejwt',
