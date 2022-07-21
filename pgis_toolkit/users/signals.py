@@ -18,7 +18,7 @@ def post_save_user(sender, created, instance,**kwargs):
     This signal is to hash the password of a user once created.'''
     errors = []
     try:
-        if created:
+        if created and instance.is_superuser != True:
             instance.password = make_password(instance.password)
             instance.save()
             return Response(status=status.HTTP_200_OK, data={"Message": "Password hashing successful!"})
