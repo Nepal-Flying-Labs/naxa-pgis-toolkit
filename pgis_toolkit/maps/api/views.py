@@ -25,7 +25,6 @@ from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
-from pgis_toolkit.maps.functions import advance_filter_data, clear_dir, get_style_detail
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
@@ -58,6 +57,9 @@ from pgis_toolkit.maps.tasks import (
     UploadVectorLayer,
     UploadWMSLayer,
 )
+from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
+from pgis_toolkit.maps.utils.functions import clear_dir
+from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
