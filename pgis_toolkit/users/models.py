@@ -57,8 +57,8 @@ class User(IsDeleted, AbstractUser):
             if not make_thumbnail(self.image, self.image_thumbnail):
                 raise Exception(
                     'Could not create thumbnail- is the file type is valid')
-        if self.password:
-            self.password=make_password(self.password)
+        # if self.password:
+        #     self.password=make_password(self.password)
         super(User, self).save(*args, **kwargs)
 
     # @property
