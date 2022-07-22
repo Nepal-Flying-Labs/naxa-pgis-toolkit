@@ -335,24 +335,27 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if not Organization.active.filter(id=organization_id).exists():
                     return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
                 queryset = queryset.select_related("organization").filter(organization__id=organization_id)
-            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
-            user_role_list = userrole_qs.values_list('group__id', flat=True)
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                '''all projects visible if the user has web app administrator role'''
+            if request.user.is_superuser:
                 queryset = queryset
-            else:
-                userrole_qs = userrole_qs.filter(organization__id=organization_id)
-                '''now retrieve a list of group the user has been into inside the organization'''
-                user_org_role_list = userrole_qs.values_list('group__id', flat=True)
-                if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
-                    '''all projects visible if the user has organization admin role amongst his roles'''
+            elif UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+                userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+                user_role_list = userrole_qs.values_list('group__id', flat=True)
+                if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+                    '''all projects visible if the user has web app administrator role'''
                     queryset = queryset
                 else:
-                    '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
-                    user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
-                    queryset = queryset.filter(id__in=user_org_proj_list)
+                    userrole_qs = userrole_qs.filter(organization__id=organization_id)
+                    '''now retrieve a list of group the user has been into inside the organization'''
+                    user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+                    if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+                        '''all projects visible if the user has organization admin role amongst his roles'''
+                        queryset = queryset
+                    else:
+                        '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
+                        user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
+                        queryset = queryset.filter(id__in=user_org_proj_list)
+            else:
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             state = request.query_params.get('state', None)
             country = request.query_params.get('country', None)
             polygon_wkt = request.query_params.get('polygon_wkt', None)
