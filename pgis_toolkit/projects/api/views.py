@@ -34,6 +34,7 @@ from pgis_toolkit.projects.models import (
     ProjectLocationFeatureCollection,
     RequestDemo,
 )
+from pgis_toolkit.projects.permissions import OrganizationCategoryPermission
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -48,6 +49,7 @@ env = environ.Env()
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [OrganizationCategoryPermission]
     default_serializer_class = OrganizationCategorySerializer
     serializer_classes = {
         'list': OrganizationCategoryListSerializer,
