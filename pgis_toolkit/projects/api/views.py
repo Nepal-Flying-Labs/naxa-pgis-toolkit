@@ -34,7 +34,10 @@ from pgis_toolkit.projects.models import (
     ProjectLocationFeatureCollection,
     RequestDemo,
 )
-from pgis_toolkit.projects.permissions import OrganizationCategoryPermission
+from pgis_toolkit.projects.permissions import (
+    DocumentPermission,
+    OrganizationCategoryPermission,
+)
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -633,6 +636,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
     http_method_names=['get', 'post', 'patch']
+    permission_classes = [DocumentPermission]
     default_serializer_class = DocumentSerializer
     serializer_classes = {
         'list': DocumentListSerializer,
