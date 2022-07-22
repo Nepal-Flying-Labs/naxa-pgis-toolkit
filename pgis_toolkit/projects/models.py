@@ -237,6 +237,9 @@ class Document(DateTimeStamp):
     class Meta:
         app_label = 'projects'
         unique_together = (("project", "name"),)
+        permissions = (
+            ('download_document', 'Can download the document'),
+        )
 
 class RequestDemo(DateTimeStamp):
     full_name = models.CharField(max_length=254)

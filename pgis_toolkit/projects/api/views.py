@@ -34,7 +34,11 @@ from pgis_toolkit.projects.models import (
     ProjectLocationFeatureCollection,
     RequestDemo,
 )
-from pgis_toolkit.projects.permissions import OrganizationCategoryPermission
+from pgis_toolkit.projects.permissions import (
+    DocumentDownloadPermission,
+    DocumentPermission,
+    OrganizationCategoryPermission,
+)
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -633,6 +637,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
     http_method_names=['get', 'post', 'patch']
+    permission_classes = [DocumentPermission]
     default_serializer_class = DocumentSerializer
     serializer_classes = {
         'list': DocumentListSerializer,
@@ -708,6 +713,7 @@ class DocumentViewset(viewsets.ModelViewSet):
 
 '''download document of a project'''
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, DocumentDownloadPermission])
 def document_download(request):
     '''http://localhost:8000/api/projects/document_download/?document=1'''
     try:
@@ -717,6 +723,8 @@ def document_download(request):
         if not Document.objects.filter(id=document).exists():
             return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
         document_instance = Document.objects.get(id=document)
+        if not document_instance.file:
+            return Response(data={'message': 'The document you are trying to download has no file.'}, status=status.HTTP_404_NOT_FOUND)
         document_extension = str(document_instance.file).split('.')[1]
         document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
         document_file = open(document_url, 'rb')
