@@ -81,19 +81,22 @@ class OrganizationViewset(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         try:
             paginator = CustomPageNumberPagination()
-            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
-            queryset = self.queryset
-            user_role_list = userrole_qs.values_list('group__id', flat=True)
-            '''filter organization list according to the role of the user.'''
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                '''web app administrator can view all organization'''
-                queryset = queryset
+            if request.user.is_superuser:
+                queryset = self.queryset
+            elif UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+                userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+                queryset = self.queryset
+                user_role_list = userrole_qs.values_list('group__id', flat=True)
+                '''filter organization list according to the role of the user.'''
+                if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+                    '''web app administrator can view all organization'''
+                    queryset = queryset
+                else:
+                    '''other user can view only the organizations they are involved in'''
+                    user_org_list = userrole_qs.values_list('organization__id', flat=True)
+                    queryset = queryset.filter(id__in=user_org_list)
             else:
-                '''other user can view only the organizations they are involved in'''
-                user_org_list = userrole_qs.values_list('organization__id', flat=True)
-                queryset = queryset.filter(id__in=user_org_list)
+                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             search_key = request.query_params.get('search', None)
             order_by = request.query_params.get('ordering', None)
             queryset = queryset.filter(name__icontains=search_key) if search_key and search_key != "" else queryset
