@@ -32,9 +32,9 @@ def handleProjectGeoJSON(project_id):
             epsg = 4326
         geometry_type = gdf['geometry'].iloc[0].geom_type
         total_bounds = gdf.total_bounds
-        bound_dict = {"total_bounds": total_bounds.tolist()}
+        # bound_dict = {"total_bounds": total_bounds.tolist()}
         project_obj.geometry_type = geometry_type
-        project_obj.bbox = bound_dict
+        project_obj.bbox = total_bounds.tolist()
         project_obj.save()
         for index, row in gdf.iterrows():
             dropped_geometry = row.drop(["geometry"])
@@ -65,9 +65,9 @@ def handleProjectShapeFile(project_id):
         gdf = gpd.read_file(shape)
         geometry_type = gdf['geometry'].iloc[0].geom_type
         total_bounds = gdf.total_bounds
-        bound_dict = {"total_bounds": total_bounds.tolist()}
+        # bound_dict = {"total_bounds": total_bounds.tolist()}
         project_obj.geometry_type = geometry_type
-        project_obj.bbox = bound_dict
+        project_obj.bbox = total_bounds.tolist()
         project_obj.save()
         crs_name = str(gdf.crs.srs)
         epsg = int(crs_name.replace("epsg:", ""))

@@ -325,9 +325,14 @@ class ProjectViewset(viewsets.ModelViewSet):
                         project.file.delete(save=True)
                         wkt_name = request_dict['location_wkt']
                         wkt_list = json.loads(request_dict['location_wkt'])
-                        for geom in wkt_list:
+                        merged_geom = GEOSGeometry(wkt_list[0])
+                        for wkt in wkt_list:
+                            geom = GEOSGeometry(wkt)
                             ProjectLocationFeatureCollection.active.create(project=project,
-                                                                            geometry=GEOSGeometry(geom))
+                                                                            geometry=geom)
+                            merged_geom = merged_geom.union(geom)
+                        project.bbox = merged_geom.extent
+                        project.save()
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
