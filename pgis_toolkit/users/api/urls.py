@@ -13,6 +13,7 @@ from .views import (
     UserPermissionViewSet,
     UserRoleUpdateView,
     UserViewSet,
+    set_csrf_token,
     user_group_list,
 )
 
@@ -36,4 +37,6 @@ urlpatterns = [
     path('change_password/', ChangePasswordView.as_view(), name='password_change'),
     path('userrole_update/<int:pk>/', UserRoleUpdateView.as_view(), name='update_userrole'),
     # path('deactivate/', DeactivateUserRoleView.as_view(), name='deactivate_userrole'),
+    path('set_csrf/', set_csrf_token, name='Set-CSRF'),
+
 ]
