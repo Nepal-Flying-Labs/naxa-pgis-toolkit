@@ -10,16 +10,20 @@ import environ
 import fiona
 import geopandas as gpd
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
 
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
@@ -49,7 +53,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
 env = environ.Env()
-
+User = get_user_model()
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
     http_method_names = ['get', 'post', 'patch']
@@ -585,25 +589,64 @@ class LayerTemplateUploadAPIView(APIView):
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-    # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
-
+    # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
+    permission_classes = [IsAuthenticated, IsTaskAuthorized]
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'geometry', 'attributes')
 
     def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        # user_id = request.user.id
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if User.active.filter(id=user_id).exists():
+            user = User.active.get(id=user_id)
+        else:
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
         '''filter by organization'''
-        if 'organization_id' not in request_keys or request.GET['organization_id'] == "":
+        if 'organization' not in request_keys or request.GET['organization'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        organization_id = request.GET['organization_id']
+        organization_id = request.GET['organization']
         if not Organization.active.filter(id=organization_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
+        '''superuser gets to see all project sites'''
+        if user.is_superuser == True:
+            print('reached here!')
+            organization_project_qs = organization_project_qs
+            print(organization_project_qs, "is organization_project_qs")
+        elif UserRole.active.filter(Q(user=user_id) & Q(active=True)).exists():
+            userrole_qs = UserRole.active.filter(Q(user=user_id) & Q(active=True))
+            user_role_list = userrole_qs.values_list('group__id', flat=True)
+            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+                '''all projects visible if the user has web app administrator role'''
+                organization_project_qs = organization_project_qs
+            else:
+                userrole_qs = userrole_qs.filter(organization__id=organization_id)
+                '''now retrieve a list of group the user has been into inside the organization'''
+                user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+                if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+                    '''all projects visible if the user has organization admin role amongst his roles'''
+                    organization_project_qs = organization_project_qs
+                else:
+                    '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
+                    user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
+                    organization_project_qs = organization_project_qs.filter(id__in=user_org_proj_list)
+        else:
+            return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
         '''search_key'''
-        if 'search_key' in request_keys and request.GET['search_key'] != "":
-            search_key = request.GET['search_key']
+        if 'search' in request_keys and request.GET['search'] != "":
+            search_key = request.GET['search']
             search_fields = ['name', 'state__name', 'country__name']
             filter_kwargs = {}
             for field in search_fields:
@@ -637,7 +680,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
     http_method_names=['get', 'post', 'patch']
-    permission_classes = [DocumentPermission]
+    permission_classes = [IsAuthenticated, DocumentPermission]
     default_serializer_class = DocumentSerializer
     serializer_classes = {
         'list': DocumentListSerializer,
