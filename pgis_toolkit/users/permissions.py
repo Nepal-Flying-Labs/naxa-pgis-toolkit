@@ -58,6 +58,13 @@ class IsTaskAuthorized(BasePermission):
                         return True
                     elif action=="retrieve" and "view_organization" in permission_list:
                         return True
+                elif admin_level_role:
+                    if action=="create" and "add_organization" and "add_project" in permission_list:
+                        return True
+                    elif action=="partial_update" and "change_organization" and "change_project" in permission_list:
+                        return True
+                    elif action=="retrieve" and "view_organization" and "view_project" in permission_list:
+                        return True
             return False
             # group_ids = userrole_qs.values_list('group__id', flat=True)
             # if request.user.is_superuser:
