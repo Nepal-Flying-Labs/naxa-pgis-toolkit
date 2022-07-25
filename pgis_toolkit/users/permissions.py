@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import BasePermission
 
+from pgis_toolkit.projects.models import Project
 from pgis_toolkit.users.models import UserRole
 
 # from users.models import User
@@ -40,7 +41,11 @@ class IsTaskAuthorized(BasePermission):
                 group_id=org_level_role[0]['group']
             elif admin_level_role:
                 group_id=admin_level_role[0]['group']
-
+                '''for organization admin who do not have any project role'''
+            if not group_id and 'project' in url and pk :
+                organization = Project.active.get(id=pk).organization
+                org_level_role=user_role_qs.filter(organization=organization,project=None).values('group')
+                group_id=org_level_role[0]['group']
             if group_id:
                 permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
                 permission_list=[data['codename'] for data in permission_qs]
@@ -113,6 +118,11 @@ class IsAuthorizedInviter(BasePermission):
                 group_id=org_level_role[0]['group']
             elif admin_level_role:
                 group_id=admin_level_role[0]['group']
+                '''for organization admin who do not have any project role'''
+            if not group_id and 'project' in request_keys and request.data['project'] != "" :
+                organization = Project.active.get(id=request.data['project']).organization
+                org_level_role=user_role_qs.filter(organization=organization,project=None).values('group')
+                group_id=org_level_role[0]['group']
             if group_id:
                 if 'group' in request_keys and request.data['group'] != "":
                     if check_invitation_hierarchy(group_id, int(request.data['group'])) == False:

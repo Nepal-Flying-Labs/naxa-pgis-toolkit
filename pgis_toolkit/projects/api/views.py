@@ -10,16 +10,20 @@ import environ
 import fiona
 import geopandas as gpd
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
 
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
@@ -39,6 +43,7 @@ from pgis_toolkit.projects.permissions import (
     DocumentPermission,
     OrganizationCategoryPermission,
 )
+from pgis_toolkit.projects.utils.get_project_queryset import get_project_queryset
 from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectGeoJSON,
     handleProjectShapeFile,
@@ -49,7 +54,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
 env = environ.Env()
-
+User = get_user_model()
 class OrganizationCategoryViewset(viewsets.ModelViewSet):
     queryset = OrganizationCategory.active.all()
     http_method_names = ['get', 'post', 'patch']
@@ -320,9 +325,14 @@ class ProjectViewset(viewsets.ModelViewSet):
                         project.file.delete(save=True)
                         wkt_name = request_dict['location_wkt']
                         wkt_list = json.loads(request_dict['location_wkt'])
-                        for geom in wkt_list:
+                        merged_geom = GEOSGeometry(wkt_list[0])
+                        for wkt in wkt_list:
+                            geom = GEOSGeometry(wkt)
                             ProjectLocationFeatureCollection.active.create(project=project,
-                                                                            geometry=GEOSGeometry(geom))
+                                                                            geometry=geom)
+                            merged_geom = merged_geom.union(geom)
+                        project.bbox = merged_geom.extent
+                        project.save()
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -331,48 +341,73 @@ class ProjectViewset(viewsets.ModelViewSet):
             return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
-        '''http://localhost:8000/api/projects/project/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search_key=ggg'''
+        '''http://localhost:8000/api/projects/project/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))&search=ggg'''
         try:
             paginator = CustomPageNumberPagination()
             organization_id = request.query_params.get('organization', None)
-            queryset = self.queryset
-            '''filter by organization id'''
-            if organization_id and organization_id != "":
-                if not Organization.active.filter(id=organization_id).exists():
-                    return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
-                queryset = queryset.select_related("organization").filter(organization__id=organization_id)
-            if request.user.is_superuser:
-                queryset = queryset
-            elif UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
-                userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
-                user_role_list = userrole_qs.values_list('group__id', flat=True)
-                if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                    '''all projects visible if the user has web app administrator role'''
-                    queryset = queryset
-                else:
-                    userrole_qs = userrole_qs.filter(organization__id=organization_id)
-                    '''now retrieve a list of group the user has been into inside the organization'''
-                    user_org_role_list = userrole_qs.values_list('group__id', flat=True)
-                    if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
-                        '''all projects visible if the user has organization admin role amongst his roles'''
-                        queryset = queryset
-                    else:
-                        '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
-                        user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
-                        queryset = queryset.filter(id__in=user_org_proj_list)
-            else:
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            state = request.query_params.get('state', None)
-            country = request.query_params.get('country', None)
+            # queryset = self.queryset
+
+            # '''filter by organization id'''
+            # if organization_id and organization_id != "":
+            #     if not Organization.active.filter(id=organization_id).exists():
+            #         return Response(data={'message': 'Invalid organization id!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     queryset = queryset.select_related("organization").filter(organization__id=organization_id)
+            # if request.user.is_superuser:
+            #     queryset = queryset
+            # elif UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+            #     userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+            #     user_role_list = userrole_qs.values_list('group__id', flat=True)
+            #     if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+            #         '''all projects visible if the user has web app administrator role'''
+            #         queryset = queryset
+            #     else:
+            #         userrole_qs = userrole_qs.filter(organization__id=organization_id)
+            #         '''now retrieve a list of group the user has been into inside the organization'''
+            #         user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+            #         if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+            #             '''all projects visible if the user has organization admin role amongst his roles'''
+            #             queryset = queryset
+            #         else:
+            #             '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
+            #             user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
+            #             queryset = queryset.filter(id__in=user_org_proj_list)
+            # else:
+            #     return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            # state = request.query_params.get('state', None)
+            # country = request.query_params.get('country', None)
+            # '''filter by state'''
+            # if state and state != "":
+            #     queryset = queryset.filter(state__id=state)
+            #     '''filter by country or polygon wkt'''
+            # elif country and country != "":
+            #     queryset = queryset.filter(country__id=country)
+            #     '''filter by polygon wkt'''
+            # elif polygon_wkt and polygon_wkt != "":
+            #     polygon = GEOSGeometry(polygon_wkt)
+            #     organization_project_list = queryset.values_list('id', flat=True)
+            #     project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
+            #     project_ids = []
+            #     for qs in project_location_qs:
+            #         if qs['geometry'].within(polygon):
+            #             project_ids.append(qs['project'])
+            #     queryset = queryset.filter(id__in=project_ids)
+            # '''search by a key'''
+            # search_key = request.query_params.get('search', None)
+            # if search_key and search_key != "":
+            #     search_fields = ['name', 'state__name', 'country__name']
+            #     filter_kwargs = {}
+            #     for field in search_fields:
+            #         filter_kwargs[field+'__icontains'] = search_key
+            #     list_of_Q = [Q(**{key: val})
+            #                     for key, val in filter_kwargs.items()]
+            #     queryset = queryset.filter(
+            #         reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            queryset = get_project_queryset(request, request.user)
+            if isinstance(queryset, dict) and 'error' in queryset.keys():
+                return Response(data=queryset, status=status.HTTP_400_BAD_REQUEST)
+            '''filter by polygon_wkt'''
             polygon_wkt = request.query_params.get('polygon_wkt', None)
-            '''filter by state'''
-            if state and state != "":
-                queryset = queryset.filter(state__id=state)
-                '''filter by country or polygon wkt'''
-            elif country and country != "":
-                queryset = queryset.filter(country__id=country)
-                '''filter by polygon wkt'''
-            elif polygon_wkt and polygon_wkt != "":
+            if polygon_wkt and polygon_wkt != "":
                 polygon = GEOSGeometry(polygon_wkt)
                 organization_project_list = queryset.values_list('id', flat=True)
                 project_location_qs = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list).values('id', 'project', 'geometry')
@@ -381,17 +416,6 @@ class ProjectViewset(viewsets.ModelViewSet):
                     if qs['geometry'].within(polygon):
                         project_ids.append(qs['project'])
                 queryset = queryset.filter(id__in=project_ids)
-            '''search by a key'''
-            search_key = request.query_params.get('search_key', None)
-            if search_key and search_key != "":
-                search_fields = ['name', 'state__name', 'country__name']
-                filter_kwargs = {}
-                for field in search_fields:
-                    filter_kwargs[field+'__icontains'] = search_key
-                list_of_Q = [Q(**{key: val})
-                                for key, val in filter_kwargs.items()]
-                queryset = queryset.filter(
-                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
             '''paginate queryset'''
             paginated_queryset = paginator.paginate_queryset(queryset, request)
             serializer = self.get_serializer(paginated_queryset, many=True)
@@ -585,45 +609,90 @@ class LayerTemplateUploadAPIView(APIView):
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
-    # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization_id=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
-
+    # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
+    # permission_classes = [IsAuthenticated, IsTaskAuthorized]
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'geometry', 'attributes')
 
     def get(self, request, *args, **kwargs):
-        if not request.GET.keys():
+        '''Authentication'''
+        # user_id = request.user.id
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if User.active.filter(id=user_id).exists():
+            user = User.active.get(id=user_id)
+        else:
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        ############################################################
+        # if not request.GET.keys():
+        #     return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        # request_keys = request.GET.keys()
+        # '''filter by organization'''
+        # if 'organization' not in request_keys or request.GET['organization'] == "":
+        #     return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        # organization_id = request.GET['organization']
+        # if not Organization.active.filter(id=organization_id).exists():
+        #     return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        # organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
+        # '''superuser gets to see all project sites'''
+        # if user.is_superuser == True:
+        #     print('reached here!')
+        #     organization_project_qs = organization_project_qs
+        #     print(organization_project_qs, "is organization_project_qs")
+        # elif UserRole.active.filter(Q(user=user_id) & Q(active=True)).exists():
+        #     userrole_qs = UserRole.active.filter(Q(user=user_id) & Q(active=True))
+        #     user_role_list = userrole_qs.values_list('group__id', flat=True)
+        #     if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+        #         '''all projects visible if the user has web app administrator role'''
+        #         organization_project_qs = organization_project_qs
+        #     else:
+        #         userrole_qs = userrole_qs.filter(organization__id=organization_id)
+        #         '''now retrieve a list of group the user has been into inside the organization'''
+        #         user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+        #         if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+        #             '''all projects visible if the user has organization admin role amongst his roles'''
+        #             organization_project_qs = organization_project_qs
+        #         else:
+        #             '''for user other than organization admin and pgis web administrator, projects are restricted only to the ones they work for.'''
+        #             user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
+        #             organization_project_qs = organization_project_qs.filter(id__in=user_org_proj_list)
+        # else:
+        #     return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+        # '''search_key'''
+        # if 'search' in request_keys and request.GET['search'] != "":
+        #     search_key = request.GET['search']
+        #     search_fields = ['name', 'state__name', 'country__name']
+        #     filter_kwargs = {}
+        #     for field in search_fields:
+        #         filter_kwargs[field+'__icontains'] = search_key
+        #     list_of_Q = [Q(**{key: val})
+        #                     for key, val in filter_kwargs.items()]
+        #     organization_project_qs = organization_project_qs.filter(
+        #         reduce(operator.or_, list_of_Q)) if search_fields else organization_project_qs
+        # '''filter by state'''
+        # if 'state' in request_keys and request.GET['state'] != "":
+        #     state = request.GET['state']
+        #     organization_project_qs = organization_project_qs.filter(state__id=state)
+        #     '''filter by state'''
+        # elif 'country' in request_keys and request.GET['country'] != "":
+        #     country = request.GET['country']
+        #     organization_project_qs = organization_project_qs.filter(country__id=country)
+        # organization_project_list = organization_project_qs.values_list('id', flat=True)
+        #################################################################################
+        organization_project_qs = get_project_queryset(request, user)
+        if isinstance(organization_project_qs, dict) and 'error' in organization_project_qs.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        request_keys = request.GET.keys()
-        '''filter by organization'''
-        if 'organization_id' not in request_keys or request.GET['organization_id'] == "":
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        organization_id = request.GET['organization_id']
-        if not Organization.active.filter(id=organization_id).exists():
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
-        '''search_key'''
-        if 'search_key' in request_keys and request.GET['search_key'] != "":
-            search_key = request.GET['search_key']
-            search_fields = ['name', 'state__name', 'country__name']
-            filter_kwargs = {}
-            for field in search_fields:
-                filter_kwargs[field+'__icontains'] = search_key
-            list_of_Q = [Q(**{key: val})
-                            for key, val in filter_kwargs.items()]
-            organization_project_qs = organization_project_qs.filter(
-                reduce(operator.or_, list_of_Q)) if search_fields else organization_project_qs
-        '''filter by state'''
-        if 'state' in request_keys and request.GET['state'] != "":
-            state = request.GET['state']
-            organization_project_qs = organization_project_qs.filter(state__id=state)
-            '''filter by state'''
-        elif 'country' in request_keys and request.GET['country'] != "":
-            country = request.GET['country']
-            organization_project_qs = organization_project_qs.filter(country__id=country)
         organization_project_list = organization_project_qs.values_list('id', flat=True)
         queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
         '''filter by polygon_wkt'''
-        if 'polygon_wkt' in request_keys and request.GET['polygon_wkt'] != "":
+        if 'polygon_wkt' in request.GET.keys() and request.GET['polygon_wkt'] != "":
             polygon_wkt = request.GET['polygon_wkt']
             polygon = GEOSGeometry(polygon_wkt)
             project_location_ids = []
@@ -637,7 +706,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
     http_method_names=['get', 'post', 'patch']
-    permission_classes = [DocumentPermission]
+    permission_classes = [IsAuthenticated, DocumentPermission]
     default_serializer_class = DocumentSerializer
     serializer_classes = {
         'list': DocumentListSerializer,
