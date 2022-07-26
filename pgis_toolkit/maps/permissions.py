@@ -9,6 +9,7 @@ from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
     LayerGroup,
+    ProjectStyle,
     SubLayer,
     Theme,
 )
@@ -20,10 +21,10 @@ User = get_user_model()
 env = environ.Env()
 
 def get_user_group(user_id,organization_id,project_id):
-    user_role_qs=UserRole.active.select_related('organization','group','user','project')
-    admin_level_role=user_role_qs.filter(user=user_id,organization=None,project=None).values('group')
-    org_level_role=user_role_qs.filter(user=user_id,organization=organization_id,project=None).values('group')
-    project_level_role=user_role_qs.filter(user=user_id,organization=organization_id,project=project_id).values('group')
+    user_role_qs=UserRole.active.select_related('organization','group','user','project').filter(user=user_id)
+    admin_level_role=user_role_qs.filter(organization=None,project=None).values('group')
+    org_level_role=user_role_qs.filter(organization=organization_id,project=None).values('group')
+    project_level_role=user_role_qs.filter(organization=organization_id,project=project_id).values('group')
     group_id=None
     if project_level_role:
         group_id=project_level_role[0]['group']
@@ -33,7 +34,10 @@ def get_user_group(user_id,organization_id,project_id):
         group_id=admin_level_role[0]['group']
     return group_id
 
-
+def get_permission_list(group_id):
+    permission_qs = Group.objects.get(id=group_id).permissions.all().values('codename')
+    permission_list = [data['codename'] for data in permission_qs]
+    return permission_list
 
 class LayerPermission(BasePermission):
     """
@@ -59,8 +63,7 @@ class LayerPermission(BasePermission):
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
-                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
-                permission_list=[data['codename'] for data in permission_qs]
+                permission_list=get_permission_list(group_id)
                 if action=="create" and "add_layer" in permission_list:
                     return True
                 elif action=="partial_update" and "change_layer" in permission_list:
@@ -69,7 +72,7 @@ class LayerPermission(BasePermission):
                     return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            print("Error occured in LayerPermission Check. Error Details: ", str(e))
             return False
 
 class SubLayerPermission(BasePermission):
@@ -94,8 +97,7 @@ class SubLayerPermission(BasePermission):
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
-                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
-                permission_list=[data['codename'] for data in permission_qs]
+                permission_list=get_permission_list(group_id)
                 if action=="list" and "view_sublayer" in permission_list:
                     return True
                 elif action=="partial_update" and "change_sublayer" in permission_list:
@@ -104,7 +106,7 @@ class SubLayerPermission(BasePermission):
                     return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            print("Error occured in SubLayerPermission Check. Error Details: ", str(e))
             return False
 
 class FeatureCollectionPermission(BasePermission):
@@ -135,8 +137,7 @@ class FeatureCollectionPermission(BasePermission):
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
-                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
-                permission_list=[data['codename'] for data in permission_qs]
+                permission_list=get_permission_list(group_id)
                 if action=="list" and "view_featurecollection" in permission_list:
                     return True
                 elif action=="create" and "add_featurecollection" in permission_list:
@@ -147,7 +148,7 @@ class FeatureCollectionPermission(BasePermission):
                     return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            print("Error occured in FeatureCollectionPermission Check. Error Details: ", str(e))
             return False
 
 class ThemePermission(BasePermission):
@@ -177,8 +178,7 @@ class ThemePermission(BasePermission):
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
-                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
-                permission_list=[data['codename'] for data in permission_qs]
+                permission_list=get_permission_list(group_id)
                 if action=="list" and "view_theme" in permission_list:
                     return True
                 elif action=="create" and "add_theme" in permission_list:
@@ -189,7 +189,7 @@ class ThemePermission(BasePermission):
                     return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            print("Error occured in ThemePermission Check. Error Details: ", str(e))
             return False
 
 
@@ -201,7 +201,6 @@ class LayerGroupPermission(BasePermission):
     def has_permission(self, request, view):
         try:
             action = view.action
-            print(action,"action")
             user_id=request.user.id
             if request.user.is_superuser:
                 return True
@@ -224,8 +223,7 @@ class LayerGroupPermission(BasePermission):
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
-                permission_qs= Group.objects.get(id=group_id).permissions.all().values('codename')
-                permission_list=[data['codename'] for data in permission_qs]
+                permission_list=get_permission_list(group_id)
                 if action=="list" and "view_layergroup" in permission_list:
                     return True
                 elif action=="create" and "add_layergroup" in permission_list:
@@ -236,5 +234,57 @@ class LayerGroupPermission(BasePermission):
                     return True
             return False
         except Exception as e:
-            print("Error occured in IsTaskAuthorized Permission Check. Error Details: ", str(e))
+            print("Error occured in LayerGroupPermission Check. Error Details: ", str(e))
+            return False
+
+# class StandardIconPermission(BasePermission):
+#     '''Permission check  for Standard Icon'''
+#     def has_permission(self, request, view):
+#         if request.user.is_superuser:
+#             return True
+#         user_role_qs = UserRole.active.filter(user=request.user, active=True)
+#         return False
+
+class ProjectStylePermission(BasePermission):
+    """
+    Permission check for ProjectStyle
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            print(action, type(action), "is action")
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                project_id=request.query_params.get("project")
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action in ['retrieve','partial_update']:
+                project_style_id=request.resolver_match.kwargs.get('pk')
+                print(project_style_id, "is project style")
+                project_id=ProjectStyle.active.get(id=project_style_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action=="create":
+                project_id=request.data.get("project",None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if action=="list" and "view_projectstyle" in permission_list:
+                    return True
+                elif action=="create" and "add_projectstyle" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_projectstyle" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_projectstyle" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectStylePermission Check. Error Details: ", str(e))
             return False

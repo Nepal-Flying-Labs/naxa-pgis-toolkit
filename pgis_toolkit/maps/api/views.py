@@ -47,6 +47,7 @@ from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
     LayerGroupPermission,
     LayerPermission,
+    ProjectStylePermission,
     SubLayerPermission,
     ThemePermission,
 )
@@ -106,6 +107,7 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectStyle.active.all()
     http_method_names = ['get','post','patch']
+    permission_classes = [ProjectStylePermission]
     default_serializer_class = ProjectStyleSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
@@ -130,7 +132,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     Viewset for multiple project style
     '''
     queryset = LayerAttribute.objects.all()
-    http_method_names = ['get','post','patch']
+    http_method_names = ['get']
     default_serializer_class = LayerAttributeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )
@@ -150,7 +152,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-
+#not in use
 @api_view(['GET'])
 def project_layers(request,id):
     '''
