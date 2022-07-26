@@ -45,6 +45,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    LayerAttributePermission,
     LayerGroupPermission,
     LayerPermission,
     ProjectStylePermission,
@@ -129,10 +130,11 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
 
 class LayerAttributeViewset(viewsets.ModelViewSet):
     '''
-    Viewset for multiple project style
+    Viewset for Layer Attribute
     '''
     queryset = LayerAttribute.objects.all()
     http_method_names = ['get']
+    permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )

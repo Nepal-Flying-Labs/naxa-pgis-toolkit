@@ -8,6 +8,7 @@ from rest_framework.permissions import BasePermission
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
+    LayerAttribute,
     LayerGroup,
     ProjectStyle,
     SubLayer,
@@ -237,14 +238,6 @@ class LayerGroupPermission(BasePermission):
             print("Error occured in LayerGroupPermission Check. Error Details: ", str(e))
             return False
 
-# class StandardIconPermission(BasePermission):
-#     '''Permission check  for Standard Icon'''
-#     def has_permission(self, request, view):
-#         if request.user.is_superuser:
-#             return True
-#         user_role_qs = UserRole.active.filter(user=request.user, active=True)
-#         return False
-
 class ProjectStylePermission(BasePermission):
     """
     Permission check for ProjectStyle
@@ -253,7 +246,6 @@ class ProjectStylePermission(BasePermission):
     def has_permission(self, request, view):
         try:
             action = view.action
-            print(action, type(action), "is action")
             user_id=request.user.id
             if request.user.is_superuser:
                 return True
@@ -287,4 +279,37 @@ class ProjectStylePermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in ProjectStylePermission Check. Error Details: ", str(e))
+            return False
+
+class LayerAttributePermission(BasePermission):
+    """
+    Permission check for ProjectStyle
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                layer_id=request.query_params.get('layer', None)
+                project_id=Layer.active.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action == 'retrieve':
+                layer_attribute_id=request.resolver_match.kwargs.get('pk')
+                project_id=LayerAttribute.active.get(id=layer_attribute_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if (action=="list" or action=="retrieve") and "view_projectstyle" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in LayerAttributePermission Check. Error Details: ", str(e))
             return False
