@@ -17,7 +17,7 @@ from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from sequences import get_next_value
@@ -49,6 +49,7 @@ from pgis_toolkit.maps.permissions import (
     LayerGroupPermission,
     LayerPermission,
     ProjectStylePermission,
+    ProjectThemeLayerPermission,
     SubLayerPermission,
     ThemePermission,
 )
@@ -255,8 +256,8 @@ def project_layers(request,id):
 #         icon_size=style_instance[0].icon_size
 #         style=style_instance[0].style
 #     return icon,icon_size,style,std_icon
-
 @api_view(['GET'])
+@permission_classes([ProjectThemeLayerPermission])
 def project_theme_layers(request):
     '''
     layers list under project theme

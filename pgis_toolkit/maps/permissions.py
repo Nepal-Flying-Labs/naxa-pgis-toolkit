@@ -256,7 +256,6 @@ class ProjectStylePermission(BasePermission):
 
             if action in ['retrieve','partial_update']:
                 project_style_id=request.resolver_match.kwargs.get('pk')
-                print(project_style_id, "is project style")
                 project_id=ProjectStyle.active.get(id=project_style_id).project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
@@ -312,4 +311,27 @@ class LayerAttributePermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in LayerAttributePermission Check. Error Details: ", str(e))
+            return False
+
+class ProjectThemeLayerPermission(BasePermission):
+    """
+    Permission check for project_theme_layers function
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            theme_id = request.query_params.get('theme', None)
+            project_id=Theme.active.get(id=theme_id).project.id
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "view_layer" and "view_layergroup" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectThemeLayerPermission Check. Error Details: ", str(e))
             return False
