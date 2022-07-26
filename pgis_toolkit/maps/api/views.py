@@ -9,6 +9,7 @@ import fiona
 import geopandas
 import pandas
 from celery.result import AsyncResult
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -17,9 +18,12 @@ from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
 from sqlalchemy import create_engine
 
@@ -92,6 +96,7 @@ from .serializers import (
     WMSLayerSerializer,
 )
 
+User = get_user_model()
 
 class StandardIconViewset(viewsets.ModelViewSet):
     '''
@@ -764,6 +769,18 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     vector_tile_fields = ('pk','layer','attributes')
 
     def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         queryset=FeatureCollection.objects.all()
         request_keys = request.GET.keys()
         '''filter by layer id'''
@@ -782,19 +799,31 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     VectorTile Generation for Advance Filter Layer
-    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer_id=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
     '''
 
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'layer', 'attributes')
 
     def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
-        if 'layer_id' not in request_keys or request.GET['layer_id'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
+        if 'layer' not in request_keys or request.GET['layer'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        layer_id = request.GET['layer_id']
+        layer_id = request.GET['layer']
         if not Layer.active.filter(id=layer_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_instance = Layer.objects.get(id=layer_id)
