@@ -70,8 +70,9 @@ class OrganizationCategoryViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
 class OrganizationViewset(viewsets.ModelViewSet):
+    '''create is handeled in PreliminaryUserAPIView inside users app'''
     queryset = Organization.active.all()
-    http_method_names = ['get', 'post', 'patch']
+    http_method_names = ['get', 'patch']
     default_serializer_class = OrganizationSerializer
     permission_classes = [IsAuthenticated, IsTaskAuthorized]
     serializer_classes = {
@@ -138,6 +139,7 @@ def delete_project(project_id):
 #         Theme.objects.create(project=project, name=theme.name, order=theme.order)
 
 class ProjectViewset(viewsets.ModelViewSet):
+    '''create is handeled in PreliminaryUserAPIView inside users app'''
     queryset = Project.active.all()
     http_method_names = ['get', 'patch']
     permission_classes = [IsAuthenticated,IsTaskAuthorized]
