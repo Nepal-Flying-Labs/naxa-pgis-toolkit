@@ -53,6 +53,7 @@ from pgis_toolkit.maps.permissions import (
     LayerDownloadPermission,
     LayerGroupPermission,
     LayerPermission,
+    ProjectLayerTemplatePermission,
     ProjectStylePermission,
     ProjectThemeLayerPermission,
     SubLayerPermission,
@@ -1067,6 +1068,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [ProjectLayerTemplatePermission]
     default_serializer_class = ProjectLayerTemplateSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
