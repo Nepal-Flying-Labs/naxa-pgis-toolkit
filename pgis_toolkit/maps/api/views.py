@@ -49,6 +49,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    ImportTemplatePermission,
     LayerAttributePermission,
     LayerDownloadPermission,
     LayerGroupPermission,
@@ -1224,6 +1225,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 @api_view(['POST'])
+@permission_classes([ImportTemplatePermission])
 def import_template(request):
     '''
     View to import General Template for a specific project

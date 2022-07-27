@@ -438,3 +438,25 @@ class ProjectsLayerTemplateAttributePermission(BasePermission):
         except Exception as e:
             print("Error occured in ProjectsLayerTemplateAttributePermission Check. Error Details: ", str(e))
             return False
+
+class ImportTemplatePermission(BasePermission):
+    """
+    Permission check for Template Import.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            project_id=request.data.get('project', None)
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "add_projectslayertemplate" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ImportTemplatePermission Check. Error Details: ", str(e))
+            return False
