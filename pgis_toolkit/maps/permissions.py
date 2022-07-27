@@ -10,6 +10,8 @@ from pgis_toolkit.maps.models import (
     Layer,
     LayerAttribute,
     LayerGroup,
+    ProjectsLayerTemplate,
+    ProjectsLayerTemplateAttribute,
     ProjectStyle,
     SubLayer,
     Theme,
@@ -306,7 +308,7 @@ class LayerAttributePermission(BasePermission):
 
             if group_id:
                 permission_list=get_permission_list(group_id)
-                if (action=="list" or action=="retrieve") and "view_projectstyle" in permission_list:
+                if (action=="list" or action=="retrieve") and "view_layerattribute" in permission_list:
                     return True
             return False
         except Exception as e:
@@ -334,4 +336,127 @@ class ProjectThemeLayerPermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in ProjectThemeLayerPermission Check. Error Details: ", str(e))
+            return False
+
+class LayerDownloadPermission(BasePermission):
+    '''Permission check for layer download'''
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            layer_id=request.query_params.get('layer_id', None)
+            project_id=Layer.active.get(id=layer_id).theme.project.id
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "download_layer" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in LayerDownloadPermission Check. Error Details: ", str(e))
+            return False
+
+class ProjectLayerTemplatePermission(BasePermission):
+    """
+    Permission check for ProjectLayerTemplate
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                project_id=request.query_params.get('project', None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action == "create":
+                project_id = request.data.get('project', None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action in ['retrieve', 'partial_update']:
+                layer_template_id=request.resolver_match.kwargs.get('pk')
+                project_id=ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if (action=="list" or action=="retrieve") and "view_projectslayertemplate" in permission_list:
+                    return True
+                elif action == "create" and "add_projectslayertemplate" in permission_list:
+                    return True
+                elif action == "partial_update" and "change_projectslayertemplate" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectLayerTemplatePermission Check. Error Details: ", str(e))
+            return False
+
+class ProjectsLayerTemplateAttributePermission(BasePermission):
+    """
+    Permission check for ProjectsLayerTemplateAttribute
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                layer_template_id=request.query_params.get('layer_template', None)
+                project_id = ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action == "create":
+                layer_template_id = request.data.get('layer_template', None)
+                project_id = ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action in ['retrieve', 'partial_update']:
+                layer_template_attr_id=request.resolver_match.kwargs.get('pk')
+                project_id=ProjectsLayerTemplateAttribute.objects.get(id=layer_template_attr_id).layer_template.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if (action=="list" or action=="retrieve") and "view_projectslayertemplateattribute" in permission_list:
+                    return True
+                elif action == "create" and "add_projectslayertemplateattribute" in permission_list:
+                    return True
+                elif action == "partial_update" and "change_projectslayertemplateattribute" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectsLayerTemplateAttributePermission Check. Error Details: ", str(e))
+            return False
+
+class ImportTemplatePermission(BasePermission):
+    """
+    Permission check for Template Import.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            project_id=request.data.get('project', None)
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "add_projectslayertemplate" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ImportTemplatePermission Check. Error Details: ", str(e))
             return False

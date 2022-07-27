@@ -42,6 +42,8 @@ from pgis_toolkit.projects.permissions import (
     DocumentDownloadPermission,
     DocumentPermission,
     OrganizationCategoryPermission,
+    OrganizationPermission,
+    ProjectPermission,
 )
 from pgis_toolkit.projects.utils.get_project_queryset import get_project_queryset
 from pgis_toolkit.projects.utils.handleProjectLocation import (
@@ -49,7 +51,6 @@ from pgis_toolkit.projects.utils.handleProjectLocation import (
     handleProjectShapeFile,
 )
 from pgis_toolkit.users.models import UserRole
-from pgis_toolkit.users.permissions import IsTaskAuthorized
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, ProjectLocationMVTView
 
@@ -74,7 +75,7 @@ class OrganizationViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
     http_method_names = ['get', 'patch']
     default_serializer_class = OrganizationSerializer
-    permission_classes = [IsAuthenticated, IsTaskAuthorized]
+    permission_classes = [IsAuthenticated, OrganizationPermission]
     serializer_classes = {
         'list': OrganizationListSerializer,
         'retrieve': OrganizationSerializer
@@ -82,13 +83,6 @@ class OrganizationViewset(viewsets.ModelViewSet):
     pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-
-    # def get_permissions(self):
-    #     if self.action == 'list' or self.action == 'retrieve':
-    #         permission_classes = [IsAuthenticated]
-    #     elif self.action == 'update' or self.action == 'partial_update' or self.action == 'create':
-    #         permission_classes = [IsTaskAuthorized]
-    #     return [permission() for permission in permission_classes]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -142,7 +136,7 @@ class ProjectViewset(viewsets.ModelViewSet):
     '''create is handeled in PreliminaryUserAPIView inside users app'''
     queryset = Project.active.all()
     http_method_names = ['get', 'patch']
-    permission_classes = [IsAuthenticated,IsTaskAuthorized]
+    permission_classes = [IsAuthenticated,ProjectPermission]
     default_serializer_class = ProjectSerializer
     serializer_classes = {
         'list': ProjectListSerializer,
@@ -152,13 +146,6 @@ class ProjectViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
-
-    # def get_permissions(self):
-    #     if self.action == 'list':
-    #         permission_classes = [IsAuthenticated]
-    #     elif self.action == 'retrieve' or self.action == 'update' or self.action == 'partial_update':
-    #         permission_classes = [IsAuthenticated,IsTaskAuthorized]
-    #     return [permission() for permission in permission_classes]
 
     # def create(self, request, *args, **kwargs):
     #     errors = []
@@ -612,7 +599,6 @@ class LayerTemplateUploadAPIView(APIView):
 
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
     # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
-    # permission_classes = [IsAuthenticated, IsTaskAuthorized]
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'geometry', 'attributes')
 

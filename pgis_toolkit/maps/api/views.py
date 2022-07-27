@@ -49,9 +49,13 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    ImportTemplatePermission,
     LayerAttributePermission,
+    LayerDownloadPermission,
     LayerGroupPermission,
     LayerPermission,
+    ProjectLayerTemplatePermission,
+    ProjectsLayerTemplateAttributePermission,
     ProjectStylePermission,
     ProjectThemeLayerPermission,
     SubLayerPermission,
@@ -858,6 +862,7 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 @api_view(['GET'])
+@permission_classes([LayerDownloadPermission])
 def layer_download(request):
     '''
     Download vector data in popular formats
@@ -1065,6 +1070,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [ProjectLayerTemplatePermission]
     default_serializer_class = ProjectLayerTemplateSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
@@ -1144,6 +1150,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectsLayerTemplateAttribute.objects.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [ProjectsLayerTemplateAttributePermission]
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer_template', )
@@ -1158,11 +1165,11 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         '''
-        http://localhost:8000/api/maps/project_layer_template_attribute/?template=2
+        http://localhost:8000/api/maps/project_layer_template_attribute/?layer_template=2
         '''
         layer_template = request.query_params.get('layer_template', None)
         if not layer_template:
-            return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'message': 'params layer_template is missing'}, status=status.HTTP_400_BAD_REQUEST)
         # queryset = self.queryset.filter(layer_template__id=layer_template)
         self.queryset=self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
@@ -1218,6 +1225,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 @api_view(['POST'])
+@permission_classes([ImportTemplatePermission])
 def import_template(request):
     '''
     View to import General Template for a specific project

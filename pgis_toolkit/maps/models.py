@@ -61,6 +61,9 @@ class Layer(IsDeleted,DateTimeStamp):
         return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
+        permissions = (
+            ('download_layer', 'Can download layer'),
+        )
 
     @property
     def vector_layer(self):

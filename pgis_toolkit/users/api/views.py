@@ -26,7 +26,7 @@ from rest_framework.viewsets import GenericViewSet
 from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
-from pgis_toolkit.users.permissions import IsAuthorizedInviter, IsTaskAuthorized
+from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
@@ -159,6 +159,7 @@ class PreliminaryUserAPIView(APIView):
                     send_mail(subject, message, from_email, recipient_list,
                             html_message=html_message, fail_silently=False)
                 else:
+                    print('reached here!')
                     for er in serializer._errors:
                         errors.append(
                             {'errorName': er, 'details': serializer._errors[er][0]})
