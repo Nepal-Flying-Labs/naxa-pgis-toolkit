@@ -138,18 +138,8 @@ class DocumentPermission(BasePermission):
             if request.user.is_superuser:
                 return True
             project_id = request.query_params.get('project')
-            project_inst = Project.active.get(id=project_id)
-            user_role_qs = UserRole.active.select_related('organization','group','user','project').filter(user=user_id, active=True)
-            admin_level_role=user_role_qs.filter(organization=None,project=None).values('group')
-            org_level_role=user_role_qs.filter(organization=project_inst.organization, project=None).values('group')
-            project_level_role=user_role_qs.filter(project=project_id).values('group')
-            group_id=None
-            if project_level_role:
-                group_id=project_level_role[0]['group']
-            elif org_level_role:
-                group_id=org_level_role[0]['group']
-            elif admin_level_role:
-                group_id=admin_level_role[0]['group']
+            organization_id = Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id, organization_id, project_id)
             if group_id:
                 permission_list=get_permission_list(group_id)
                 if action=="create" and "add_document" in permission_list:
@@ -176,19 +166,9 @@ class DocumentDownloadPermission(BasePermission):
             if request.user.is_superuser:
                 return True
             document_id = request.query_params.get('document')
-            document_inst = Document.objects.get(id=document_id)
-            project_inst = Project.active.get(id=document_inst.project.id)
-            user_role_qs = UserRole.active.select_related('organization','group','user','project').filter(user=user_id, active=True)
-            admin_level_role=user_role_qs.filter(organization=None,project=None).values('group')
-            org_level_role=user_role_qs.filter(organization=project_inst.organization, project=None).values('group')
-            project_level_role=user_role_qs.filter(project=project_inst).values('group')
-            group_id=None
-            if project_level_role:
-                group_id=project_level_role[0]['group']
-            elif org_level_role:
-                group_id=org_level_role[0]['group']
-            elif admin_level_role:
-                group_id=admin_level_role[0]['group']
+            project_id = Document.objects.get(id=document_id).project.id
+            organization_id = Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id, organization_id, project_id)
             if group_id:
                 permission_list=get_permission_list(group_id)
                 if "download_document" in permission_list:
