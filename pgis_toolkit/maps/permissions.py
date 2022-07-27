@@ -10,6 +10,8 @@ from pgis_toolkit.maps.models import (
     Layer,
     LayerAttribute,
     LayerGroup,
+    ProjectsLayerTemplate,
+    ProjectsLayerTemplateAttribute,
     ProjectStyle,
     SubLayer,
     Theme,
@@ -375,11 +377,10 @@ class ProjectLayerTemplatePermission(BasePermission):
             if action == "create":
                 project_id = request.data.get('project', None)
                 organization_id=Project.active.get(id=project_id).organization.id
-                print(project_id, organization_id, "project and organization ids")
 
             if action in ['retrieve', 'partial_update']:
                 layer_template_id=request.resolver_match.kwargs.get('pk')
-                project_id=ProjectLayerTemplate.active.get(id=layer_template_id).project.id
+                project_id=ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
             group_id=get_user_group(user_id,organization_id,project_id)
@@ -395,4 +396,45 @@ class ProjectLayerTemplatePermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in ProjectLayerTemplatePermission Check. Error Details: ", str(e))
+            return False
+
+class ProjectsLayerTemplateAttributePermission(BasePermission):
+    """
+    Permission check for ProjectsLayerTemplateAttribute
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+
+            if action =="list":
+                layer_template_id=request.query_params.get('layer_template', None)
+                project_id = ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action == "create":
+                layer_template_id = request.data.get('layer_template', None)
+                project_id = ProjectsLayerTemplate.active.get(id=layer_template_id).project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            if action in ['retrieve', 'partial_update']:
+                layer_template_attr_id=request.resolver_match.kwargs.get('pk')
+                project_id=ProjectsLayerTemplateAttribute.objects.get(id=layer_template_attr_id).layer_template.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if (action=="list" or action=="retrieve") and "view_projectslayertemplateattribute" in permission_list:
+                    return True
+                elif action == "create" and "add_projectslayertemplateattribute" in permission_list:
+                    return True
+                elif action == "partial_update" and "change_projectslayertemplateattribute" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectsLayerTemplateAttributePermission Check. Error Details: ", str(e))
             return False
