@@ -78,7 +78,7 @@ class OrganizationPermission(BasePermission):
                 '''organizations in which users are involved are filtered and provided in list.'''
             if action == "list":
                 return True
-            if action in ["retrieve" , "partial_update"]:
+            elif action in ["retrieve" , "partial_update"]:
                 organization_id = request.resolver_match.kwargs.get('pk')
                 project_id = None
             group_id=get_user_group(user_id, organization_id, project_id)
@@ -109,8 +109,7 @@ class ProjectPermission(BasePermission):
             if action == "list":
                 organization_id = request.query_params.get('organization', None)
                 project_id=None
-
-            if action in ["retrieve" , "partial_update"]:
+            elif action in ["retrieve" , "partial_update"]:
                 project_id = request.resolver_match.kwargs.get('pk')
                 organization_id = Project.active.get(id=project_id).organization.id
 
@@ -137,8 +136,16 @@ class DocumentPermission(BasePermission):
             user_id = request.user.id
             if request.user.is_superuser:
                 return True
-            project_id = request.query_params.get('project')
-            organization_id = Project.active.get(id=project_id).organization.id
+            if action=="list":
+                project_id = request.query_params.get('project')
+                organization_id = Project.active.get(id=project_id).organization.id
+            elif action=="create":
+                project_id = request.data.get('project')
+                organization_id = Project.active.get(id=project_id).organization.id
+            elif action in ["retrieve", "partial_update"]:
+                document_id = request.resolver_match.kwargs.get('pk')
+                project_id = Document.objects.get(id=document_id).project.id
+                organization_id = Project.active.get(id=project_id).organization.id
             group_id=get_user_group(user_id, organization_id, project_id)
             if group_id:
                 permission_list=get_permission_list(group_id)

@@ -34,6 +34,7 @@ def get_permission_list(group_id):
     return permission_list
 
 def check_invitation_hierarchy(user_group, inviting_group):
+    print(user_group, inviting_group, "are group ids")
     hier= {int(env('PGIS_WEB_APP_ADMINISTRATOR')): 1, int(env('ORGANIZATION_ADMIN')): 2, int(env('PROJECT_MANAGER')): 3, int(env('DATA_COLLECTOR')): 4}
     return True if hier[user_group] <= hier[inviting_group] else False
 
@@ -58,6 +59,7 @@ class IsAuthorizedInviter(BasePermission):
             if 'project_name' in request_keys and request.data['project_name'] != "":
                 project_name = request.data['project_name']
             group_id=get_user_group(user_id, organization_id, project_id)
+            print(group_id, "is group id")
             permission_list=get_permission_list(group_id)
             if project_name:
                 '''user who can add a project can invite other users in that particular project in any role.'''
@@ -65,12 +67,11 @@ class IsAuthorizedInviter(BasePermission):
                     return True
             elif organization_name:
                 '''user who can add a organization can invite other users in that particular organization in any role.'''
-                if "add_organization" in permission_list
+                if "add_organization" in permission_list:
                     return True
-            '''invitation for already existing organizations and projects are handeled via hierarchy check'''
+                    '''invitation for already existing organizations and projects are handeled via hierarchy check'''
             elif 'group' in request_keys and request.data['group'] != "":
-                if check_invitation_hierarchy(group_id, int(request.data['group'])) == True:
-                    return True
+                return check_invitation_hierarchy(group_id, int(request.data['group']))
             return False
         except Exception as e:
             print("Error occured in IsAuthorizedInviter Permission Check Error. Details:", str(e))
