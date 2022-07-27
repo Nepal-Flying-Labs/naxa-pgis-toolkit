@@ -50,6 +50,7 @@ from pgis_toolkit.maps.models import (
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
     LayerAttributePermission,
+    LayerDownloadPermission,
     LayerGroupPermission,
     LayerPermission,
     ProjectStylePermission,
@@ -858,6 +859,7 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 @api_view(['GET'])
+@permission_classes([LayerDownloadPermission])
 def layer_download(request):
     '''
     Download vector data in popular formats

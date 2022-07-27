@@ -335,3 +335,23 @@ class ProjectThemeLayerPermission(BasePermission):
         except Exception as e:
             print("Error occured in ProjectThemeLayerPermission Check. Error Details: ", str(e))
             return False
+
+class LayerDownloadPermission(BasePermission):
+    '''Permission check for layer download'''
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            layer_id=request.query_params.get('layer_id', None)
+            project_id=Layer.active.get(id=layer_id).theme.project.id
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "download_layer" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in LayerDownloadPermission Check. Error Details: ", str(e))
+            return False
