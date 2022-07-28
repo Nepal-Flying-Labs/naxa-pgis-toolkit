@@ -412,6 +412,21 @@ class ProjectViewset(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+'''Retrieve bbox and project name in Map page'''
+@api_view(['GET'])
+def get_project_detail(request, *args, **kwargs):
+    project = request.query_params.get('project', None)
+    if project:
+        if Project.active.filter(id=project).exists():
+            project_instance = Project.active.get(id=project)
+            data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox}
+            return Response(status=status.HTTP_200_OK, data={'message': 'success', 'data': data})
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Project Matching queryset not found!"})
+    else:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params project is missing"})
+
+
 class DefaultThemeViewset(viewsets.ModelViewSet):
     queryset = Organization.active.all()
     http_method_names = ['get', 'post', 'patch']

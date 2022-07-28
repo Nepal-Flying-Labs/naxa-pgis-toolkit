@@ -13,6 +13,7 @@ from pgis_toolkit.projects.api.views import (
     ProjectViewset,
     RequestDemoViewset,
     document_download,
+    get_project_detail,
     layer_template_download,
 )
 
@@ -33,5 +34,6 @@ urlpatterns = [
          name='layer_template_download'),
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
     path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet.as_view(), name='project_location_vectortile'),
-    path('document_download/', document_download, name='document_download')
+    path('document_download/', document_download, name='document_download'),
+    path('project_detail/', get_project_detail, name='project_detail'),
 ]

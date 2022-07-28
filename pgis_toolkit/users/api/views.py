@@ -159,7 +159,6 @@ class PreliminaryUserAPIView(APIView):
                     send_mail(subject, message, from_email, recipient_list,
                             html_message=html_message, fail_silently=False)
                 else:
-                    print('reached here!')
                     for er in serializer._errors:
                         errors.append(
                             {'errorName': er, 'details': serializer._errors[er][0]})
