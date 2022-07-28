@@ -639,7 +639,9 @@ def get_layer_upload_task_response(request):
             try:
                 response, layer_id = result.get()
                 if response == "successful":
-                    return Response({"message": response, "layer_id": layer_id}, status=200)
+                    layer_instance=Layer.active.get(id=int(layer_id))
+                    theme_id=layer_instance.theme.id if layer_instance.theme else None
+                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id}, status=200)
                 else:
                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
