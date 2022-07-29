@@ -285,10 +285,10 @@ def project_theme_layers(request):
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_list=[]
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
-        for group in group_qs.iterator():
+        for group in group_qs:
             group_layer_list=[]
             group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
-            for layer in group_layer_qs.iterator():
+            for layer in group_layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
@@ -306,14 +306,14 @@ def project_theme_layers(request):
         layer_list=[]
         layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
-        for layer in layer_qs.iterator():
+        for layer in layer_qs:
             layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
             if layer.layer_type=="Vector":
                 layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                 sub_layer_list=[]
                 sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
-                for sub_layer in sub_layer_qs.iterator():
+                for sub_layer in sub_layer_qs:
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
                     sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
                     sub_layer_list.append(sub_layer_item)
@@ -532,7 +532,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
-                    return Response(data={'message':response,"id":serializer.data['id']},status=200)
+                    return Response(data={'message':response,"id":serializer.data['id'], "group": serializer.data['group']},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
