@@ -499,6 +499,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             name = request_dict['name'] if 'name' in request_keys else None
             layer_instance=Layer.active.get(pk=pk)
             project_id=layer_instance.theme.project.id
+            group_id = None
             if Layer.active.exclude(pk=pk).filter(theme__project=project_id,name=name).exists():
                 return Response(data={'message': 'Cannot create duplicate layer names with in project.'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = LayerUpdateSerializer(layer_instance, data=request_dict, partial=True)
@@ -514,7 +515,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                     request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme']},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
@@ -522,7 +523,6 @@ class LayerViewSet(viewsets.ModelViewSet):
                 elif layer_type == "Raster":
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
-                        Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
@@ -532,7 +532,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
-                    return Response(data={'message':response,"id":serializer.data['id'], "group": serializer.data['group']},status=200)
+                        if layer_instance.group:
+                            group_id = layer_instance.group.id
+                    return Response(data={'message':"success","id":serializer.data['id'], "group":group_id},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -641,7 +643,8 @@ def get_layer_upload_task_response(request):
                 if response == "successful":
                     layer_instance=Layer.active.get(id=int(layer_id))
                     theme_id=layer_instance.theme.id if layer_instance.theme else None
-                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id}, status=200)
+                    group_id = layer_instance.group.id if layer_instance.group else None
+                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
                 else:
                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:

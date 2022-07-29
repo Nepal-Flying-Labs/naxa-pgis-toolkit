@@ -278,6 +278,7 @@ def UpdateRasterLayer(layer_id, request_dict):
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
             return "successful", layer_id
+        return "successful", layer_id
     except Exception as e:
         return str(e), None
 
