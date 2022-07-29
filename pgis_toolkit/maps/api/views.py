@@ -285,10 +285,10 @@ def project_theme_layers(request):
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_list=[]
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
-        for group in group_qs:
+        for group in group_qs.iterator():
             group_layer_list=[]
             group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
-            for layer in group_layer_qs:
+            for layer in group_layer_qs.iterator():
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
@@ -306,14 +306,14 @@ def project_theme_layers(request):
         layer_list=[]
         layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
-        for layer in layer_qs:
+        for layer in layer_qs.iterator():
             layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
             if layer.layer_type=="Vector":
                 layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                 sub_layer_list=[]
                 sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
-                for sub_layer in sub_layer_qs:
+                for sub_layer in sub_layer_qs.iterator():
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
                     sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
                     sub_layer_list.append(sub_layer_item)
