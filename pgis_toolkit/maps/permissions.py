@@ -460,3 +460,25 @@ class ImportTemplatePermission(BasePermission):
         except Exception as e:
             print("Error occured in ImportTemplatePermission Check. Error Details: ", str(e))
             return False
+
+class FeatureGeoJSONPermission(BasePermission):
+    """
+    Permission check for FeatureGeoJSONAPIView
+    """
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            feature_id=request.resolver_match.kwargs.get('pk')
+            project_id= FeatureCollection.objects.get(id=feature_id).layer.theme.project.id
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "view_featurecollection" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in FeatureGeoJSONPermission Check. Error Details: ", str(e))
+            return False

@@ -38,7 +38,7 @@ class UserAdmin(admin.ModelAdmin):
         (None, {"fields": ("is_deleted",)}),
         (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
         (_("Personal info"), {"fields": ("full_name", "email", "contact", "image")}),
-        (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser")}),
+        (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser", "user_permissions")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
     list_display = ("is_deleted","id", "full_name", "email", "is_active")

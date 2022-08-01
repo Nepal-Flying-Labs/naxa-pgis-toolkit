@@ -38,8 +38,8 @@ class User(IsDeleted, AbstractUser):
     '''removing unnecessary fields'''
     first_name = None
     last_name = None
-    groups = None
-    user_permissions = None
+    # groups = None
+    # user_permissions = None
     #overriding email field by making it unique field
     email = models.EmailField(unique=True)
     address = models.CharField(max_length=254)
