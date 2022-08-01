@@ -11,6 +11,7 @@ import pandas
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.serializers import serialize
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -49,6 +50,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    FeatureGeoJSONPermission,
     ImportTemplatePermission,
     LayerAttributePermission,
     LayerDownloadPermission,
@@ -1260,3 +1262,18 @@ def import_template(request):
     except Exception as e:
         ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
         return Response(data='Error: '+str(e))
+
+'''GeoJSON API for features.'''
+class FeatureGeoJSONAPIView(APIView):
+    permission_classes = [FeatureGeoJSONPermission]
+    def get(self, request, pk=None, *args, **kwargs):
+        try:
+            feature_qs = FeatureCollection.active.filter(id=pk)
+            if feature_qs.exists():
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
+                geojson_data = json.loads(data)
+            else:
+                return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data=geojson_data, status=status.HTTP_200_OK)
