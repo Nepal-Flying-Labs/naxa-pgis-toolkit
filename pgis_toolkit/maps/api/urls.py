@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from pgis_toolkit.maps.api.views import (  # ReorderView,
     AdvanceFilterVectorTileQuerySet,
     FeatureCollectionViewset,
+    FeatureGeoJSONAPIView,
     LayerAttributeViewset,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
@@ -47,4 +48,5 @@ urlpatterns = [
     path('layer_download/', layer_download, name='layer_download'),
     path('advance_filter_vectortile/<int:z>/<int:x>/<int:y>/', AdvanceFilterVectorTileQuerySet.as_view(), name="AdvanceFilterVectorTileQuerySet"),
     path('import_template/', import_template, name='import_template'),
+    path('feature/<int:pk>/', FeatureGeoJSONAPIView.as_view(), name='feature'),
 ]

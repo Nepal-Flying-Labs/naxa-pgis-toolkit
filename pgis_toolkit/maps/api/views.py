@@ -11,6 +11,7 @@ import pandas
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.serializers import serialize
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -49,6 +50,7 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    FeatureGeoJSONPermission,
     ImportTemplatePermission,
     LayerAttributePermission,
     LayerDownloadPermission,
@@ -286,10 +288,10 @@ def project_theme_layers(request):
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_list=[]
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
-        for group in group_qs.iterator():
+        for group in group_qs:
             group_layer_list=[]
             group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
-            for layer in group_layer_qs.iterator():
+            for layer in group_layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
@@ -308,14 +310,14 @@ def project_theme_layers(request):
         layer_list=[]
         layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
-        for layer in layer_qs.iterator():
-            layer_item={"id":layer.id,"type":"layer","name":layer.name,'layer_type':layer.layer_type}
+        for layer in layer_qs:
+            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
             if layer.layer_type=="Vector":
                 layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                 sub_layer_list=[]
                 sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
-                for sub_layer in sub_layer_qs.iterator():
+                for sub_layer in sub_layer_qs:
                     icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
                     sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
                     sub_layer_list.append(sub_layer_item)
@@ -502,6 +504,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             name = request_dict['name'] if 'name' in request_keys else None
             layer_instance=Layer.active.get(pk=pk)
             project_id=layer_instance.theme.project.id
+            group_id = None
             if Layer.active.exclude(pk=pk).filter(theme__project=project_id,name=name).exists():
                 return Response(data={'message': 'Cannot create duplicate layer names with in project.'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = LayerUpdateSerializer(layer_instance, data=request_dict, partial=True)
@@ -517,7 +520,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                     request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme']},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
@@ -525,7 +528,6 @@ class LayerViewSet(viewsets.ModelViewSet):
                 elif layer_type == "Raster":
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
-                        Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
@@ -535,7 +537,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
-                    return Response(data={'message':response,"id":serializer.data['id']},status=200)
+                        if layer_instance.group:
+                            group_id = layer_instance.group.id
+                    return Response(data={'message':"success","id":serializer.data['id'], "group":group_id},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -644,7 +648,8 @@ def get_layer_upload_task_response(request):
                 if response == "successful":
                     layer_instance=Layer.active.get(id=int(layer_id))
                     theme_id=layer_instance.theme.id if layer_instance.theme else None
-                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id}, status=200)
+                    group_id = layer_instance.group.id if layer_instance.group else None
+                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
                 else:
                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
@@ -1260,3 +1265,18 @@ def import_template(request):
     except Exception as e:
         ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
         return Response(data='Error: '+str(e))
+
+'''GeoJSON API for features.'''
+class FeatureGeoJSONAPIView(APIView):
+    permission_classes = [FeatureGeoJSONPermission]
+    def get(self, request, pk=None, *args, **kwargs):
+        try:
+            feature_qs = FeatureCollection.active.filter(id=pk)
+            if feature_qs.exists():
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
+                geojson_data = json.loads(data)
+            else:
+                return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data=geojson_data, status=status.HTTP_200_OK)

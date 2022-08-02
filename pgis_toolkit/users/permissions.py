@@ -34,7 +34,6 @@ def get_permission_list(group_id):
     return permission_list
 
 def check_invitation_hierarchy(user_group, inviting_group):
-    print(user_group, inviting_group, "are group ids")
     hier= {int(env('PGIS_WEB_APP_ADMINISTRATOR')): 1, int(env('ORGANIZATION_ADMIN')): 2, int(env('PROJECT_MANAGER')): 3, int(env('DATA_COLLECTOR')): 4}
     return True if hier[user_group] <= hier[inviting_group] else False
 

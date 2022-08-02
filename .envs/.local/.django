@@ -1,6 +1,6 @@
 # General
 # ------------------------------------------------------------------------------
-USE_DOCKER=yes
+USE_DOCKER=no
 IPYTHONDIR=/app/.ipython
 #URL=http://0.0.0.0:8000
 URL=https://pgis.naxa.com.np
