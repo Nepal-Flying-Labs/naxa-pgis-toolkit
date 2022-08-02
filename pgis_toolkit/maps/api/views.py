@@ -274,6 +274,7 @@ def project_theme_layers(request):
     This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
     '''
     try:
+        options=[]
         theme_id=request.query_params.get("theme",None)
         project_style=request.query_params.get("project_style")
         if not project_style:
@@ -301,13 +302,14 @@ def project_theme_layers(request):
                 # elif layer.layer_type=="WMS":
                 #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
                 group_layer_list.append(layer_item)
-            group_item={"id":group.id,"name":group.name,'layer':group_layer_list}
-            group_list.append(group_item)
+            group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
+            # group_list.append(group_item)
+            options.append(group_item)
         layer_list=[]
         layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
         for layer in layer_qs.iterator():
-            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
+            layer_item={"id":layer.id,"type":"layer","name":layer.name,'layer_type':layer.layer_type}
             if layer.layer_type=="Vector":
                 layer_detail_instance=vector_layer_qs.get(layer=layer.id)
                 sub_layer_list=[]
@@ -327,10 +329,11 @@ def project_theme_layers(request):
             #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
             # elif layer.layer_type=="WMS":
             #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
-            layer_list.append(layer_item)
-        theme_item={'group':group_list,'layer':layer_list}
-        # theme_list.append(theme_item)
-        return Response(theme_item,status=200)
+            # layer_list.append(layer_item)
+            options.append(layer_item)
+        # theme_item={'group':group_list,'layer':layer_list}
+        return Response(options,status=200)
+        # return Response(theme_item,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
