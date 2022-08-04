@@ -155,6 +155,18 @@ def test_advertised():
     geoserver.publish_featurestore_sqlview(store_name="SecurityForcesGeoserver88", name="SecurityForcesGeoserver88_mannual7", sql=sql, workspace='pgis')
 '''
 
+def get_standard_dtype(dtype):
+    dtype = str(dtype)
+    if dtype == 'int64':
+        return 'int'
+    elif dtype == 'float64':
+        return 'float'
+    elif dtype == 'datetime64':
+        return 'date'
+    elif dtype == 'object' or dtype == 'bool':
+        return 'str'
+    else:
+        return 'unknown'
 
 def geoserver_layer_publish(layer_instance):
     # print("geoserver layer publish called")
@@ -295,8 +307,10 @@ def upload_feature(geodataframe, layer_instance, geom_type):
         try:
             for col_name in geodataframe.columns:
                 if col_name != 'geometry':
+                    dtype = geodataframe[col_name].dtypes
+                    data_type = get_standard_dtype(dtype)
                     LayerAttribute.objects.create(
-                        layer=layer_instance, name=col_name)
+                        layer=layer_instance, name=col_name, data_type=data_type)
         except Exception as e:
             Layer.objects.filter(id=layer_id).delete()
             return ("attribute_error : "+str(e))
