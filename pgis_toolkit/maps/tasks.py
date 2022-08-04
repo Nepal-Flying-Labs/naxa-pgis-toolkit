@@ -1,6 +1,9 @@
+import glob
 import json
 import os
+import shutil
 import time
+import zipfile
 from logging import exception
 
 import geopandas
@@ -287,3 +290,71 @@ def UploadWMSLayer(layer_id, request_dict):
         layer_instance = Layer.active.get(id=layer_id)
         WMSLayer.objects.get_or_create(layer=layer_instance, url=request_dict['url'])
     return Response(data={'message': 'URL is mandatory!'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def handleDataMergeUpdate(layer_id):
+    try:
+        print("handle handleDataMergeUpdate entered")
+        errors = []
+        layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
+        layer_file = LayerFile.objects.get(layer=layer_id).file.path
+        file_path = os.path.dirname(layer_file)
+        with zipfile.ZipFile(layer_file, 'r') as zip_ref:
+            zip_ref.extractall(file_path)
+        shape = glob.glob(
+            r'{}/**/*.shp'.format(file_path), recursive=True)[0]
+        geodataframe = geopandas.read_file(shape)
+        try:
+            shutil.rmtree(file_path)
+        except OSError as e:
+            print("Error: %s " % (e.strerror))
+        epsg = geodataframe.crs.to_epsg()
+        utm_zone = geodataframe.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
+            else:
+                return "Unknown Coordinate System", None
+        '''retrieving properties from the shapefile using fiona'''
+        c = fiona.open(shape)
+        schema=c.schema
+        geom_type=schema['geometry']
+        '''validaing geometry type'''
+        if vector_layer_instance.geom_type != geom_type:
+            return (f"Existing layer geom type {vector_layer_instance.geom_type} and incoming data geom type {geom_type} doesn't match!")
+        col_properties = {}
+        for data in schema['properties']:
+            data_type=schema['properties'][data].split(':')[0]
+            if data_type=='str' or data_type=='int':
+                length=schema['properties'][data].split(':')[1]
+                precision = None
+            elif data_type=="float":
+                length = schema['properties'][data].split(':')[1].split('.')[0]
+                precision = schema['properties'][data].split(':')[1].split('.')[1]
+            values_list = [data_type, length, precision]
+            col_properties[str(data)] = values_list
+        col_prop_keys = col_properties.keys()
+        layer_attributes_qs = LayerAttribute.objects.select_related('layer').filter(layer=layer_instance).values('name', 'data_type', 'length', 'precision')
+        for attr in layer_attributes_qs:
+            '''validating column, data type, length and precision'''
+            name = attr['name']
+            if name not in col_prop_keys: return (f'column {name} is missing in uploading file.')
+            values_list = col_properties[name]
+            if attr['data_type'] != values_list[0]: return (f'Existing data type {attr["data_type"]} and incoming data type {values_list[0]} of column {name} does not match!')
+            if attr['length'] != values_list[1]: return (f'Existing data length {attr["length"]} and incoming data length {values_list[1]} of column {name} does not match!')
+            if attr['precision'] != values_list[2]: return (f'Existing data precision {attr["precision"]} and incoming data precision {values_list[2]} of column {name} does not match!')
+
+        '''update/merge data using geopandas'''
+        response = update_merge_data(geodataframe)
+
+        '''update extent of the layer'''
+        total_bounds = geodataframe.total_bounds
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
+
+        # response = upload_feature(
+        #     geodataframe, layer_instance, geom_type)
+        return response
+    except Exception as e:
+        return ("error occured in handle shapefile: " + str(e))

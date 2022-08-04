@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.maps.api.views import (  # ReorderView,
     AdvanceFilterVectorTileQuerySet,
+    DataMergeUpdateAPIView,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
@@ -49,4 +50,5 @@ urlpatterns = [
     path('advance_filter_vectortile/<int:z>/<int:x>/<int:y>/', AdvanceFilterVectorTileQuerySet.as_view(), name="AdvanceFilterVectorTileQuerySet"),
     path('import_template/', import_template, name='import_template'),
     path('feature/<int:pk>/', FeatureGeoJSONAPIView.as_view(), name='feature'),
+    path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
 ]
