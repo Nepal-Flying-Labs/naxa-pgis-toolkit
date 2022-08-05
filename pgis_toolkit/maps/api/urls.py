@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from pgis_toolkit.maps.api.views import (  # ReorderView,
+from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     AdvanceFilterVectorTileQuerySet,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
@@ -18,7 +18,6 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,
     get_layer_upload_task_response,
     import_template,
     layer_download,
-    project_layers,
     project_theme_layers,
     reorder,
 )
@@ -38,7 +37,7 @@ app_name = "projects"
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('project_layers/<int:id>/', project_layers, name='project_layers'),
+    # path('project_layers/<int:id>/', project_layers, name='project_layers'),
     path('project_theme_layers/', project_theme_layers, name='project_theme_layers'),
     # path('layer/', LayerAPIView.as_view(), name='layer'),
     # path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
