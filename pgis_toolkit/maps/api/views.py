@@ -165,14 +165,14 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         self.queryset = self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
-
+'''
 #not in use
 @api_view(['GET'])
 def project_layers(request,id):
-    '''
-    http://0.0.0.0:8000/api/maps/project_layers/<project_id>/
-    This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
-    '''
+
+    # http://0.0.0.0:8000/api/maps/project_layers/<project_id>/
+    # This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
+
     try:
         theme_list=[]
         theme_qs=Theme.active.select_related('project').filter(project=id).order_by('order')
@@ -238,7 +238,7 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
-
+'''
 # def get_style_detail(layer_id,sublayer_id,project_style):
 #     icon,icon_size,style,std_icon=None,None,None,None
 #     if sublayer_id:
@@ -294,10 +294,10 @@ def project_theme_layers(request):
             for layer in group_layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
-                    icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                    icon,style,std_icon=get_style_detail(layer.id,None,project_style)
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
-                    layer_item['icon_size']=icon_size
+                    # layer_item['icon_size']=icon_size
                     layer_item['style']=style
                 # elif layer.layer_type=="Raster":
                 #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
@@ -318,13 +318,13 @@ def project_theme_layers(request):
                 sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                 for sub_layer in sub_layer_qs:
-                    icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
-                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
+                    icon,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
+                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'style':style}
                     sub_layer_list.append(sub_layer_item)
-                icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                icon,style,std_icon=get_style_detail(layer.id,None,project_style)
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
-                layer_item['icon_size']=icon_size,
+                # layer_item['icon_size']=icon_size,
                 layer_item['style']=style
                 layer_item['sub_layer']=sub_layer_list
             # elif layer.layer_type=="Raster":
@@ -381,7 +381,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             '''Corressponding layer detail'''
             if layer_instance.layer_type=="Vector":
                 vector_layer_instance=Vectorlayer.objects.select_related('layer').get(layer=layer_instance.id)
-                vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'icon_size', 'show_label', 'label_field', 'label_style']
+                vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
                 results['std_icon']=env("URL")+vector_layer_instance.std_icon.icon.url if vector_layer_instance.std_icon else None
@@ -616,8 +616,8 @@ class SubLayerViewset(viewsets.ModelViewSet):
                     sub_layer_style_instance=SubLayerStyle.objects.create(sub_layer=sub_layer_instance,project_style=project_style_instance)
                 if 'icon' in request_dict.keys():
                     sub_layer_style_instance.icon=request_dict['icon']
-                if 'icon_size' in request_dict.keys():
-                    sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
+                # if 'icon_size' in request_dict.keys():
+                #     sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
                 if 'style' in request_dict.keys():
                     sub_layer_style_instance.style=json.loads(request_dict['style'])
                 if 'std_icon' in request_dict.keys():
