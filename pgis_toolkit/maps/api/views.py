@@ -9,7 +9,9 @@ import fiona
 import geopandas
 import pandas
 from celery.result import AsyncResult
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.serializers import serialize
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -17,15 +19,17 @@ from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
-from rest_framework.decorators import api_view
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
 from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
-from pgis_toolkit.maps.functions import advance_filter_data, clear_dir, get_style_detail
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
@@ -46,8 +50,16 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
+    FeatureGeoJSONPermission,
+    ImportTemplatePermission,
+    LayerAttributePermission,
+    LayerDownloadPermission,
     LayerGroupPermission,
     LayerPermission,
+    ProjectLayerTemplatePermission,
+    ProjectsLayerTemplateAttributePermission,
+    ProjectStylePermission,
+    ProjectThemeLayerPermission,
     SubLayerPermission,
     ThemePermission,
 )
@@ -58,6 +70,9 @@ from pgis_toolkit.maps.tasks import (
     UploadVectorLayer,
     UploadWMSLayer,
 )
+from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
+from pgis_toolkit.maps.utils.functions import clear_dir
+from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
@@ -87,6 +102,7 @@ from .serializers import (
     WMSLayerSerializer,
 )
 
+User = get_user_model()
 
 class StandardIconViewset(viewsets.ModelViewSet):
     '''
@@ -104,6 +120,7 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectStyle.active.all()
     http_method_names = ['get','post','patch']
+    permission_classes = [ProjectStylePermission]
     default_serializer_class = ProjectStyleSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
@@ -125,10 +142,11 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
 
 class LayerAttributeViewset(viewsets.ModelViewSet):
     '''
-    Viewset for multiple project style
+    Viewset for Layer Attribute
     '''
     queryset = LayerAttribute.objects.all()
-    http_method_names = ['get','post','patch']
+    http_method_names = ['get']
+    permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer', )
@@ -147,14 +165,14 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         self.queryset = self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
-
-
+'''
+#not in use
 @api_view(['GET'])
 def project_layers(request,id):
-    '''
-    http://0.0.0.0:8000/api/maps/project_layers/<project_id>/
-    This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
-    '''
+
+    # http://0.0.0.0:8000/api/maps/project_layers/<project_id>/
+    # This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
+
     try:
         theme_list=[]
         theme_qs=Theme.active.select_related('project').filter(project=id).order_by('order')
@@ -220,7 +238,7 @@ def project_layers(request,id):
         return Response(theme_list)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
-
+'''
 # def get_style_detail(layer_id,sublayer_id,project_style):
 #     icon,icon_size,style,std_icon=None,None,None,None
 #     if sublayer_id:
@@ -249,8 +267,8 @@ def project_layers(request,id):
 #         icon_size=style_instance[0].icon_size
 #         style=style_instance[0].style
 #     return icon,icon_size,style,std_icon
-
 @api_view(['GET'])
+@permission_classes([ProjectThemeLayerPermission])
 def project_theme_layers(request):
     '''
     layers list under project theme
@@ -258,6 +276,7 @@ def project_theme_layers(request):
     This view is for the left side bar of the map page (theme,layer,group,sublayer navigation)
     '''
     try:
+        options=[]
         theme_id=request.query_params.get("theme",None)
         project_style=request.query_params.get("project_style")
         if not project_style:
@@ -275,18 +294,19 @@ def project_theme_layers(request):
             for layer in group_layer_qs:
                 layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
                 if layer.layer_type=="Vector":
-                    icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                    icon,style,std_icon=get_style_detail(layer.id,None,project_style)
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
-                    layer_item['icon_size']=icon_size
+                    # layer_item['icon_size']=icon_size
                     layer_item['style']=style
                 # elif layer.layer_type=="Raster":
                 #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
                 # elif layer.layer_type=="WMS":
                 #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
                 group_layer_list.append(layer_item)
-            group_item={"id":group.id,"name":group.name,'layer':group_layer_list}
-            group_list.append(group_item)
+            group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
+            # group_list.append(group_item)
+            options.append(group_item)
         layer_list=[]
         layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
@@ -298,23 +318,24 @@ def project_theme_layers(request):
                 sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
                 # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
                 for sub_layer in sub_layer_qs:
-                    icon,icon_size,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
-                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'icon_size':icon_size,'style':style}
+                    icon,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
+                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'style':style}
                     sub_layer_list.append(sub_layer_item)
-                icon,icon_size,style,std_icon=get_style_detail(layer.id,None,project_style)
+                icon,style,std_icon=get_style_detail(layer.id,None,project_style)
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
-                layer_item['icon_size']=icon_size,
+                # layer_item['icon_size']=icon_size,
                 layer_item['style']=style
                 layer_item['sub_layer']=sub_layer_list
             # elif layer.layer_type=="Raster":
             #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
             # elif layer.layer_type=="WMS":
             #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
-            layer_list.append(layer_item)
-        theme_item={'group':group_list,'layer':layer_list}
-        # theme_list.append(theme_item)
-        return Response(theme_item,status=200)
+            # layer_list.append(layer_item)
+            options.append(layer_item)
+        # theme_item={'group':group_list,'layer':layer_list}
+        return Response(options,status=200)
+        # return Response(theme_item,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
@@ -360,7 +381,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             '''Corressponding layer detail'''
             if layer_instance.layer_type=="Vector":
                 vector_layer_instance=Vectorlayer.objects.select_related('layer').get(layer=layer_instance.id)
-                vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'icon_size', 'show_label', 'label_field', 'label_style']
+                vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
                 results['std_icon']=env("URL")+vector_layer_instance.std_icon.icon.url if vector_layer_instance.std_icon else None
@@ -483,6 +504,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             name = request_dict['name'] if 'name' in request_keys else None
             layer_instance=Layer.active.get(pk=pk)
             project_id=layer_instance.theme.project.id
+            group_id = None
             if Layer.active.exclude(pk=pk).filter(theme__project=project_id,name=name).exists():
                 return Response(data={'message': 'Cannot create duplicate layer names with in project.'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = LayerUpdateSerializer(layer_instance, data=request_dict, partial=True)
@@ -498,7 +520,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                     request_dict['project_style']=project_style
                     response=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
-                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme']},status=200)
+                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']},status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
@@ -506,7 +528,6 @@ class LayerViewSet(viewsets.ModelViewSet):
                 elif layer_type == "Raster":
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
-                        Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
                     response = UpdateRasterLayer.delay(pk, request_dict)
                     return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
@@ -516,7 +537,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
-                    return Response(data={'message':response,"id":serializer.data['id']},status=200)
+                        if layer_instance.group:
+                            group_id = layer_instance.group.id
+                    return Response(data={'message':"success","id":serializer.data['id'], "group":group_id},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -593,8 +616,8 @@ class SubLayerViewset(viewsets.ModelViewSet):
                     sub_layer_style_instance=SubLayerStyle.objects.create(sub_layer=sub_layer_instance,project_style=project_style_instance)
                 if 'icon' in request_dict.keys():
                     sub_layer_style_instance.icon=request_dict['icon']
-                if 'icon_size' in request_dict.keys():
-                    sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
+                # if 'icon_size' in request_dict.keys():
+                #     sub_layer_style_instance.icon_size=json.loads(request_dict['icon_size'])
                 if 'style' in request_dict.keys():
                     sub_layer_style_instance.style=json.loads(request_dict['style'])
                 if 'std_icon' in request_dict.keys():
@@ -623,7 +646,10 @@ def get_layer_upload_task_response(request):
             try:
                 response, layer_id = result.get()
                 if response == "successful":
-                    return Response({"message": response, "layer_id": layer_id}, status=200)
+                    layer_instance=Layer.active.get(id=int(layer_id))
+                    theme_id=layer_instance.theme.id if layer_instance.theme else None
+                    group_id = layer_instance.group.id if layer_instance.group else None
+                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
                 else:
                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
@@ -757,6 +783,18 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     vector_tile_fields = ('pk','layer','attributes')
 
     def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         queryset=FeatureCollection.objects.all()
         request_keys = request.GET.keys()
         '''filter by layer id'''
@@ -775,19 +813,31 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     VectorTile Generation for Advance Filter Layer
-    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer_id=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
     '''
 
     vector_tile_layer_name = None
     vector_tile_fields = ('pk', 'layer', 'attributes')
 
     def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
-        if 'layer_id' not in request_keys or request.GET['layer_id'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
+        if 'layer' not in request_keys or request.GET['layer'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        layer_id = request.GET['layer_id']
+        layer_id = request.GET['layer']
         if not Layer.active.filter(id=layer_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_instance = Layer.objects.get(id=layer_id)
@@ -822,6 +872,7 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 @api_view(['GET'])
+@permission_classes([LayerDownloadPermission])
 def layer_download(request):
     '''
     Download vector data in popular formats
@@ -1029,6 +1080,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectsLayerTemplate.active.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [ProjectLayerTemplatePermission]
     default_serializer_class = ProjectLayerTemplateSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('project', )
@@ -1108,6 +1160,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     '''
     queryset = ProjectsLayerTemplateAttribute.objects.all()
     http_method_names = ['get', 'post', 'patch']
+    permission_classes = [ProjectsLayerTemplateAttributePermission]
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ('layer_template', )
@@ -1122,11 +1175,11 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         '''
-        http://localhost:8000/api/maps/project_layer_template_attribute/?template=2
+        http://localhost:8000/api/maps/project_layer_template_attribute/?layer_template=2
         '''
         layer_template = request.query_params.get('layer_template', None)
         if not layer_template:
-            return Response(data={'message': 'params template is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'message': 'params layer_template is missing'}, status=status.HTTP_400_BAD_REQUEST)
         # queryset = self.queryset.filter(layer_template__id=layer_template)
         self.queryset=self.filter_queryset(self.queryset)
         serializer = self.get_serializer(self.queryset, many=True)
@@ -1182,6 +1235,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 @api_view(['POST'])
+@permission_classes([ImportTemplatePermission])
 def import_template(request):
     '''
     View to import General Template for a specific project
@@ -1211,3 +1265,18 @@ def import_template(request):
     except Exception as e:
         ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
         return Response(data='Error: '+str(e))
+
+'''GeoJSON API for features.'''
+class FeatureGeoJSONAPIView(APIView):
+    permission_classes = [FeatureGeoJSONPermission]
+    def get(self, request, pk=None, *args, **kwargs):
+        try:
+            feature_qs = FeatureCollection.active.filter(id=pk)
+            if feature_qs.exists():
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
+                geojson_data = json.loads(data)
+            else:
+                return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data=geojson_data, status=status.HTTP_200_OK)

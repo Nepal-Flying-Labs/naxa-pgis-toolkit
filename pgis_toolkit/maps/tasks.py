@@ -28,9 +28,8 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
-
-from .functions import (
-    clear_dir,
+from pgis_toolkit.maps.utils.functions import clear_dir
+from pgis_toolkit.maps.utils.layer_upload import (
     handleCSV,
     handleGeoJSON,
     handleGPX,
@@ -193,8 +192,8 @@ def UploadRasterLayer(layer_id, request_dict):
     from config.settings.base import MEDIA_ROOT, env
     from config.settings.local import geoserver
     from pgis_toolkit.maps.api.serializers import RasterLayerSerializer
-    from pgis_toolkit.maps.functions import clear_dir
     from pgis_toolkit.maps.models import Layer, LayerFile, RasterLayer
+    from pgis_toolkit.maps.utils.functions import clear_dir
 
     try:
         errors=[]
@@ -279,6 +278,7 @@ def UpdateRasterLayer(layer_id, request_dict):
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
             return "successful", layer_id
+        return "successful", layer_id
     except Exception as e:
         return str(e), None
 

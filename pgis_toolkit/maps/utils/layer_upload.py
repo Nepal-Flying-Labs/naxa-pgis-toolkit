@@ -4,13 +4,10 @@ import os
 import shutil
 import zipfile
 from distutils.command.config import config
-from typing import List, Optional, Set
 
-import fiona
 import geopandas as gpd
 import kml2geojson
 import pandas as pd
-import requests
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
 from shapely import speedups
@@ -22,22 +19,18 @@ from shapely.geometry import (
     Point,
     Polygon,
 )
-from sqlalchemy import create_engine
 
 from config.settings.base import env
 from config.settings.local import geoserver
-
-from .models import (
+from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
     LayerAttribute,
     LayerFile,
-    LayerStyle,
-    SubLayerStyle,
     Vectorlayer,
 )
 
-
+'''
 class Geoserver1:
     """
     Attributes
@@ -160,11 +153,11 @@ def test_advertised():
     print(geoserver1.get_workspaces(),"geoserver1")
     sql = 'SELECT * FROM maps_featurecollection WHERE layer_id = 309'
     geoserver.publish_featurestore_sqlview(store_name="SecurityForcesGeoserver88", name="SecurityForcesGeoserver88_mannual7", sql=sql, workspace='pgis')
-
+'''
 
 
 def geoserver_layer_publish(layer_instance):
-    print("geoserver layer publish called")
+    # print("geoserver layer publish called")
     '''Geoserver layer publish'''
     table_name = layer_instance.name.replace(" ", "")
     try:
@@ -570,85 +563,3 @@ def handleGeoJSON(layer_id):
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
-
-#function to clear files in a specific directory
-def clear_dir(dir):
-    for files in os.listdir(dir):
-        path = os.path.join(dir, files)
-        try:
-            shutil.rmtree(path) #clearing directory
-            os.rmdir(dir) #removing directory
-        except OSError:
-            os.remove(path)
-
-'''function to filer dataset'''
-def advance_filter_data(field, operator, value, dataset):
-    result_dataset = []
-    if operator == 1:
-        key = "attributes__"+field
-    elif operator == 2:
-        key = "attributes__"+field+"__lt"
-    elif operator == 3:
-        key = "attributes__"+field+"__gt"
-    elif operator == 4:
-        key = "attributes__"+field
-    elif operator == 5:
-        key = "attributes__"+field+"__lte"
-    elif operator == 6:
-        key = "attributes__"+field+"__gte"
-    elif operator == 7:
-        if "%" in value:
-            if value.startswith("%") and value.endswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__icontains"
-            elif value.startswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__endswith"
-            elif value.endswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__startswith"
-            elif not value.startswith("%") and not value.endswith("%"):
-                value = value.split("%")
-                key1 = "attributes__"+field+"__startswith"
-                key2 = "attributes__"+field+"__endswith"
-                filter_dict = {}
-                filter_dict[key1] = value[0]
-                filter_dict[key2] = value[1]
-                result_dataset = dataset.filter(**filter_dict)
-                return result_dataset
-    filter_dict = {}
-    filter_dict[key] = value
-    result_dataset = dataset.filter(**filter_dict)
-    return result_dataset
-
-
-def get_style_detail(layer_id,sublayer_id,project_style):
-    icon,icon_size,style,std_icon=None,None,None,None
-    layer_style_qs=LayerStyle.objects.select_related('layer','project_style')
-    if sublayer_id:
-        sub_layer_style_qs=SubLayerStyle.objects.select_related('sub_layer','project_style')
-        if project_style=="default":
-            style_instance=sub_layer_style_qs.filter(sub_layer=sublayer_id,project_style=None)
-            if not style_instance.exists():
-                style_instance=layer_style_qs.filter(layer=layer_id,project_style=None)
-        else:
-            style_instance=sub_layer_style_qs.filter(sub_layer=sublayer_id,project_style=project_style)
-            if not style_instance.exists():
-                style_instance=sub_layer_style_qs.filter(sub_layer=sublayer_id,project_style=None)
-                if not style_instance.exists():
-                    style_instance=layer_style_qs.filter(layer=layer_id,project_style=None)
-    else:
-        if project_style=="default":
-            style_instance=layer_style_qs.filter(layer=layer_id,project_style=None)
-        else:
-            style_instance=layer_style_qs.filter(layer=layer_id,project_style=project_style)
-            if not style_instance.exists():
-                style_instance=layer_style_qs.filter(layer=layer_id,project_style=None)
-    if style_instance.exists():
-        # icon_url=env("URL")+style_instance[0].icon.url if style_instance[0].icon else None
-        # std_icon_url=env("URL")+style_instance[0].std_icon.icon.url if style_instance[0].std_icon else None
-        icon=style_instance[0].get_icon_url
-        std_icon=style_instance[0].get_std_icon_url
-        icon_size=style_instance[0].icon_size
-        style=style_instance[0].style
-    return icon,icon_size,style,std_icon

@@ -9,8 +9,10 @@ from django.contrib.auth.models import Group, Permission
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db.models.query import QuerySet
+from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -24,7 +26,7 @@ from rest_framework.viewsets import GenericViewSet
 from config.settings import base as settings
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
-from pgis_toolkit.users.permissions import IsAuthorizedInviter, IsTaskAuthorized
+from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
@@ -705,3 +707,10 @@ class UserRoleUpdateView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+@ ensure_csrf_cookie
+def set_csrf_token(request):
+    """
+    This will be `/api/set-csrf-cookie/` on `urls.py`
+    """
+    return JsonResponse({"details": "CSRF cookie set"})

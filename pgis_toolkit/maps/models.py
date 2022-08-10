@@ -61,6 +61,9 @@ class Layer(IsDeleted,DateTimeStamp):
         return f'{self.id} {self.name}'
     class Meta:
         app_label = 'maps'
+        permissions = (
+            ('download_layer', 'Can download layer'),
+        )
 
     @property
     def vector_layer(self):
@@ -310,7 +313,7 @@ class LayerStyle(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE)
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
-    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    # icon_size = models.JSONField(default=dict,blank=True, null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_style_std_icon",blank=True,null=True)
 
     class Meta:
@@ -328,7 +331,7 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.CASCADE)
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
     icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
-    icon_size = models.JSONField(default=dict,blank=True, null=True)
+    # icon_size = models.JSONField(default=dict,blank=True, null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="sublayer_style_std_icon",blank=True,null=True)
 
     class Meta:
