@@ -283,59 +283,49 @@ def project_theme_layers(request):
             project_style="default"
         if not theme_id:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
+
         layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
-        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme=theme_id)
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
-        group_list=[]
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type')
             for layer in group_layer_qs:
-                layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
-                if layer.layer_type=="Vector":
-                    icon,style,std_icon=get_style_detail(layer.id,None,project_style)
+                layer_item=layer
+                if layer['layer_type']=="Vector":
+                    icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
-                    # layer_item['icon_size']=icon_size
                     layer_item['style']=style
-                # elif layer.layer_type=="Raster":
-                #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
-                # elif layer.layer_type=="WMS":
-                #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+                    # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
-            # group_list.append(group_item)
             options.append(group_item)
-        layer_list=[]
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type')
         for layer in layer_qs:
-            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
-            if layer.layer_type=="Vector":
-                layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+            layer_item=layer
+            if layer['layer_type']=="Vector":
                 sub_layer_list=[]
-                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
-                # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
+
+                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer['id']).values('id','name')
                 for sub_layer in sub_layer_qs:
-                    icon,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
-                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'style':style}
+                    icon,style,std_icon=get_style_detail(layer['id'],sub_layer['id'],project_style)
+                    sub_layer_item=sub_layer
+                    sub_layer_item['icon']=icon
+                    sub_layer_item['std_icon']=std_icon
+                    sub_layer_item['style']=style
+                    # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
-                icon,style,std_icon=get_style_detail(layer.id,None,project_style)
+
+                icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
-                # layer_item['icon_size']=icon_size,
                 layer_item['style']=style
+                # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
-            # elif layer.layer_type=="Raster":
-            #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
-            # elif layer.layer_type=="WMS":
-            #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
-            # layer_list.append(layer_item)
             options.append(layer_item)
-        # theme_item={'group':group_list,'layer':layer_list}
         return Response(options,status=200)
-        # return Response(theme_item,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
