@@ -421,10 +421,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
-                    print("is_vector")
                     '''check whether celery is working or not'''
                     is_working=get_celery_worker_status()
-                    print(is_working,"is_working")
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
@@ -1280,11 +1278,19 @@ class FeatureGeoJSONAPIView(APIView):
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-'''API for data merge/update'''
+'''
+API for data merge/update
+missed_col = yes means merge/udate missed columns
+extra_col = yes means merge/update extra columns
+verified = yes means the user has insisted on merging/updating columns even after missed or extra columns
+'''
 class DataMergeUpdateAPIView(APIView):
-    def post(self, request, pk=None, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         errors=[]
         try:
+            missed_col= request.data.get('missed_col', 'no')
+            extra_col = request.data.get('extra_col', 'no')
+            verified = request.data.get('verified', 'no')
             layer = request.data.get('layer', None)
             layer_file_instance = None
             if layer and Layer.active.filter(id=layer).exists():
@@ -1298,15 +1304,15 @@ class DataMergeUpdateAPIView(APIView):
                 else:
                     return Response(data={'message': 'File is missing!'}, status=status.HTTP_400_BAD_REQUEST)
                 dir = MEDIA_ROOT+"/geofiles/"
-                '''Knowing file extension'''
-                path_split = os.path.splitext(layer_file_instance.file.name)
-                file_extension = path_split[1]
-                if file_extension == ".zip":
-                    response = handleDataMergeUpdate(layer)
-                    return Response(response)
+                response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
+                print(response, "are response")
+                print(code, "is code")
+                '''clear directory'''
+                clear_dir(dir)
+                if response == "success" or code == 200:
+                    return Response(response, status=status.HTTP_200_OK)
                 else:
-                    clear_dir(dir)
-                    return Response(data={'message': 'Only Shapfiles in zipped format are supported!'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(data={'message': 'Layer matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
