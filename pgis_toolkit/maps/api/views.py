@@ -297,7 +297,7 @@ def project_theme_layers(request):
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['style']=style
-                    layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
+                    # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
@@ -315,14 +315,14 @@ def project_theme_layers(request):
                     sub_layer_item['icon']=icon
                     sub_layer_item['std_icon']=std_icon
                     sub_layer_item['style']=style
-                    sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
+                    # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
 
                 icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
                 layer_item['style']=style
-                layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
+                # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
             options.append(layer_item)
         return Response(options,status=200)
