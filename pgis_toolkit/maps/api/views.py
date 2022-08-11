@@ -69,6 +69,7 @@ from pgis_toolkit.maps.tasks import (
     UploadRasterLayer,
     UploadVectorLayer,
     UploadWMSLayer,
+    handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
 from pgis_toolkit.maps.utils.functions import clear_dir
@@ -413,10 +414,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
-                    print("is_vector")
                     '''check whether celery is working or not'''
                     is_working=get_celery_worker_status()
-                    print(is_working,"is_working")
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
@@ -1257,6 +1256,7 @@ def import_template(request):
         return Response(data='Error: '+str(e))
 
 '''GeoJSON API for features.'''
+'''{{baseURL}}api/maps/feature/2/'''
 class FeatureGeoJSONAPIView(APIView):
     permission_classes = [FeatureGeoJSONPermission]
     def get(self, request, pk=None, *args, **kwargs):
@@ -1265,8 +1265,48 @@ class FeatureGeoJSONAPIView(APIView):
             if feature_qs.exists():
                 data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
                 geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=status.HTTP_200_OK)
             else:
                 return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(data=geojson_data, status=status.HTTP_200_OK)
+
+'''
+API for data merge/update
+missed_col = yes means merge/udate missed columns
+extra_col = yes means merge/update extra columns
+verified = yes means the user has insisted on merging/updating columns even after missed or extra columns
+'''
+class DataMergeUpdateAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        errors=[]
+        try:
+            missed_col= request.data.get('missed_col', 'no')
+            extra_col = request.data.get('extra_col', 'no')
+            verified = request.data.get('verified', 'no')
+            layer = request.data.get('layer', None)
+            layer_file_instance = None
+            if layer and Layer.active.filter(id=layer).exists():
+                layer_instance = Layer.active.get(id=layer)
+                if layer_instance.layer_type != 'Vector':
+                    return Response(data={'message': 'Data Merge and Update features are valid for vector layers only!'}, status=status.HTTP_400_BAD_REQUEST)
+                if 'file' in request.FILES and request.FILES.get('file') != "":
+                    layer_file_instance = LayerFile.objects.get(layer__id=layer)
+                    layer_file_instance.file=request.FILES['file']
+                    layer_file_instance.save()
+                else:
+                    return Response(data={'message': 'File is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+                dir = MEDIA_ROOT+"/geofiles/"
+                response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
+                print(response, "are response")
+                print(code, "is code")
+                '''clear directory'''
+                clear_dir(dir)
+                if response == "success" or code == 200:
+                    return Response(response, status=status.HTTP_200_OK)
+                else:
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(data={'message': 'Layer matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -217,13 +217,13 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                     if feature_bbox[0]<layer_bbox[0]:
                         layer_bbox[0]=feature_bbox[0]
 
-                    elif feature_bbox[1]<layer_bbox[1]:
+                    if feature_bbox[1]<layer_bbox[1]:
                         layer_bbox[1]=feature_bbox[1]
 
-                    elif feature_bbox[2]>layer_bbox[2]:
+                    if feature_bbox[2]>layer_bbox[2]:
                         layer_bbox[2]=feature_bbox[2]
 
-                    elif feature_bbox[3]>layer_bbox[3]:
+                    if feature_bbox[3]>layer_bbox[3]:
                         layer_bbox[3]=feature_bbox[3]
 
                     # else:
@@ -236,19 +236,19 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                     if sub_layer_bbox[0] < layer_bbox[0]:
                         sub_layer_bbox[0]=feature_bbox[0]
 
-                    elif sub_layer_bbox[1] < layer_bbox[1]:
+                    if sub_layer_bbox[1] < layer_bbox[1]:
                         sub_layer_bbox[1]= feature_bbox[1]
 
-                    elif sub_layer_bbox[2] > layer_bbox[2]:
+                    if sub_layer_bbox[2] > layer_bbox[2]:
                         sub_layer_bbox[2]=feature_bbox[2]
 
-                    elif sub_layer_bbox[3]>layer_bbox[3]:
+                    if sub_layer_bbox[3]>layer_bbox[3]:
                         sub_layer_bbox[3]=feature_bbox[3]
 
                     # else:
                     #     print("sub no case satisfies")
                     sub_layer_instance.bbox=sub_layer_bbox
-                elif feature_bbox:
+                elif sub_layer_instance and feature_bbox:
                     sub_layer_instance.bbox=feature_bbox
                 '''save bbox'''
                 vector_layer_instance.save()
