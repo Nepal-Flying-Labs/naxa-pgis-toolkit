@@ -4,6 +4,7 @@ from functools import reduce
 import environ
 from django.db.models import Count, Q
 from django.http import HttpResponse
+from rest_framework import status
 
 from pgis_toolkit.projects.models import Organization, Project
 from pgis_toolkit.users.models import UserRole
@@ -14,14 +15,14 @@ env = environ.Env()
 def get_project_queryset(request, user):
     try:
         if not request.GET.keys():
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponse('No request params is given!', status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
         '''filter by organization'''
         if 'organization' not in request_keys or request.GET['organization'] == "":
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponse('Params organization is missing', status=status.HTTP_400_BAD_REQUEST)
         organization_id = request.GET['organization']
         if not Organization.active.filter(id=organization_id).exists():
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponse('Organization matching queryset does not exist!', status=status.HTTP_400_BAD_REQUEST)
         organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
         '''superuser gets to see all project sites'''
         if user.is_superuser == True:
@@ -66,6 +67,6 @@ def get_project_queryset(request, user):
             organization_project_qs = organization_project_qs.filter(country__id=country)
         return organization_project_qs
     except Exception as e:
-        error = {'error': 'Error occured in get_project_queryset method. Details: '+ str(e)}
+        error = 'Error occured in get_project_queryset method. Details: '+ str(e)
         print(error)
-        return error
+        return str(e)
