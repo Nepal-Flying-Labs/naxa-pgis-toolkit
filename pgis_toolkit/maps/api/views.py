@@ -1273,9 +1273,9 @@ class FeatureGeoJSONAPIView(APIView):
 
 '''
 API for data merge/update
-missed_col = yes means merge/udate missed columns
+missed_col = yes means merge/udate missed columns with null values. If no, terminate process from frontend.
 extra_col = yes means merge/update extra columns
-verified = yes means the user has insisted on merging/updating columns even after missed or extra columns
+verified = yes means the user has insisted on merging/updating columns even after missed or extra columns and missed rows. If no, terminate process from frontend.
 '''
 class DataMergeUpdateAPIView(APIView):
     def post(self, request, *args, **kwargs):
@@ -1296,17 +1296,41 @@ class DataMergeUpdateAPIView(APIView):
                     layer_file_instance.save()
                 else:
                     return Response(data={'message': 'File is missing!'}, status=status.HTTP_400_BAD_REQUEST)
-                dir = MEDIA_ROOT+"/geofiles/"
-                response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
-                print(response, "are response")
-                print(code, "is code")
-                '''clear directory'''
-                clear_dir(dir)
-                if response == "success" or code == 200:
-                    return Response(response, status=status.HTTP_200_OK)
-                else:
-                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+                '''check whether celery is working or not'''
+                is_working=get_celery_worker_status()
+                if is_working != "working":
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                response = handleDataMergeUpdate.delay(layer, missed_col, extra_col, verified)
+                return Response(status=200, data={'message': 'Updating/Merging Data', 'task_id': response.task_id})
+                # response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
+                # '''clear directory'''
+                # clear_dir(dir)
+                # if response == "success" or code == 200:
+                #     return Response(response, status=status.HTTP_200_OK)
+                # else:
+                #     return Response(response, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(data={'message': 'Layer matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_data_merge_update_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data merge update
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                response, code = result.get()
+                if response == "success" or code == 200:
+                    return Response(response, status=status.HTTP_200_OK)
+                else:
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
