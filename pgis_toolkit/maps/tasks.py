@@ -296,10 +296,24 @@ def UploadWMSLayer(layer_id, request_dict):
         WMSLayer.objects.get_or_create(layer=layer_instance, url=request_dict['url'])
     return Response(data={'message': 'URL is mandatory!'}, status=status.HTTP_400_BAD_REQUEST)
 
-from django.contrib.gis.geos import GEOSGeometry
 
-
+@shared_task(max_retries=1, soft_time_limit=8000)
 def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
+    from django.contrib.gis.geos import GEOSGeometry
+
+    from pgis_toolkit.maps.models import (
+        FeatureCollection,
+        Layer,
+        LayerAttribute,
+        LayerFile,
+        Vectorlayer,
+    )
+    from pgis_toolkit.maps.utils.layer_upload import (
+        get_standard_dtype,
+        handleGeoJSONForDataMerge,
+        handleShapeFileForDataMerge,
+        validate_geometry_type,
+    )
     try:
         print("entered maps > tasks > handleDataMergeUpdate")
         errors = []
@@ -314,9 +328,12 @@ def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
         if file_extension == ".zip":
             geodataframe = handleShapeFileForDataMerge(layer_file_path)
         elif file_extension == ".geojson":
-            geodataframe = handleShapeFileForDataMerge(layer_file_path)
+            geodataframe = handleGeoJSONForDataMerge(layer_file_path)
         else:
             return ('Only Shapefile and GeoJSON file formats are supported!', None)
+        '''clear directory'''
+        dir = MEDIA_ROOT+"/geofiles/"
+        clear_dir(dir)
         if isinstance(geodataframe, str):
             return geodataframe, None
         '''retrieving geometry type'''
