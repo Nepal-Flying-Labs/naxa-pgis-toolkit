@@ -69,6 +69,7 @@ from pgis_toolkit.maps.tasks import (
     UploadRasterLayer,
     UploadVectorLayer,
     UploadWMSLayer,
+    handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
 from pgis_toolkit.maps.utils.functions import clear_dir
@@ -283,59 +284,49 @@ def project_theme_layers(request):
             project_style="default"
         if not theme_id:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
+
         layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
-        vector_layer_qs=Vectorlayer.objects.select_related('layer').filter(layer__theme=theme_id)
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
-        group_list=[]
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type')
             for layer in group_layer_qs:
-                layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
-                if layer.layer_type=="Vector":
-                    icon,style,std_icon=get_style_detail(layer.id,None,project_style)
+                layer_item=layer
+                if layer['layer_type']=="Vector":
+                    icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
-                    # layer_item['icon_size']=icon_size
                     layer_item['style']=style
-                # elif layer.layer_type=="Raster":
-                #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
-                # elif layer.layer_type=="WMS":
-                #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
+                    # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
-            # group_list.append(group_item)
             options.append(group_item)
-        layer_list=[]
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order')
 
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type')
         for layer in layer_qs:
-            layer_item={"id":layer.id,"name":layer.name,'layer_type':layer.layer_type}
-            if layer.layer_type=="Vector":
-                layer_detail_instance=vector_layer_qs.get(layer=layer.id)
+            layer_item=layer
+            if layer['layer_type']=="Vector":
                 sub_layer_list=[]
-                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id)
-                # sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer.id).values('id','name','icon','icon_size','style')
+
+                sub_layer_qs=SubLayer.active.select_related('layer').filter(layer=layer['id']).values('id','name')
                 for sub_layer in sub_layer_qs:
-                    icon,style,std_icon=get_style_detail(layer.id,sub_layer.id,project_style)
-                    sub_layer_item={"id":sub_layer.id,"name":sub_layer.name,'icon':icon,'std_icon':std_icon,'style':style}
+                    icon,style,std_icon=get_style_detail(layer['id'],sub_layer['id'],project_style)
+                    sub_layer_item=sub_layer
+                    sub_layer_item['icon']=icon
+                    sub_layer_item['std_icon']=std_icon
+                    sub_layer_item['style']=style
+                    # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
-                icon,style,std_icon=get_style_detail(layer.id,None,project_style)
+
+                icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
-                # layer_item['icon_size']=icon_size,
                 layer_item['style']=style
+                # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
-            # elif layer.layer_type=="Raster":
-            #     layer_detail_instance=RasterLayer.objects.get(layer=layer.id)
-            # elif layer.layer_type=="WMS":
-            #     layer_detail_instance=WMSLayer.objects.get(layer=layer.id)
-            # layer_list.append(layer_item)
             options.append(layer_item)
-        # theme_item={'group':group_list,'layer':layer_list}
         return Response(options,status=200)
-        # return Response(theme_item,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
@@ -423,10 +414,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 created_object = serializer.save()
                 layer_type = created_object.layer_type
                 if layer_type == "Vector":
-                    print("is_vector")
                     '''check whether celery is working or not'''
                     is_working=get_celery_worker_status()
-                    print(is_working,"is_working")
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
@@ -1267,6 +1256,7 @@ def import_template(request):
         return Response(data='Error: '+str(e))
 
 '''GeoJSON API for features.'''
+'''{{baseURL}}api/maps/feature/2/'''
 class FeatureGeoJSONAPIView(APIView):
     permission_classes = [FeatureGeoJSONPermission]
     def get(self, request, pk=None, *args, **kwargs):
@@ -1275,8 +1265,72 @@ class FeatureGeoJSONAPIView(APIView):
             if feature_qs.exists():
                 data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
                 geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=status.HTTP_200_OK)
             else:
                 return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(data=geojson_data, status=status.HTTP_200_OK)
+
+'''
+API for data merge/update
+missed_col = yes means merge/udate missed columns with null values. If no, terminate process from frontend.
+extra_col = yes means merge/update extra columns
+verified = yes means the user has insisted on merging/updating columns even after missed or extra columns and missed rows. If no, terminate process from frontend.
+'''
+class DataMergeUpdateAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        errors=[]
+        try:
+            missed_col= request.data.get('missed_col', 'no')
+            extra_col = request.data.get('extra_col', 'no')
+            verified = request.data.get('verified', 'no')
+            layer = request.data.get('layer', None)
+            layer_file_instance = None
+            if layer and Layer.active.filter(id=layer).exists():
+                layer_instance = Layer.active.get(id=layer)
+                if layer_instance.layer_type != 'Vector':
+                    return Response(data={'message': 'Data Merge and Update features are valid for vector layers only!'}, status=status.HTTP_400_BAD_REQUEST)
+                if 'file' in request.FILES and request.FILES.get('file') != "":
+                    layer_file_instance = LayerFile.objects.get(layer__id=layer)
+                    layer_file_instance.file=request.FILES['file']
+                    layer_file_instance.save()
+                else:
+                    return Response(data={'message': 'File is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+                '''check whether celery is working or not'''
+                is_working=get_celery_worker_status()
+                if is_working != "working":
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                response = handleDataMergeUpdate.delay(layer, missed_col, extra_col, verified)
+                return Response(status=200, data={'message': 'Updating/Merging Data', 'task_id': response.task_id})
+                # response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
+                # '''clear directory'''
+                # clear_dir(dir)
+                # if response == "success" or code == 200:
+                #     return Response(response, status=status.HTTP_200_OK)
+                # else:
+                #     return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(data={'message': 'Layer matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_data_merge_update_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data merge update
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                response, code = result.get()
+                if response == "success" or code == 200:
+                    return Response(response, status=status.HTTP_200_OK)
+                else:
+                    return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

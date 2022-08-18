@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Count, Q
+from django.db.models.query import QuerySet
 from django.http import HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -28,6 +29,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
+    Country,
     DefaultTheme,
     Document,
     LayerTemplate,
@@ -37,6 +39,7 @@ from pgis_toolkit.projects.models import (
     Project,
     ProjectLocationFeatureCollection,
     RequestDemo,
+    State,
 )
 from pgis_toolkit.projects.permissions import (
     DocumentDownloadPermission,
@@ -392,8 +395,11 @@ class ProjectViewset(viewsets.ModelViewSet):
             #     queryset = queryset.filter(
             #         reduce(operator.or_, list_of_Q)) if search_fields else queryset
             queryset = get_project_queryset(request, request.user)
-            if isinstance(queryset, dict) and 'error' in queryset.keys():
-                return Response(data=queryset, status=status.HTTP_400_BAD_REQUEST)
+            if not isinstance(queryset, QuerySet):
+                if isinstance(queryset, HttpResponse):
+                    return Response(queryset.content, status=queryset.status_code)
+                else:
+                    return Response(data=queryset, status=status.HTTP_400_BAD_REQUEST)
             '''filter by polygon_wkt'''
             polygon_wkt = request.query_params.get('polygon_wkt', None)
             if polygon_wkt and polygon_wkt != "":
@@ -690,8 +696,12 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         # organization_project_list = organization_project_qs.values_list('id', flat=True)
         #################################################################################
         organization_project_qs = get_project_queryset(request, user)
-        if isinstance(organization_project_qs, dict) and 'error' in organization_project_qs.keys():
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(organization_project_qs, QuerySet):
+            print(organization_project_qs, type(organization_project_qs), "is response")
+            if isinstance(organization_project_qs, HttpResponse):
+                return organization_project_qs
+            else:
+                return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         organization_project_list = organization_project_qs.values_list('id', flat=True)
         queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
         '''filter by polygon_wkt'''
@@ -819,3 +829,20 @@ class RequestDemoViewset(viewsets.ModelViewSet):
         elif self.action == 'create':
             permission_classes = [AllowAny]
         return [permission() for permission in permission_classes]
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_country_choices(request, *args, **kwargs):
+    data = Country.objects.all().values('id', 'name')
+    return Response(data=data, status=200)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_state_choices(request, *args, **kwargs):
+    country = request.query_params.get('country', None)
+    if country:
+        country_list = json.loads(country)
+        data = State.objects.filter(country__id__in=country_list).values('id', 'name')
+    else:
+        data = State.objects.all().values('id', 'name')
+    return Response(data=data, status=200)

@@ -1,6 +1,9 @@
+import glob
 import json
 import os
+import shutil
 import time
+import zipfile
 from logging import exception
 
 import geopandas
@@ -20,6 +23,7 @@ from pgis_toolkit.maps.api.serializers import (
 from pgis_toolkit.maps.models import (
     FeatureCollection,
     Layer,
+    LayerAttribute,
     LayerFile,
     LayerStyle,
     ProjectStyle,
@@ -30,11 +34,15 @@ from pgis_toolkit.maps.models import (
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.layer_upload import (
+    get_standard_dtype,
     handleCSV,
     handleGeoJSON,
+    handleGeoJSONForDataMerge,
     handleGPX,
     handleKML,
     handleShapeFile,
+    handleShapeFileForDataMerge,
+    validate_geometry_type,
 )
 
 
@@ -287,3 +295,149 @@ def UploadWMSLayer(layer_id, request_dict):
         layer_instance = Layer.active.get(id=layer_id)
         WMSLayer.objects.get_or_create(layer=layer_instance, url=request_dict['url'])
     return Response(data={'message': 'URL is mandatory!'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
+    from django.contrib.gis.geos import GEOSGeometry
+
+    from pgis_toolkit.maps.models import (
+        FeatureCollection,
+        Layer,
+        LayerAttribute,
+        LayerFile,
+        Vectorlayer,
+    )
+    from pgis_toolkit.maps.utils.layer_upload import (
+        get_standard_dtype,
+        handleGeoJSONForDataMerge,
+        handleShapeFileForDataMerge,
+        validate_geometry_type,
+    )
+    try:
+        print("entered maps > tasks > handleDataMergeUpdate")
+        errors = []
+        layer_instance = Layer.objects.get(id=layer_id)
+        vector_layer_instance = Vectorlayer.objects.get(layer=layer_id)
+        layer_file = LayerFile.objects.get(layer=layer_id).file
+        layer_file_path = layer_file.path
+        '''Knowing file extension'''
+        path_split = os.path.splitext(layer_file.name)
+        file_extension = path_split[1]
+        '''handle shapfile'''
+        if file_extension == ".zip":
+            geodataframe = handleShapeFileForDataMerge(layer_file_path)
+        elif file_extension == ".geojson":
+            geodataframe = handleGeoJSONForDataMerge(layer_file_path)
+        else:
+            return ('Only Shapefile and GeoJSON file formats are supported!', None)
+        '''clear directory'''
+        dir = MEDIA_ROOT+"/geofiles/"
+        clear_dir(dir)
+        if isinstance(geodataframe, str):
+            return geodataframe, None
+        '''retrieving geometry type'''
+        response,geom_type=validate_geometry_type(geodataframe)
+        if not geom_type:
+            return (response, None)
+        '''validaing geometry type'''
+        if vector_layer_instance.geom_type != geom_type:
+            return (f"Existing layer geom type {vector_layer_instance.geom_type} and incoming data geom type {geom_type} doesn't match!", None)
+        '''retrieving data types of columns'''
+        col_properties = geodataframe.dtypes.to_dict()
+        col_properties.pop('geometry')
+        col_prop_keys = col_properties.keys()
+        layer_attributes = LayerAttribute.objects.select_related('layer').filter(layer=layer_instance)
+        layer_attributes_qs = layer_attributes.values('name', 'data_type')
+        missed_col_list = []
+        missed_rows_list = []
+        data_type_response = {'Column Name': 'Existing Data Type > Incoming Data Type'}
+        response_dict = {}
+        for attr in layer_attributes_qs:
+            name = attr['name']
+            '''validating attribute name'''
+            if not name in col_prop_keys:
+                missed_col_list.append(name)
+                continue
+            col_data_type = get_standard_dtype(col_properties[name])
+            '''validating attribute data type'''
+            if attr['data_type'] != col_data_type:
+                data_type_response[name] = f'{attr["data_type"]} > {col_data_type}'
+        if len(data_type_response) > 1:
+            return ({'error': 'data type mismatch!', 'details': data_type_response}, None)
+        '''post validation'''
+        '''check if any extra columns are present!'''
+        layer_attributes_list = layer_attributes.values_list('name', flat=True)
+        new_columns = list(set(col_prop_keys) - set(layer_attributes_list))
+        '''update/merge data if verified using geopandas'''
+        '''checking if id column is present or not'''
+        merge = 'yes' if not 'id' in col_prop_keys else 'no'
+        feature_coll_ids = FeatureCollection.active.filter(layer=layer_instance).values_list('id', flat=True)
+        '''missed records which are already in the system'''
+        ids_list = geodataframe['id'].values.tolist()
+        missed_rows_list = list(set(feature_coll_ids) - set(ids_list))
+        if verified == 'no':
+            if missed_col_list:
+                response_dict['missed_col_list'] = missed_col_list
+            if new_columns:
+                response_dict['extra_col_list'] = new_columns
+            if missed_rows_list:
+                response_dict['missed_rows_list'] = missed_rows_list
+            return response_dict, 200
+        # missed_col_dict = {}
+        '''update geodataframe with missed coumns if merge/update is insisted. '''
+        if missed_col_list and missed_col == 'yes':
+            missed_col_dict = dict.fromkeys(missed_col_list, None)
+            geodataframe = geodataframe.assign(**missed_col_dict)
+            '''if extra column is present and user does not intend to keep it.'''
+        if new_columns and extra_col == 'no':
+            geodataframe.drop(new_columns, axis=1, inplace=True)
+            '''missed rows should be updated if there are any new columns'''
+        if new_columns and missed_rows_list and verified == 'yes':
+            missed_feature_qs = FeatureCollection.active.filter(id__in=missed_rows_list)
+            new_col_dict = dict.fromkeys(new_columns, None)
+            for feature in missed_feature_qs:
+                attributes_dict = feature.attributes
+                attributes_dict |= new_col_dict
+                feature.attributes = attributes_dict
+                feature.save()
+        for index, row in geodataframe.iterrows():
+            '''removing geometry'''
+            geometry = row["geometry"]
+            dropped_geometry = row.drop(["geometry"])
+            dropped_geometry_dict = dropped_geometry.to_dict()
+            # if missed_col_dict:
+            #     '''add the missed columns' key and value'''
+            #     dropped_geometry_dict |= missed_col_dict
+            for key, value in dropped_geometry_dict.items():
+                '''replacing Nan value to None and '''
+                if str(value).lower() == 'nan' or str(value).lower() == 'none':
+                    dropped_geometry_dict[key] = None
+                if merge == 'yes':
+                    '''directly create features if column id is not present in incoming files'''
+                    FeatureCollection.active.create(layer=layer_instance, geometry=GEOSGeometry(str(geometry)), attributes=dropped_geometry_dict)
+                    '''checking if id exists or not'''
+                elif key == 'id':
+                    if value in feature_coll_ids:
+                        '''updating data if it exists'''
+                        feature = FeatureCollection.active.get(id=value)
+                        feature.layer=layer_instance
+                        feature.geometry=GEOSGeometry(str(geometry))
+                        feature.attributes=dropped_geometry_dict
+                        feature.save()
+                    else:
+                        '''creating new features in case the id are not in existing feature collections'''
+                        FeatureCollection.active.create(layer=layer_instance, geometry=GEOSGeometry(str(geometry)), attributes=dropped_geometry_dict)
+        '''create new layerattributes if incoming dataset contains new columns as well'''
+        if extra_col == 'yes':
+            for key in new_columns:
+                key_dtype = get_standard_dtype(col_properties[key])
+                LayerAttribute.objects.create(layer=layer_instance, name=key, data_type=key_dtype)
+        '''update extent of the layer'''
+        total_bounds = geodataframe.total_bounds
+        vector_layer_instance.bbox = total_bounds.tolist()
+        vector_layer_instance.save()
+        return 'success', None
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return ('Error: ' + str(e))

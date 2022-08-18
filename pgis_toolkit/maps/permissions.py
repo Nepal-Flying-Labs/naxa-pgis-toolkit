@@ -301,7 +301,7 @@ class LayerAttributePermission(BasePermission):
 
             if action == 'retrieve':
                 layer_attribute_id=request.resolver_match.kwargs.get('pk')
-                project_id=LayerAttribute.active.get(id=layer_attribute_id).project.id
+                project_id=LayerAttribute.objects.get(id=layer_attribute_id).project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
             group_id=get_user_group(user_id,organization_id,project_id)

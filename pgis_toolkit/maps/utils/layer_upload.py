@@ -155,6 +155,18 @@ def test_advertised():
     geoserver.publish_featurestore_sqlview(store_name="SecurityForcesGeoserver88", name="SecurityForcesGeoserver88_mannual7", sql=sql, workspace='pgis')
 '''
 
+def get_standard_dtype(dtype):
+    dtype = str(dtype)
+    if dtype == 'int64':
+        return 'int'
+    elif dtype == 'float64':
+        return 'float'
+    elif dtype == 'datetime64':
+        return 'date'
+    elif dtype == 'object' or dtype == 'bool':
+        return 'str'
+    else:
+        return 'unknown'
 
 def geoserver_layer_publish(layer_instance):
     # print("geoserver layer publish called")
@@ -295,8 +307,10 @@ def upload_feature(geodataframe, layer_instance, geom_type):
         try:
             for col_name in geodataframe.columns:
                 if col_name != 'geometry':
+                    dtype = geodataframe[col_name].dtypes
+                    data_type = get_standard_dtype(dtype)
                     LayerAttribute.objects.create(
-                        layer=layer_instance, name=col_name)
+                        layer=layer_instance, name=col_name, data_type=data_type)
         except Exception as e:
             Layer.objects.filter(id=layer_id).delete()
             return ("attribute_error : "+str(e))
@@ -562,4 +576,48 @@ def handleGeoJSON(layer_id):
         return response
     except Exception as e:
         Layer.objects.filter(id=layer_id).delete()
+        return ("error occured : " + str(e))
+
+def handleShapeFileForDataMerge(layer_file_path):
+    try:
+        print('entered utils > layer_upload > handleShapeFileForDataMerge function')
+        file_path = os.path.dirname(layer_file_path)
+        with zipfile.ZipFile(layer_file_path, 'r') as zip_ref:
+            zip_ref.extractall(file_path)
+        shape = glob.glob(
+            r'{}/**/*.shp'.format(file_path), recursive=True)[0]
+        geodataframe = gpd.read_file(shape)
+        try:
+            shutil.rmtree(file_path)
+        except OSError as e:
+            print("Error: %s " % (e.strerror))
+        epsg = geodataframe.crs.to_epsg()
+        utm_zone = geodataframe.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted"
+            else:
+                return "Unknown Coordinate System"
+        return geodataframe
+    except Exception as e:
+        print('Error occured in handleShapeFileForDataMerge. Details: '+ str(e))
+        return ('Error: ' + str(e))
+
+def handleGeoJSONForDataMerge(layer_file_path):
+    try:
+        print('entered utils > layer_upload > handleGeoJSONForDataMerge function')
+        file_path = os.path.dirname(layer_file_path)
+        geodataframe = gpd.read_file(layer_file_path)
+        '''coordinate system validation'''
+        epsg = geodataframe.crs.to_epsg()
+        utm_zone = geodataframe.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                Layer.objects.filter(id=layer_id).delete()
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted"
+            else:
+                return "Unknown Coordinate System"
+        return response
+    except Exception as e:
+        print('Error occured in handleGeoJSONForDataMerge. Details: '+ str(e))
         return ("error occured : " + str(e))
