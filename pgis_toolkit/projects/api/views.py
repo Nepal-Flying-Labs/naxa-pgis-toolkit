@@ -29,6 +29,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from pgis_toolkit.maps.models import Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
+    Country,
     DefaultTheme,
     Document,
     LayerTemplate,
@@ -38,6 +39,7 @@ from pgis_toolkit.projects.models import (
     Project,
     ProjectLocationFeatureCollection,
     RequestDemo,
+    State,
 )
 from pgis_toolkit.projects.permissions import (
     DocumentDownloadPermission,
@@ -827,3 +829,20 @@ class RequestDemoViewset(viewsets.ModelViewSet):
         elif self.action == 'create':
             permission_classes = [AllowAny]
         return [permission() for permission in permission_classes]
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_country_choices(request, *args, **kwargs):
+    data = Country.objects.all().values('id', 'name')
+    return Response(data=data, status=200)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_state_choices(request, *args, **kwargs):
+    country = request.query_params.get('country', None)
+    if country:
+        country_list = json.loads(country)
+        data = State.objects.filter(country__id__in=country_list).values('id', 'name')
+    else:
+        data = State.objects.all().values('id', 'name')
+    return Response(data=data, status=200)
