@@ -74,7 +74,7 @@ class PreliminaryUserAPIView(APIView):
         errors=[]
         project_instance, organization_instance = None, None
         try:
-            verify_url = settings.URL + '/api/users/preliminary_user_verify/?token='
+            verify_url = settings.URL + '/verify-user/?token='
             request.data._mutable = True
             email_list = request.data.get('email', None)
             if not email_list:
