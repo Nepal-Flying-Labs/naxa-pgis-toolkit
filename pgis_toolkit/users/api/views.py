@@ -230,7 +230,8 @@ class PreliminaryUserVerificationAPIView(APIView):
                     user_role_serializer.save()
                     '''delete PreliminaryUserInstance once the job is done'''
                     preliminary_user_instance.delete()
-                    return Response(data={'message': 'Successully created new user role.', 'data': data_dict}, status=status.HTTP_200_OK)
+                    return Response(data=data_dict, status=status.HTTP_200_OK)
+                    # return Response(data={'message': 'Successully created new user role.', 'data': data_dict}, status=status.HTTP_200_OK)
                 else:
                     for er in user_role_serializer._errors:
                         errors.append({"errorName": er, "details": serializer._errors[er][0]})
