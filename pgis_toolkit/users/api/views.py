@@ -502,6 +502,17 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserDetailSerializer(user_instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+'''Requesting user detail'''
+''''''
+class RequestUserDetailAPIView(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request, *args, **kwargs):
+        user_instance = request.user
+        if not user_instance:
+            return Response(data={'message': 'Not logged in!'}, status=400)
+        serializer = UserDetailSerializer(user_instance)
+        return Response(data=serializer.data, status=400)
+
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
     permission_classes = [AllowAny]
