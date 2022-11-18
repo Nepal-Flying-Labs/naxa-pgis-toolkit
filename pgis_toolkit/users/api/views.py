@@ -751,3 +751,30 @@ def set_csrf_token(request):
     This will be `/api/set-csrf-cookie/` on `urls.py`
     """
     return JsonResponse({"details": "CSRF cookie set"})
+
+'''Landing page'''
+@api_view(['GET'])
+def landing_page(request, *args, **kwargs):
+    userrole_qs = UserRole.active.filter(user__id=request.user.id, active=True)
+    organization_ids = userrole_qs.exclude(organization=None).values_list('organization__id', flat=True).distinct()
+    project_ids = userrole_qs.exclude(project=None).values_list('project__id', flat=True).distinct()
+    group_ids = userrole_qs.values_list('group__id', flat=True).distinct()
+    page, organization, project = '', None, None
+    if request.user.is_superuser:
+        page = 'organization_list'
+    elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+        page = 'organization_list'
+    elif not organization_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the organization!'}, status=400)
+    elif organization_ids.count() > 1:
+        page = 'organization_list'
+    elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
+    elif int(env('ORGANIZATION_ADMIN')) in group_ids or project_ids.count() > 1:
+        page = 'project_list'
+        organization = organization_ids.first()
+    else:
+        page = 'inside_project'
+        organization = organization_ids.first()
+        project = project_ids.first()
+    if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
+    result = {'page': page, 'organization': organization, 'project': project}
+    return Response(data=result, status=200)
