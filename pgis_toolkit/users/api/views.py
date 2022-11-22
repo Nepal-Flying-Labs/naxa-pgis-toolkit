@@ -652,7 +652,7 @@ class ForgotPasswordEmailView(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            reset_url = settings.URL + '/api/users/reset_password/?token='
+            reset_url = settings.URL + '/reset-password/?token='
             username_or_email = request.data.get('username_or_email')
             if User.active.filter(Q(username=username_or_email) | Q(email=username_or_email)).exists():
                 profile = User.active.filter(Q(username=username_or_email) | Q(email=username_or_email))
@@ -662,7 +662,7 @@ class ForgotPasswordEmailView(APIView):
                     user.save()
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'Click in the link to reset your password: {reset_url}{user.email_verification_token}',
+                    'paragraph_1': f'Greetings {user.full_name}!\nClick in the link to password of account with username {user.username}.\nLink: {reset_url}{user.email_verification_token}',
                     }
                     template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)

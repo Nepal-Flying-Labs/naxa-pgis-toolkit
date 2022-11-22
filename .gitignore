@@ -281,3 +281,4 @@ geoserver-data
 !.envs/.local/
 docker-compose.yml
 compose/local_run/
+cache/
