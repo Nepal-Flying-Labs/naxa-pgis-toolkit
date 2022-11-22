@@ -1410,8 +1410,61 @@ class NetworkAnalysisAPIView(APIView):
             edge_attributes = directed_edges.to_dict(orient="index")
             node_attributes = nodes.to_dict(orient="index")
             node_attributes = [(k, v) for k, v in node_attributes.items()]
-            # print(edge_attributes[0], "is edge attributes")
-            # print(node_attributes[0], "is nodes attributes")
+            node_ids=nodes.index.values.tolist()
+
+            edge_list = []
+
+            for i in range(0, len(directed_edges)):
+                e_attrib = edge_attributes[i]
+                from_node_id = e_attrib["u"]
+                to_node_id = e_attrib["v"]
+
+                # Both from_node_id and to_node_id needs to exist in our nodes
+                if from_node_id not in node_ids:
+                    print("Did not find from-node", from_node_id)
+                    continue
+                if to_node_id not in node_ids:
+                    print("Did not find to-node", to_node_id)
+                    continue
+
+                edge = [from_node_id, to_node_id, e_attrib]
+                edge_list.append(edge)
+
+            # Create the graph
+            graph = nx.MultiDiGraph(crs=edges.crs)
+            graph.add_nodes_from(node_attributes)
+            graph.add_edges_from(edge_list)
+
+            # What do we have?
+            G=graph
+
+            nodes, edges = ox.graph_to_gdfs(graph)
+            orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=34.549184, Y=0.306370, return_dist=True)
+            dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=34.5317, Y=0.310894, return_dist=True)
+            print("Origin node-id:", orig_node_id, "and distance:", dist_to_orig, "meters.")
+            print("Destination node-id:", dest_node_id, "and distance:", dist_to_dest, "meters.")
+
+            import folium
+            routes = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=5, weight='length')
+            i=0
+            route_map=None
+            for route in routes:
+                if i==0:
+                    route_map=ox.plot_route_folium(G, route, popup_attribute='length')
+                else:
+                    route_map=ox.plot_route_folium(G, route, route_map=route_map, color='#ff0000',popup_attribute='length', opacity=0.5)
+                i=i+1
+
+            folium.Marker(
+                    location=[0.306370, 34.549184],
+                    popup='Destination',
+                ).add_to(route_map)
+            folium.Marker(
+                    location=[0.310894, 34.5317],
+                    popup='Origin',
+                ).add_to(route_map)
+
+            route_map.save('network_analysis_result.html')
             clear_dir('cache/')
             return Response(data=result, status=200)
         except Exception as e:
