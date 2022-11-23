@@ -64,6 +64,7 @@ from pgis_toolkit.maps.permissions import (
     ThemePermission,
 )
 from pgis_toolkit.maps.tasks import (
+    CreateNetworkGraph,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -1335,15 +1336,14 @@ def get_data_merge_update_task_response(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-import geopandas as gpd
-import matplotlib.pyplot as plt
-import networkx as nx
-import osmnx as ox
-import pandas as pd
-from descartes import PolygonPatch
-from shapely.geometry import LineString, Point, Polygon
+# import geopandas as gpd
+# import matplotlib.pyplot as plt
+# import networkx as nx
+# import osmnx as ox
+# import pandas as pd
+# from descartes import PolygonPatch
+# from shapely.geometry import LineString, Point, Polygon
 
-ox.config(log_console=True, use_cache=True)
 
 def road_class_to_kmph(road_class):
     """
@@ -1365,107 +1365,150 @@ def road_class_to_kmph(road_class):
 
 class NetworkAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
-    def get(self, request, *args, **kwarggs):
+    def post(self, request, *args, **kwarggs):
+        '''
+        parameters required:
+        -------------------------------------------------------
+        source: analysis source
+        origin_long <float>: longitude of origin point
+        origin_lat <float>: latitude of origin point
+        destination_long <float>: longitude of destination point
+        destination_lat <float>: latitude of destination point
+        k <int>: number of shortest paths to generate
+        distance <int: meters>: retain only those nodes within a bounding box of this distance from the origin point.
+        -------------------------------------------------------
+        returns: task id running in celery worker.
+        '''
         try:
-            result = {}
-            # download street network data from OSM and construct a MultiDiGraph model
-            lat=0.319363
-            long = 34.572876
-            distance = 5000 #in meters
-            G = ox.graph_from_point((lat, long), dist=distance)
-            nodes, edges = ox.graph_to_gdfs(G)
+            request_dict = request.data
+            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat']
+            for key in check_list:
+                if key not in request_dict or request_dict[key]=='':
+                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat are required!'}, status=400)
+            source = request_dict['source']
+            origin_long = float(request_dict['origin_long'])
+            origin_lat = float(request_dict['origin_lat'])
+            destination_long = float(request_dict['destination_long'])
+            destination_lat = float(request_dict['destination_lat'])
+            k = int(request_dict['k']) if 'k' in request_dict and request_dict['k'] != '' else 3
+            distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
 
-            '''create a new col maxspeed which will later be used to calculate time'''
-            edges["maxspeed"]=None
-            edges["maxspeed"] = edges["maxspeed"].astype(float).astype(pd.Int64Dtype())
-            edges["maxspeed"].unique()
+            is_working=get_celery_worker_status()
+            if is_working != "working":
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
 
-            '''Separate rows with / without speed limit information '''
-            mask = edges["maxspeed"].isnull()
-            edges_without_maxspeed = edges.loc[mask].copy()
-            edges_with_maxspeed = edges.loc[~mask].copy()
+            if source == 'osm':
+                # response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance)
+                # return Response(status=200, data={'message': 'Updating/Merging Data', 'task_id': response.task_id})
+                response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
+                print(response, "is response")
+            elif source == 'system':
+                response = 'not implemented'
+                status = 200
+            else:
+                response = 'source parameter is missing!'
+                status = 400
 
-            '''Apply the function and update the maxspeed'''
-            edges_without_maxspeed["maxspeed"] = edges_without_maxspeed["highway"].apply(road_class_to_kmph)
-            # edges_without_maxspeed.head(5).loc[:, ["maxspeed", "highway"]]
-            edges = edges_with_maxspeed.append(edges_without_maxspeed)
-            edges["maxspeed"] = edges["maxspeed"].astype(int)
-            edges["travel_time_seconds"] = edges["length"] / (edges["maxspeed"]/3.6)
-            oneway = edges.loc[edges["oneway"]==True].copy().reset_index()
-            twoway = edges.loc[edges["oneway"].isin([False, None])].copy().reset_index()
-            '''check'''
-            try:
-                assert len(oneway) + len(twoway) == len(edges)
-            except AssertionError as e:
-                return Response(data={'message': 'error', 'details': 'Sum of oneway and twoway roads do not match with total roads.'}, status=400)
 
-            '''Make a copy out of twoway edges and reverse the nodes'''
-            opposite_direction = twoway.copy()
-            opposite_direction = opposite_direction.rename(columns={"u": "v", "v": "u"})
 
-            '''obtain edges now with direction'''
-            directed_edges = pd.concat([oneway, twoway, opposite_direction], ignore_index=True)
+            # result = {}
+            # # download street network data from OSM and construct a MultiDiGraph model
+            # # lat=0.319363
+            # # long = 34.572876
+            # # distance = 5000 #in meters
+            # G = ox.graph_from_point((lat, long), dist=distance)
+            # nodes, edges = ox.graph_to_gdfs(G)
 
-            '''convert both directed edge and nodes to dict format'''
-            edge_attributes = directed_edges.to_dict(orient="index")
-            node_attributes = nodes.to_dict(orient="index")
-            node_attributes = [(k, v) for k, v in node_attributes.items()]
-            node_ids=nodes.index.values.tolist()
+            # '''create a new col maxspeed which will later be used to calculate time'''
+            # edges["maxspeed"]=None
+            # edges["maxspeed"] = edges["maxspeed"].astype(float).astype(pd.Int64Dtype())
+            # edges["maxspeed"].unique()
 
-            edge_list = []
+            # '''Separate rows with / without speed limit information '''
+            # mask = edges["maxspeed"].isnull()
+            # edges_without_maxspeed = edges.loc[mask].copy()
+            # edges_with_maxspeed = edges.loc[~mask].copy()
 
-            for i in range(0, len(directed_edges)):
-                e_attrib = edge_attributes[i]
-                from_node_id = e_attrib["u"]
-                to_node_id = e_attrib["v"]
+            # '''Apply the function and update the maxspeed'''
+            # edges_without_maxspeed["maxspeed"] = edges_without_maxspeed["highway"].apply(road_class_to_kmph)
+            # # edges_without_maxspeed.head(5).loc[:, ["maxspeed", "highway"]]
+            # edges = edges_with_maxspeed.append(edges_without_maxspeed)
+            # edges["maxspeed"] = edges["maxspeed"].astype(int)
+            # edges["travel_time_seconds"] = edges["length"] / (edges["maxspeed"]/3.6)
+            # oneway = edges.loc[edges["oneway"]==True].copy().reset_index()
+            # twoway = edges.loc[edges["oneway"].isin([False, None])].copy().reset_index()
+            # '''check'''
+            # try:
+            #     assert len(oneway) + len(twoway) == len(edges)
+            # except AssertionError as e:
+            #     return Response(data={'message': 'error', 'details': 'Sum of oneway and twoway roads do not match with total roads.'}, status=400)
 
-                # Both from_node_id and to_node_id needs to exist in our nodes
-                if from_node_id not in node_ids:
-                    print("Did not find from-node", from_node_id)
-                    continue
-                if to_node_id not in node_ids:
-                    print("Did not find to-node", to_node_id)
-                    continue
+            # '''Make a copy out of twoway edges and reverse the nodes'''
+            # opposite_direction = twoway.copy()
+            # opposite_direction = opposite_direction.rename(columns={"u": "v", "v": "u"})
 
-                edge = [from_node_id, to_node_id, e_attrib]
-                edge_list.append(edge)
+            # '''obtain edges now with direction'''
+            # directed_edges = pd.concat([oneway, twoway, opposite_direction], ignore_index=True)
 
-            # Create the graph
-            graph = nx.MultiDiGraph(crs=edges.crs)
-            graph.add_nodes_from(node_attributes)
-            graph.add_edges_from(edge_list)
+            # '''convert both directed edge and nodes to dict format'''
+            # edge_attributes = directed_edges.to_dict(orient="index")
+            # node_attributes = nodes.to_dict(orient="index")
+            # node_attributes = [(k, v) for k, v in node_attributes.items()]
+            # node_ids=nodes.index.values.tolist()
 
-            # What do we have?
-            G=graph
+            # edge_list = []
 
-            nodes, edges = ox.graph_to_gdfs(graph)
-            orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=34.549184, Y=0.306370, return_dist=True)
-            dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=34.5317, Y=0.310894, return_dist=True)
-            print("Origin node-id:", orig_node_id, "and distance:", dist_to_orig, "meters.")
-            print("Destination node-id:", dest_node_id, "and distance:", dist_to_dest, "meters.")
+            # for i in range(0, len(directed_edges)):
+            #     e_attrib = edge_attributes[i]
+            #     from_node_id = e_attrib["u"]
+            #     to_node_id = e_attrib["v"]
 
-            import folium
-            routes = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=5, weight='length')
-            i=0
-            route_map=None
-            for route in routes:
-                if i==0:
-                    route_map=ox.plot_route_folium(G, route, popup_attribute='length')
-                else:
-                    route_map=ox.plot_route_folium(G, route, route_map=route_map, color='#ff0000',popup_attribute='length', opacity=0.5)
-                i=i+1
+            #     # Both from_node_id and to_node_id needs to exist in our nodes
+            #     if from_node_id not in node_ids:
+            #         print("Did not find from-node", from_node_id)
+            #         continue
+            #     if to_node_id not in node_ids:
+            #         print("Did not find to-node", to_node_id)
+            #         continue
 
-            folium.Marker(
-                    location=[0.306370, 34.549184],
-                    popup='Destination',
-                ).add_to(route_map)
-            folium.Marker(
-                    location=[0.310894, 34.5317],
-                    popup='Origin',
-                ).add_to(route_map)
+            #     edge = [from_node_id, to_node_id, e_attrib]
+            #     edge_list.append(edge)
 
-            route_map.save('network_analysis_result.html')
+            # # Create the graph
+            # graph = nx.MultiDiGraph(crs=edges.crs)
+            # graph.add_nodes_from(node_attributes)
+            # graph.add_edges_from(edge_list)
+
+            # # What do we have?
+            # G=graph
+
+            # nodes, edges = ox.graph_to_gdfs(graph)
+            # orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=34.549184, Y=0.306370, return_dist=True)
+            # dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=34.5317, Y=0.310894, return_dist=True)
+            # print("Origin node-id:", orig_node_id, "and distance:", dist_to_orig, "meters.")
+            # print("Destination node-id:", dest_node_id, "and distance:", dist_to_dest, "meters.")
+
+            # import folium
+            # routes = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=5, weight='length')
+            # i=0
+            # route_map=None
+            # for route in routes:
+            #     if i==0:
+            #         route_map=ox.plot_route_folium(G, route, popup_attribute='length')
+            #     else:
+            #         route_map=ox.plot_route_folium(G, route, route_map=route_map, color='#ff0000',popup_attribute='length', opacity=0.5)
+            #     i=i+1
+
+            # folium.Marker(
+            #         location=[0.306370, 34.549184],
+            #         popup='Destination',
+            #     ).add_to(route_map)
+            # folium.Marker(
+            #         location=[0.310894, 34.5317],
+            #         popup='Origin',
+            #     ).add_to(route_map)
+
             clear_dir('cache/')
-            return Response(data=result, status=200)
+            return Response(data={'message': response}, status=status)
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
