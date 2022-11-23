@@ -343,3 +343,13 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     @property
     def get_std_icon_url(self):
         return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+
+class NetworkRoutes(DateTimeStamp,IsDeleted):
+    analysis_id = models.UUIDField()
+    route_no = models.IntegerField(blank=True, null=True)
+    geometry=md.GeometryField(srid=4326)
+    length = models.FloatField(max_length=10, verbose_name='Length in meters')
+    travel_time = models.FloatField(max_length=10, verbose_name='Travel Time in seconds')
+
+    class Meta:
+        app_label = 'maps'
