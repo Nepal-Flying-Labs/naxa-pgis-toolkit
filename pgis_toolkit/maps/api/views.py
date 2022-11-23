@@ -1408,8 +1408,13 @@ class NetworkAnalysisAPIView(APIView):
             else:
                 response = 'source parameter is missing!'
                 status = 400
-
-
+            clear_dir('cache/')
+            if status==200:
+                return Response(data={'analysis_id': response}, status=status)
+            else:
+                return Response(data={'message': response}, status=status)
+        except Exception as e:
+            return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
             # result = {}
             # # download street network data from OSM and construct a MultiDiGraph model
@@ -1507,8 +1512,3 @@ class NetworkAnalysisAPIView(APIView):
             #         location=[0.310894, 34.5317],
             #         popup='Origin',
             #     ).add_to(route_map)
-
-            clear_dir('cache/')
-            return Response(data={'message': response}, status=status)
-        except Exception as e:
-            return Response(data={'message': 'error', 'details': str(e)}, status=400)
