@@ -159,3 +159,8 @@ class LayerAttributeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerAttribute
         fields=['id','name','alias']
+
+class NetworkRoutesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields = '__all__'
