@@ -621,7 +621,7 @@ class LayerTemplateUploadAPIView(APIView):
 class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
     # "http://localhost:8000/api/projects/project_location_vectortile/{z}/{x}/{y}/?organization=1&state=&country=&polygon_wkt=POLYGON ((84 26, 86 26, 86 30, 84 30, 84 26))"
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk', 'geometry', 'attributes')
+    vector_tile_fields = ('pk', 'project', 'attributes')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -639,6 +639,13 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
             user = User.active.get(id=user_id)
         else:
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        if not request.GET.keys():
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        request_keys = request.GET.keys()
+        '''filter by organization'''
+        if 'project' not in request_keys or request.GET['project'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        project = request.GET['project']
         ############################################################
         # if not request.GET.keys():
         #     return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
@@ -695,24 +702,17 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         #     organization_project_qs = organization_project_qs.filter(country__id=country)
         # organization_project_list = organization_project_qs.values_list('id', flat=True)
         #################################################################################
-        organization_project_qs = get_project_queryset(request, user)
-        if not isinstance(organization_project_qs, QuerySet):
-            print(organization_project_qs, type(organization_project_qs), "is response")
-            if isinstance(organization_project_qs, HttpResponse):
-                return organization_project_qs
-            else:
-                return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        organization_project_list = organization_project_qs.values_list('id', flat=True)
-        queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project__id__in=organization_project_list)
-        '''filter by polygon_wkt'''
-        if 'polygon_wkt' in request.GET.keys() and request.GET['polygon_wkt'] != "":
-            polygon_wkt = request.GET['polygon_wkt']
-            polygon = GEOSGeometry(polygon_wkt)
-            project_location_ids = []
-            for qs in queryset:
-                if (qs.geometry).within(polygon):
-                    project_location_ids.append(qs.id)
-            queryset = queryset.filter(id__in=project_location_ids)
+
+        # organization_project_qs = get_project_queryset(request, user)
+        # if not isinstance(organization_project_qs, QuerySet):
+        #     print(organization_project_qs, type(organization_project_qs), "is response")
+        #     if isinstance(organization_project_qs, HttpResponse):
+        #         return organization_project_qs
+        #     else:
+        #         return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        # organization_project_list = organization_project_qs.values_list('id', flat=True)
+
+        queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project=project)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
