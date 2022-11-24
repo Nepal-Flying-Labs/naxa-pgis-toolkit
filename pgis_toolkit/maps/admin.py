@@ -92,7 +92,7 @@ class SubLayerStyleAdmin(admin.ModelAdmin):
     list_filter = ('project_style__project',)
 
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted','analysis_id', 'route_no', 'length', 'travel_time')
+    list_display = ('id','is_deleted','analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
     list_filter = ('analysis_id', 'route_no')
 
 # Register your models here.

@@ -17,6 +17,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
+    get_analysis_task_response,
     get_data_merge_update_task_response,
     get_layer_upload_task_response,
     import_template,
@@ -54,4 +55,6 @@ urlpatterns = [
     path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
     path('get_data_merge_update_task_response/', get_data_merge_update_task_response),
     path('network_analysis/', NetworkAnalysisAPIView.as_view(), name='network_analysis'),
+    path('get_analysis_task_response/', get_analysis_task_response),
+
 ]
