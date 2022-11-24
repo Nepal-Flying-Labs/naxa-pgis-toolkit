@@ -1396,23 +1396,17 @@ class NetworkAnalysisAPIView(APIView):
             is_working=get_celery_worker_status()
             if is_working != "working":
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
-
             if source == 'osm':
-                # response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance)
-                # return Response(status=200, data={'message': 'Updating/Merging Data', 'task_id': response.task_id})
-                response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
-                print(response, "is response")
+                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance)
+                # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
                 response = 'not implemented'
-                status = 200
             else:
                 response = 'source parameter is missing!'
                 status = 400
-            clear_dir('cache/')
-            if status==200:
-                return Response(data={'analysis_id': response}, status=status)
-            else:
                 return Response(data={'message': response}, status=status)
+            clear_dir('cache/')
+            return Response(status=200, data={'message': 'Performing Network Analysis', 'task_id': response.task_id})
         except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
@@ -1512,3 +1506,24 @@ class NetworkAnalysisAPIView(APIView):
             #         location=[0.310894, 34.5317],
             #         popup='Origin',
             #     ).add_to(route_map)
+
+@api_view(['GET'])
+def get_analysis_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data merge update
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                response, code = result.get()
+                if code == 200:
+                    return Response(data={'analysis_id':response}, status=status.HTTP_200_OK)
+                else:
+                    return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait for result"}, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

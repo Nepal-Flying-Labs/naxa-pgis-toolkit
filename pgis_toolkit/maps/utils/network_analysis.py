@@ -11,8 +11,6 @@ from pgis_toolkit.maps.models import NetworkRoutes
 
 
 def generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G):
-
-    ox.config(log_console=True, use_cache=True)
     errors=[]
     try:
         road_max_speed = 50 #kmph
@@ -23,7 +21,7 @@ def generate_routes(origin_long, origin_lat, destination_long, destination_lat, 
         print("Origin node-id:", orig_node_id, "and distance:", dist_to_orig, "meters.")
         print("Destination node-id:", dest_node_id, "and distance:", dist_to_dest, "meters.")
         routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
-        '''retrieve edges from array of nodes inside routes_list and retrieve array of dictionary containing routes'''
+        '''retrieve edges from array of nodes inside routes_list'''
         network_routes_objs = []
         analysis_id = uuid.uuid4()
         for route in routes_list:
@@ -42,7 +40,7 @@ def generate_routes(origin_long, origin_lat, destination_long, destination_lat, 
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return errors,400
+                return str(errors),400
         network_routes_objs.sort(key = lambda x: x.length)
         route_index=1
         for nr in network_routes_objs:

@@ -442,26 +442,19 @@ def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
         print("error occured in handleDataMergeUpdate: " + str(e))
         return ('Error: ' + str(e))
 
-# @shared_task(max_retries=1, soft_time_limit=8000)
+@shared_task(max_retries=1, soft_time_limit=8000)
 def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance):
-    # import geopandas as gpd
-    # import matplotlib.pyplot as plt
-    # import networkx as nx
+
     import osmnx as ox
     ox.config(log_console=True, use_cache=True)
     from pgis_toolkit.maps.utils.network_analysis import generate_routes
 
-    # import pandas as pd
-    # from descartes import PolygonPatch
-    # from shapely.geometry import LineString, Point, Polygon
-
     try:
-        # lat = (origin_lat + destination_lat)/2
-        # long = (origin_long + destination_long)/2
-        lat = 0.319363
-        long = 34.572876
+        lat = (origin_lat + destination_lat)/2
+        long = (origin_long + destination_long)/2
+        # lat = 0.319363
+        # long = 34.572876
         G = ox.graph_from_point((lat, long), dist=distance)
-        print(G, "is graph")
         response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G)
         return response, status
     except Exception as e:
