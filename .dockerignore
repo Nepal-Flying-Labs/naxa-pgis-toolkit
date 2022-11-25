@@ -8,3 +8,5 @@
 .readthedocs.yml
 .travis.yml
 venv
+pgis_toolkit_local_postgres_data
+.ipython

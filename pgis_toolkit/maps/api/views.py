@@ -37,6 +37,7 @@ from pgis_toolkit.maps.models import (
     LayerFile,
     LayerGroup,
     LayerStyle,
+    NetworkRoutes,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
@@ -77,7 +78,11 @@ from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
-from pgis_toolkit.utils.vectortile import BaseVectorTileView, LayerMVTView
+from pgis_toolkit.utils.vectortile import (
+    BaseVectorTileView,
+    LayerMVTView,
+    NetworkRoutesMVTView,
+)
 
 from .serializers import (
     FeatureCollectionListSerializer,
@@ -1527,3 +1532,36 @@ def get_analysis_task_response(request):
         return Response({'message': "Please wait for result"}, status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class NetworkRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
+    '''
+    VectorTile Generation for Maps Layer
+    url:"http://0.0.0.0:8000/api/maps/network_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
+    '''
+    vector_tile_layer_name = None
+    vector_tile_fields = ('id','route_no','length','travel_time')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'analysis_id' not in request_keys or request.GET['analysis_id'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        analysis_id=request.GET['analysis_id']
+        queryset=NetworkRoutes.active.filter(analysis_id=analysis_id)
+        if 'route_no' in request_keys and request.GET['route_no'] != "":
+            route_no=request.GET['route_no']
+            queryset=queryset.filter(route_no=int(route_no))
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))

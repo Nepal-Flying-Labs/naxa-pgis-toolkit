@@ -273,3 +273,7 @@ class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
 class PostGISFeatureView(LayerMVTView, ListView):
     model = FeatureCollection
     vector_tile_fields = ("layer", "attributes")
+
+#Network Routes MVT View
+class NetworkRoutesMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+    pass
