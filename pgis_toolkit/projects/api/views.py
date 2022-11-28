@@ -846,3 +846,9 @@ def get_state_choices(request, *args, **kwargs):
     else:
         data = State.objects.all().values('id', 'name')
     return Response(data=data, status=200)
+
+class ContactPersonViewset(viewsets.ModelViewSet):
+    queryset = ContactPerson.active.all()
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post', 'patch']
+    serializer_class = ContactPersonSerializer

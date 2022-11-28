@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from pgis_toolkit.projects.models import (
+    ContactPerson,
     DefaultTheme,
     Document,
     LayerTemplate,
@@ -52,6 +53,8 @@ class OrganizationRetrieveSerializer(serializers.ModelSerializer):
         representation['projects'] = project_qs.count()
         representation['ongoing'] = project_qs.filter(status__in=['draft', 'ongoing']).count()
         representation['completed'] = project_qs.filter(status='completed').count()
+        contact_person_qs = ContactPerson.active.filter(organization=instance).values('id', 'name', 'email')
+        representation['contact_person'] = contact_person_qs if contact_person_qs else []
         return representation
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -190,4 +193,9 @@ class DocumentSerializer(serializers.ModelSerializer):
 class RequestDemoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestDemo
+        fields = '__all__'
+
+class ContactPersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactPerson
         fields = '__all__'

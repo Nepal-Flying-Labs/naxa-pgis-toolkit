@@ -58,6 +58,11 @@ class RequestDemoAlertAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'email')
     search_fields = ('id', 'name', 'email')
 
+class ContactPersonAdmin(admin.ModelAdmin):
+    list_display = ('id', 'is_deleted', 'name', 'email', 'organization', 'project')
+    list_filter = ('organization', 'project')
+
+
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
 admin.site.register(Organization, OrganizationAdmin)
@@ -71,3 +76,4 @@ admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureColl
 admin.site.register(Document, DocumentAdmin)
 admin.site.register(RequestDemo, RequestDemoAdmin)
 admin.site.register(RequestDemoAlert, RequestDemoAlertAdmin)
+admin.site.register(ContactPerson, ContactPersonAdmin)
