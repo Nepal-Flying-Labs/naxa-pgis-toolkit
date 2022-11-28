@@ -59,3 +59,9 @@ STATUS_CHOICES = (
 THEMATIC_AREA_CHOICES = (
     ('Climate change and Energy', _('Climate change and Energy')),
 )
+
+PROJECT_STATUS_CHOICES = (
+    ('ongoing', _('Ongoing')),
+    ('completed', _('Completed')),
+    ('draft', _('Draft')),
+)

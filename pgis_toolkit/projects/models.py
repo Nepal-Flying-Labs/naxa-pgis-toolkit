@@ -12,6 +12,7 @@ from pgis_toolkit.utils.constants import (
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
+    PROJECT_STATUS_CHOICES,
     PUBLISHED_MONTH_CHOICES,
     THEMATIC_AREA_CHOICES,
     UNIT_CHOICES,
@@ -134,16 +135,20 @@ class Project(IsDeleted,DateTimeStamp):
 
     organization=models.ForeignKey(Organization, related_name='ProjectOrganization', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
+    status = models.CharField(max_length=20, choices=PROJECT_STATUS_CHOICES, default='draft')
     description=models.TextField(blank=True,null=True)
+    thematic_areas=models.CharField(max_length=50, choices=THEMATIC_AREA_CHOICES, blank=True, null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
     country = models.ManyToManyField(Country, blank=True)
     state = models.ManyToManyField(State, blank=True)
+    geographical_region = models.CharField(max_length=254, blank=True, null=True)
     location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, blank=True, null=True)
     file = models.FileField(upload_to='site/',blank=True, null=True)
     geometry_type = models.CharField(max_length=50, blank=True, null=True)
     file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
+    partners = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
