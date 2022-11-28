@@ -4,6 +4,7 @@ from pgis_toolkit.projects.models import (
     ContactPerson,
     DefaultTheme,
     Document,
+    Image,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
@@ -78,7 +79,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'state', 'country')
+        fields = ('id', 'name', 'state', 'country', 'status')
         # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
         # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
@@ -188,6 +189,11 @@ class DocumentListSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
+        fields = '__all__'
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
         fields = '__all__'
 
 class RequestDemoSerializer(serializers.ModelSerializer):

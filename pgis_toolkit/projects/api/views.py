@@ -32,6 +32,7 @@ from pgis_toolkit.projects.models import (
     Country,
     DefaultTheme,
     Document,
+    Image,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
@@ -715,6 +716,13 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         queryset = ProjectLocationFeatureCollection.active.select_related("project").filter(project=project)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+class ImageViewset(viewsets.ModelViewSet):
+    queryset=Image.objects.all()
+    http_method_names = ['get', 'post', 'patch']
+    permission_classes = [IsAuthenticated]
+    serializer_class = ImageSerializer
+
 
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
