@@ -94,6 +94,7 @@ class Organization(IsDeleted,DateTimeStamp):
         if Organization.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Organization with name {self.name} already exists.')
 
+
 class Country(models.Model):
     name = models.CharField(max_length=100, blank=True, null=True)
     code = models.CharField(max_length=3, blank=True, null=True)
@@ -166,6 +167,16 @@ class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     def __str__(self):
         return str(self.id)
 
+    class Meta:
+        app_label = 'projects'
+
+class ContactPerson(IsDeleted):
+    name = models.CharField(max_length=100)
+    position = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    contact = models.CharField(max_length=20, blank=True, null=True)
+    organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.SET_NULL)
+    project = models.ForeignKey(Project, blank=True, null=True, on_delete=models.SET_NULL)
     class Meta:
         app_label = 'projects'
 
