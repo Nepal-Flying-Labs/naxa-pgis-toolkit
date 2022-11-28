@@ -55,3 +55,7 @@ STATUS_CHOICES = (
     ('Pending', _('Pending')),
     ('Expired', _('Expired'))
 )
+
+THEMATIC_AREA_CHOICES = (
+    ('Climate change and Energy', _('Climate change and Energy')),
+)

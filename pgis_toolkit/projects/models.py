@@ -13,6 +13,7 @@ from pgis_toolkit.utils.constants import (
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
     PUBLISHED_MONTH_CHOICES,
+    THEMATIC_AREA_CHOICES,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
@@ -76,6 +77,9 @@ class Organization(IsDeleted,DateTimeStamp):
     address=models.CharField(max_length=254,blank=True,null=True)
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
+    thematic_areas=models.CharField(max_length=50, choices=THEMATIC_AREA_CHOICES, blank=True, null=True)
+    description = models.CharField(max_length=254, blank=True, null=True)
+    size = models.CharField(max_length=10,blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
