@@ -304,6 +304,11 @@ def project_theme_layers(request):
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['style']=style
+                    vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                    if vector_layer.exists():
+                        layer_item['bbox'] = vector_layer[0].bbox
+                    else:
+                        layer_item['bbox'] = []
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
@@ -322,6 +327,11 @@ def project_theme_layers(request):
                     sub_layer_item['icon']=icon
                     sub_layer_item['std_icon']=std_icon
                     sub_layer_item['style']=style
+                    sub_layer = SubLayer.objects.filter(id=sub_layer['id'])
+                    if sub_layer.exists():
+                        sub_layer_item['bbox'] = sub_layer[0].bbox
+                    else:
+                        sub_layer_item['bbox'] = []
                     # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
 
@@ -329,6 +339,11 @@ def project_theme_layers(request):
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
                 layer_item['style']=style
+                vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                if vector_layer.exists():
+                    layer_item['bbox'] = vector_layer[0].bbox
+                else:
+                    layer_item['bbox'] = []
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
             options.append(layer_item)
