@@ -316,8 +316,9 @@ def upload_feature(geodataframe, layer_instance, geom_type):
             return ("attribute_error : "+str(e))
 
         # '''Geoserver layer publish'''
-        response = geoserver_layer_publish(layer_instance)
-        return response
+        # response = geoserver_layer_publish(layer_instance)
+        # return response
+        return "successful"
 
     except Exception as e:
         # Layer.objects.filter(id=layer_id).delete()
