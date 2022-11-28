@@ -261,6 +261,15 @@ class Document(DateTimeStamp):
             ('download_document', 'Can download the document'),
         )
 
+class Image(DateTimeStamp):
+    project=models.ForeignKey(Project, on_delete=models.CASCADE)
+    title = models.CharField(max_length=254, blank=True, null=True)
+    caption = models.CharField(max_length=254, blank=True, null=True)
+    image = models.ImageField(upload_to='project/images/')
+
+    class Meta:
+        app_label='projects'
+
 class RequestDemo(DateTimeStamp):
     full_name = models.CharField(max_length=254)
     email = models.EmailField(max_length=254)
