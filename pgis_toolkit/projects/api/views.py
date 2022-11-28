@@ -81,7 +81,7 @@ class OrganizationViewset(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, OrganizationPermission]
     serializer_classes = {
         'list': OrganizationListSerializer,
-        'retrieve': OrganizationSerializer
+        'retrieve': OrganizationRetrieveSerializer,
     }
     pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):

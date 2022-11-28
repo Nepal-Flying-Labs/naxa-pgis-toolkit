@@ -41,6 +41,19 @@ class OrganizationListSerializer(serializers.ModelSerializer):
     def get_projects(self, instance):
         return Project.active.select_related('organization').filter(organization__id=instance.id).count()
 
+class OrganizationRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        project_qs = Project.active.select_related('organization').filter(organization__id=instance.id)
+        representation['projects'] = project_qs.count()
+        representation['ongoing'] = project_qs.filter(status__in=['draft', 'ongoing']).count()
+        representation['completed'] = project_qs.filter(status='completed').count()
+        return representation
+
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization

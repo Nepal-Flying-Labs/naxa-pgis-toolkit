@@ -78,7 +78,7 @@ class Organization(IsDeleted,DateTimeStamp):
     address=models.CharField(max_length=254,blank=True,null=True)
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
-    thematic_areas=models.CharField(max_length=50, choices=THEMATIC_AREA_CHOICES, blank=True, null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
     description = models.CharField(max_length=254, blank=True, null=True)
     size = models.CharField(max_length=10,blank=True, null=True)
 
@@ -137,7 +137,7 @@ class Project(IsDeleted,DateTimeStamp):
     name=models.CharField(max_length=254)
     status = models.CharField(max_length=20, choices=PROJECT_STATUS_CHOICES, default='draft')
     description=models.TextField(blank=True,null=True)
-    thematic_areas=models.CharField(max_length=50, choices=THEMATIC_AREA_CHOICES, blank=True, null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
     country = models.ManyToManyField(Country, blank=True)
