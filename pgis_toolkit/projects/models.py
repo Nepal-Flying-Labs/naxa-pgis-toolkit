@@ -12,7 +12,9 @@ from pgis_toolkit.utils.constants import (
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
+    PROJECT_STATUS_CHOICES,
     PUBLISHED_MONTH_CHOICES,
+    THEMATIC_AREA_CHOICES,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
@@ -76,6 +78,9 @@ class Organization(IsDeleted,DateTimeStamp):
     address=models.CharField(max_length=254,blank=True,null=True)
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
+    description = models.CharField(max_length=254, blank=True, null=True)
+    size = models.CharField(max_length=10,blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -89,6 +94,7 @@ class Organization(IsDeleted,DateTimeStamp):
         """
         if Organization.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Organization with name {self.name} already exists.')
+
 
 class Country(models.Model):
     name = models.CharField(max_length=100, blank=True, null=True)
@@ -129,16 +135,20 @@ class Project(IsDeleted,DateTimeStamp):
 
     organization=models.ForeignKey(Organization, related_name='ProjectOrganization', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
+    status = models.CharField(max_length=20, choices=PROJECT_STATUS_CHOICES, default='draft')
     description=models.TextField(blank=True,null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
     country = models.ManyToManyField(Country, blank=True)
     state = models.ManyToManyField(State, blank=True)
+    geographical_region = models.CharField(max_length=254, blank=True, null=True)
     location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, blank=True, null=True)
     file = models.FileField(upload_to='site/',blank=True, null=True)
     geometry_type = models.CharField(max_length=50, blank=True, null=True)
     file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
+    partners = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -162,6 +172,16 @@ class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     def __str__(self):
         return str(self.id)
 
+    class Meta:
+        app_label = 'projects'
+
+class ContactPerson(IsDeleted):
+    name = models.CharField(max_length=100)
+    position = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    contact = models.CharField(max_length=20, blank=True, null=True)
+    organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.SET_NULL)
+    project = models.ForeignKey(Project, blank=True, null=True, on_delete=models.SET_NULL)
     class Meta:
         app_label = 'projects'
 
@@ -240,6 +260,15 @@ class Document(DateTimeStamp):
         permissions = (
             ('download_document', 'Can download the document'),
         )
+
+class Image(DateTimeStamp):
+    project=models.ForeignKey(Project, on_delete=models.CASCADE)
+    title = models.CharField(max_length=254, blank=True, null=True)
+    caption = models.CharField(max_length=254, blank=True, null=True)
+    image = models.ImageField(upload_to='project/images/')
+
+    class Meta:
+        app_label='projects'
 
 class RequestDemo(DateTimeStamp):
     full_name = models.CharField(max_length=254)

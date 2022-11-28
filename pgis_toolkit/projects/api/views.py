@@ -32,6 +32,7 @@ from pgis_toolkit.projects.models import (
     Country,
     DefaultTheme,
     Document,
+    Image,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
@@ -81,7 +82,7 @@ class OrganizationViewset(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, OrganizationPermission]
     serializer_classes = {
         'list': OrganizationListSerializer,
-        'retrieve': OrganizationSerializer
+        'retrieve': OrganizationRetrieveSerializer,
     }
     pagination_class = CustomPageNumberPagination
     def get_serializer_class(self):
@@ -716,6 +717,13 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
+class ImageViewset(viewsets.ModelViewSet):
+    queryset=Image.objects.all()
+    http_method_names = ['get', 'post', 'patch']
+    permission_classes = [IsAuthenticated]
+    serializer_class = ImageSerializer
+
+
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
     http_method_names=['get', 'post', 'patch']
@@ -846,3 +854,9 @@ def get_state_choices(request, *args, **kwargs):
     else:
         data = State.objects.all().values('id', 'name')
     return Response(data=data, status=200)
+
+class ContactPersonViewset(viewsets.ModelViewSet):
+    queryset = ContactPerson.active.all()
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post', 'patch']
+    serializer_class = ContactPersonSerializer

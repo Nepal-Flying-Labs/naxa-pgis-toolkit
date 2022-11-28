@@ -1,8 +1,10 @@
 from rest_framework import serializers
 
 from pgis_toolkit.projects.models import (
+    ContactPerson,
     DefaultTheme,
     Document,
+    Image,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
@@ -41,6 +43,21 @@ class OrganizationListSerializer(serializers.ModelSerializer):
     def get_projects(self, instance):
         return Project.active.select_related('organization').filter(organization__id=instance.id).count()
 
+class OrganizationRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        project_qs = Project.active.select_related('organization').filter(organization__id=instance.id)
+        representation['projects'] = project_qs.count()
+        representation['ongoing'] = project_qs.filter(status__in=['draft', 'ongoing']).count()
+        representation['completed'] = project_qs.filter(status='completed').count()
+        contact_person_qs = ContactPerson.active.filter(organization=instance).values('id', 'name', 'email')
+        representation['contact_person'] = contact_person_qs if contact_person_qs else []
+        return representation
+
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
@@ -62,7 +79,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'state', 'country')
+        fields = ('id', 'name', 'state', 'country', 'status')
         # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
         # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
@@ -174,7 +191,17 @@ class DocumentSerializer(serializers.ModelSerializer):
         model = Document
         fields = '__all__'
 
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = '__all__'
+
 class RequestDemoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestDemo
+        fields = '__all__'
+
+class ContactPersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactPerson
         fields = '__all__'
