@@ -308,8 +308,10 @@ def project_theme_layers(request):
                     vector_layer = Vectorlayer.objects.filter(id=layer['id'])
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
+                        layer_item['geom_type'] = vector_layer[0].geom_type
                     else:
                         layer_item['bbox'] = []
+                        layer_item['geom'] = ''
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
@@ -343,8 +345,10 @@ def project_theme_layers(request):
                 vector_layer = Vectorlayer.objects.filter(id=layer['id'])
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
+                    layer_item['geom_type'] = vector_layer[0].geom_type
                 else:
                     layer_item['bbox'] = []
+                    layer_item['geom_type'] = ''
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
             options.append(layer_item)
