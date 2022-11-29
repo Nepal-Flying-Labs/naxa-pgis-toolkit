@@ -21,6 +21,7 @@ from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -790,7 +791,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk','layer','attributes')
+    vector_tile_fields = ('pk','layer')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -827,7 +828,7 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
 
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk', 'layer', 'attributes')
+    vector_tile_fields = ('pk', 'layer')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -1580,3 +1581,31 @@ class NetworkRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
             queryset=queryset.filter(route_no=int(route_no))
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''Map Popup API'''
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def feature_popup(request, *args, **kwargs):
+    try:
+        result={}
+        feature_id = request.query_params.get('feature_id', None)
+        if not feature_id:
+            return Response(data={'message': 'feature_id query params is missing'}, status=400)
+        feature_qs = FeatureCollection.active.filter(id=feature_id)
+        if feature_qs.exists():
+            feature_inst = feature_qs[0]
+        attributes = feature_inst.attributes
+        vector_layer = Vectorlayer.objects.filter(layer=feature_inst.layer)
+        if vector_layer.exists():
+            popup_fields = vector_layer[0].popup_fields
+        else:
+            popup_fields = []
+        if popup_fields:
+            for field, value in attributes.items():
+                if field in popup_fields:
+                    result[field] = value
+        else:
+            result=attributes
+        return Response(data=result, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
