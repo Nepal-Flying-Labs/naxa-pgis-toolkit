@@ -288,6 +288,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectShapeFile(project_id)
                             if response == "successful":
+                                '''change project status to ongoing'''
+                                project.status='ongoing'
+                                project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -302,6 +305,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectGeoJSON(project_id)
                             if response == "successful":
+                                '''change project status to ongoing'''
+                                project.status='ongoing'
+                                project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -325,6 +331,8 @@ class ProjectViewset(viewsets.ModelViewSet):
                                                                             geometry=geom)
                             merged_geom = merged_geom.union(geom)
                         project.bbox = merged_geom.extent
+                        '''change project status to ongoing'''
+                        project.status='ongoing'
                         project.save()
                 serializer = ProjectSerializer(
                     project, context={'request': request})
