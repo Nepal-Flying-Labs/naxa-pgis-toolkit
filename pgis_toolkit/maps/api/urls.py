@@ -18,6 +18,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
+    feature_popup,
     get_analysis_task_response,
     get_data_merge_update_task_response,
     get_layer_upload_task_response,
@@ -58,5 +59,5 @@ urlpatterns = [
     path('network_analysis/', NetworkAnalysisAPIView.as_view(), name='network_analysis'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('network_routes_vectortile/<int:z>/<int:x>/<int:y>/', NetworkRoutesTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
-
+    path('feature_popup/', feature_popup, name='feature_popup'),
 ]
