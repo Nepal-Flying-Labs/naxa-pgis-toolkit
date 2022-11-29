@@ -791,7 +791,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk','layer','attributes')
+    vector_tile_fields = ('pk','layer')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -828,7 +828,7 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
 
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk', 'layer', 'attributes')
+    vector_tile_fields = ('pk', 'layer')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
