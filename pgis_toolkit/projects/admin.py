@@ -17,9 +17,9 @@ class DefaultThemeAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
 
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('id', 'is_deleted', 'organization', 'name')
+    list_display = ('id', 'is_deleted', 'organization', 'name', 'status')
     search_fields = ('id', 'name')
-    list_filter = ('organization', 'start_date', 'end_date')
+    list_filter = ('organization', 'status', 'start_date', 'end_date')
 
 class ProjectLocationFeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'project', 'attributes')
