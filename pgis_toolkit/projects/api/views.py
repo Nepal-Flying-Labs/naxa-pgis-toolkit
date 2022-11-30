@@ -750,7 +750,7 @@ class ImageViewset(viewsets.ModelViewSet):
         return Response(status=status.HTTP_200_OK, data={'Message': 'Image Data deleted'})
 
 class DocumentViewset(viewsets.ModelViewSet):
-    queryset=Document.objects.all()
+    queryset=Document.active.all()
     http_method_names=['get', 'post', 'patch']
     permission_classes = [IsAuthenticated, DocumentPermission]
     default_serializer_class = DocumentSerializer
@@ -769,7 +769,7 @@ class DocumentViewset(viewsets.ModelViewSet):
             project = request.data.get('project', None)
             if not project or not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Invalid project params!'}, status=status.HTTP_400_BAD_REQUEST)
-            if name and Document.objects.filter(Q(project__id=project) & Q(name=name)).exists():
+            if name and Document.active.filter(Q(project__id=project) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate document name for the same project!'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
@@ -782,7 +782,7 @@ class DocumentViewset(viewsets.ModelViewSet):
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/2/'''
         try:
-            document_instance = Document.objects.get(pk=pk)
+            document_instance = Document.active.get(pk=pk)
             request.data._mutable = True
             request_dict = request.data
             request_keys = request_dict.keys()
@@ -797,7 +797,7 @@ class DocumentViewset(viewsets.ModelViewSet):
             elif 'name' in request_keys and request_dict['name'] != "":
                 name = request_dict['name']
                 project = document_instance.project.id
-            if (name or project) and (Document.objects.exclude(pk=pk).filter(Q(project__id=project) & Q(name=name)).exists()):
+            if (name or project) and (Document.active.exclude(pk=pk).filter(Q(project__id=project) & Q(name=name)).exists()):
                 return Response(data={'messgae': 'Cannot create duplicate document name for the same project!'})
             if 'cover_image' in request_keys and isinstance(request_dict['cover_image'], str):
                 request_dict.pop('cover_image', None)

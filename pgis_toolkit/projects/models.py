@@ -243,7 +243,7 @@ class LayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
         app_label = 'projects'
         unique_together = (("layer_template", "name"),)
 
-class Document(DateTimeStamp):
+class Document(IsDeleted, DateTimeStamp):
     name=models.CharField(max_length=254)
     project=models.ForeignKey(Project, on_delete=models.CASCADE)
     cover_image=models.ImageField(upload_to='documents/cover_images/', blank=True, null=True)
