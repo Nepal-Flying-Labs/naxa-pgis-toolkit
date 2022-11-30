@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -727,10 +727,27 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 
 class ImageViewset(viewsets.ModelViewSet):
     queryset=Image.objects.all()
-    http_method_names = ['get', 'post', 'patch']
+    http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [IsAuthenticated]
     serializer_class = ImageSerializer
 
+    def get_queryset(self, *args, **kwargs):
+        try:
+            queryset=Image.objects.all()
+            project = self.request.query_params.get('project', None)
+            if project:
+                queryset=queryset.filter(project=project)
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'Message': 'Image Data deleted'})
 
 class DocumentViewset(viewsets.ModelViewSet):
     queryset=Document.objects.all()
