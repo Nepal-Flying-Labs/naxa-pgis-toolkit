@@ -774,7 +774,7 @@ class DocumentViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
                 created_object = serializer.save()
-            return Response(data={'data': serializer.data}, status=status.HTTP_201_CREATED)
+            return Response(data= serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             Document.objects.get(id=created_object.id).delete()
             return Response(data='Error: '+str(e))
