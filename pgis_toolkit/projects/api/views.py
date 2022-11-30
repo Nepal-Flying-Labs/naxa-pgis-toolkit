@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -288,6 +288,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectShapeFile(project_id)
                             if response == "successful":
+                                '''change project status to ongoing'''
+                                project.status='ongoing'
+                                project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -302,6 +305,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectGeoJSON(project_id)
                             if response == "successful":
+                                '''change project status to ongoing'''
+                                project.status='ongoing'
+                                project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -325,6 +331,8 @@ class ProjectViewset(viewsets.ModelViewSet):
                                                                             geometry=geom)
                             merged_geom = merged_geom.union(geom)
                         project.bbox = merged_geom.extent
+                        '''change project status to ongoing'''
+                        project.status='ongoing'
                         project.save()
                 serializer = ProjectSerializer(
                     project, context={'request': request})
@@ -719,13 +727,30 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 
 class ImageViewset(viewsets.ModelViewSet):
     queryset=Image.objects.all()
-    http_method_names = ['get', 'post', 'patch']
+    http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [IsAuthenticated]
     serializer_class = ImageSerializer
 
+    def get_queryset(self, *args, **kwargs):
+        try:
+            queryset=Image.objects.all()
+            project = self.request.query_params.get('project', None)
+            if project:
+                queryset=queryset.filter(project=project)
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'Message': 'Image Data deleted'})
 
 class DocumentViewset(viewsets.ModelViewSet):
-    queryset=Document.objects.all()
+    queryset=Document.active.all()
     http_method_names=['get', 'post', 'patch']
     permission_classes = [IsAuthenticated, DocumentPermission]
     default_serializer_class = DocumentSerializer
@@ -744,12 +769,12 @@ class DocumentViewset(viewsets.ModelViewSet):
             project = request.data.get('project', None)
             if not project or not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Invalid project params!'}, status=status.HTTP_400_BAD_REQUEST)
-            if name and Document.objects.filter(Q(project__id=project) & Q(name=name)).exists():
+            if name and Document.active.filter(Q(project__id=project) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate document name for the same project!'}, status=status.HTTP_400_BAD_REQUEST)
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
                 created_object = serializer.save()
-            return Response(data={'data': serializer.data}, status=status.HTTP_201_CREATED)
+            return Response(data= serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             Document.objects.get(id=created_object.id).delete()
             return Response(data='Error: '+str(e))
@@ -757,7 +782,7 @@ class DocumentViewset(viewsets.ModelViewSet):
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/2/'''
         try:
-            document_instance = Document.objects.get(pk=pk)
+            document_instance = Document.active.get(pk=pk)
             request.data._mutable = True
             request_dict = request.data
             request_keys = request_dict.keys()
@@ -772,7 +797,7 @@ class DocumentViewset(viewsets.ModelViewSet):
             elif 'name' in request_keys and request_dict['name'] != "":
                 name = request_dict['name']
                 project = document_instance.project.id
-            if (name or project) and (Document.objects.exclude(pk=pk).filter(Q(project__id=project) & Q(name=name)).exists()):
+            if (name or project) and (Document.active.exclude(pk=pk).filter(Q(project__id=project) & Q(name=name)).exists()):
                 return Response(data={'messgae': 'Cannot create duplicate document name for the same project!'})
             if 'cover_image' in request_keys and isinstance(request_dict['cover_image'], str):
                 request_dict.pop('cover_image', None)
