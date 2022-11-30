@@ -357,7 +357,7 @@ class Analysis(DateTimeStamp,IsDeleted):
         app_label = 'maps'
 
 class NetworkRoutes(DateTimeStamp,IsDeleted):
-    analysis_id = models.UUIDField()
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
