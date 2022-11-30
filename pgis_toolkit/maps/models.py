@@ -16,6 +16,7 @@ from pgis_toolkit.projects.models import (
     TemplateAttribute,
 )
 from pgis_toolkit.utils.constants import (
+    ANALYSIS_TYPE_CHOICES,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
@@ -344,12 +345,23 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     def get_std_icon_url(self):
         return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
 
+class Analysis(DateTimeStamp,IsDeleted):
+    name = models.CharField(max_length=254)
+    project = models.IntegerField(db_index=True)
+    display = models.BooleanField(default=False)
+    type = models.CharField(max_length=100, choices=ANALYSIS_TYPE_CHOICES)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
 class NetworkRoutes(DateTimeStamp,IsDeleted):
     analysis_id = models.UUIDField()
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
     travel_time = models.FloatField(max_length=10, verbose_name='Travel Time in seconds')
-
+    style = models.JSONField(default=dict, blank=True, null=True) #route style
     class Meta:
         app_label = 'maps'

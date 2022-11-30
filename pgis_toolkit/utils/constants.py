@@ -65,3 +65,7 @@ PROJECT_STATUS_CHOICES = (
     ('completed', _('Completed')),
     ('draft', _('Draft')),
 )
+
+ANALYSIS_TYPE_CHOICES = (
+    ('Nearest Path Analysis', _('Nearest Path Analysis')),
+)
