@@ -344,7 +344,7 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     @property
     def get_std_icon_url(self):
         return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
-
+'''similar to Layer'''
 class Analysis(DateTimeStamp,IsDeleted):
     name = models.CharField(max_length=254)
     project = models.IntegerField(db_index=True)
@@ -356,6 +356,7 @@ class Analysis(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+'''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
@@ -365,3 +366,33 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     style = models.JSONField(default=dict, blank=True, null=True) #route style
     class Meta:
         app_label = 'maps'
+
+    def save(self, *args, **kwargs):
+        '''Update bbox of Analysis'''
+        try:
+            if self.geometry:
+                route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
+                route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
+
+                analysis_instance=Analysis.active.get(id=self.analysis_id)
+                analysis_bbox= analysis_instance.bbox
+
+                if analysis_bbox and route_bbox:
+                    if route_bbox[0]<analysis_bbox[0]:
+                        analysis_bbox[0]=route_bbox[0]
+
+                    if route_bbox[1]<analysis_bbox[1]:
+                        analysis_bbox[1]=route_bbox[1]
+
+                    if route_bbox[2]>analysis_bbox[2]:
+                        analysis_bbox[2]=route_bbox[2]
+
+                    if route_bbox[3]>analysis_bbox[3]:
+                        analysis_bbox[3]=route_bbox[3]
+
+                elif route_bbox:
+                    analysis_bbox.bbox=route_bbox
+                analysis_instance.save()
+        except Exception as e:
+            print(f'error in def save of NetworkRoutes: {str(e)}')
+        super(NetworkRoutes, self).save(*args, **kwargs)
