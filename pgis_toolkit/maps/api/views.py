@@ -1407,10 +1407,10 @@ class NetworkAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat']
+            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat are required!'}, status=400)
+                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -1418,12 +1418,22 @@ class NetworkAnalysisAPIView(APIView):
             destination_lat = float(request_dict['destination_lat'])
             k = int(request_dict['k']) if 'k' in request_dict and request_dict['k'] != '' else 3
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
-
+            '''for analysis object'''
+            name=request_dict['name']
+            type=request_dict['type']
+            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
+            project = int(request_dict['project'])
+            '''create analysis_instance'''
+            if Analysis.active.filter(name=name, type=type, project=project).exists():
+                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
+            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
+            analysis_id = analysis_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
+                analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
             if source == 'osm':
-                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance)
+                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
                 response = 'not implemented'
@@ -1434,6 +1444,7 @@ class NetworkAnalysisAPIView(APIView):
             clear_dir('cache/')
             return Response(status=200, data={'message': 'Performing Network Analysis', 'task_id': response.task_id})
         except Exception as e:
+            analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
             # result = {}

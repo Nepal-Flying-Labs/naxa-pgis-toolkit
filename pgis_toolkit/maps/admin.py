@@ -92,7 +92,7 @@ class SubLayerStyleAdmin(admin.ModelAdmin):
     list_filter = ('project_style__project',)
 
 class AnalysisAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'type', 'geom_type', 'display', 'project', 'uploaded_date')
+    list_display = ('id','is_deleted', 'name', 'type', 'geom_type', 'display', 'project', 'uploaded_date')
     list_filter = ('type', 'display', 'project')
 
 class NetworkRoutesAdmin(admin.ModelAdmin):
