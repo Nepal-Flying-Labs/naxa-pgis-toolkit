@@ -32,6 +32,7 @@ from sqlalchemy import create_engine
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
+    Analysis,
     FeatureCollection,
     Layer,
     LayerAttribute,
@@ -1613,3 +1614,30 @@ def feature_popup(request, *args, **kwargs):
         return Response(data=result, status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+'''Analysis layers api for map page'''
+@api_view(['GET'])
+def analysis_layers(request, *args, **kwargs):
+    options={}
+    try:
+        project = request.query_params.get('project', None)
+        if not project or project == '':
+            return Response(data={'message': 'project params is missing!'}, status=400)
+        analysis_types = Analysis.active.filter(project=project).values_list('type', flat=True).distinct()
+        for ana_type in analysis_types:
+            print(ana_type, type(ana_type), "is ana type")
+            '''say network analysis'''
+            ana_type_list=[]
+            analys_qs = Analysis.active.filter(project=project, type=ana_type)
+            for analysis in analys_qs:
+                analysis_dict={}
+                analysis_dict['id'] = analysis.id
+                analysis_dict['name'] = analysis.name
+                analysis_dict['geom_type'] = analysis.geom_type
+                analysis_dict['bbox'] = analysis.bbox
+                analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'style')
+                ana_type_list.append(analysis_dict)
+            options[ana_type]=ana_type_list
+        return Response(options,status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
