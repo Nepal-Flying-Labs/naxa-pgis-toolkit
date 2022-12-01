@@ -1389,7 +1389,7 @@ def road_class_to_kmph(road_class):
     else:
         return 50
 
-class NetworkAnalysisAPIView(APIView):
+class ShortestPathAPIView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwarggs):
         '''
@@ -1566,10 +1566,10 @@ def get_analysis_task_response(request):
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class NetworkRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
+class ShortestRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Maps Layer
-    url:"http://0.0.0.0:8000/api/maps/network_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
+    url:"http://0.0.0.0:8000/api/maps/shortest_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = None
     vector_tile_fields = ('id','route_no','length','travel_time')
@@ -1646,7 +1646,7 @@ def analysis_layers(request, *args, **kwargs):
                 analysis_dict['name'] = analysis.name
                 analysis_dict['geom_type'] = analysis.geom_type
                 analysis_dict['bbox'] = analysis.bbox
-                analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'style')
+                analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'style', 'bbox')
                 ana_type_list.append(analysis_dict)
             options[ana_type]=ana_type_list
         return Response(options,status=200)
