@@ -91,9 +91,13 @@ class SubLayerStyleAdmin(admin.ModelAdmin):
     list_display = ('id','sub_layer', 'project_style', 'is_deleted','uploaded_date','last_updated')
     list_filter = ('project_style__project',)
 
+class AnalysisAdmin(admin.ModelAdmin):
+    list_display = ('id','is_deleted', 'name', 'type', 'geom_type', 'display', 'project', 'uploaded_date')
+    list_filter = ('type', 'display', 'project')
+
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted','analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
-    list_filter = ('analysis_id', 'route_no')
+    list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
+    list_filter = ('route_no', 'analysis_id')
 
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
@@ -113,3 +117,4 @@ admin.site.register(ProjectStyle,ProjectStyleAdmin)
 admin.site.register(LayerStyle,LayerStyleAdmin)
 admin.site.register(SubLayerStyle,SubLayerStyleAdmin)
 admin.site.register(NetworkRoutes, NetworkRoutesAdmin)
+admin.site.register(Analysis, AnalysisAdmin)

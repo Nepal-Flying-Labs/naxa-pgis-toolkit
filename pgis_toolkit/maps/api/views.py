@@ -32,6 +32,7 @@ from sqlalchemy import create_engine
 from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
+    Analysis,
     FeatureCollection,
     Layer,
     LayerAttribute,
@@ -1388,7 +1389,7 @@ def road_class_to_kmph(road_class):
     else:
         return 50
 
-class NetworkAnalysisAPIView(APIView):
+class ShortestPathAPIView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwarggs):
         '''
@@ -1406,10 +1407,10 @@ class NetworkAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat']
+            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat are required!'}, status=400)
+                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -1417,12 +1418,22 @@ class NetworkAnalysisAPIView(APIView):
             destination_lat = float(request_dict['destination_lat'])
             k = int(request_dict['k']) if 'k' in request_dict and request_dict['k'] != '' else 3
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
-
+            '''for analysis object'''
+            name=request_dict['name']
+            type=request_dict['type']
+            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
+            project = int(request_dict['project'])
+            '''create analysis_instance'''
+            if Analysis.active.filter(name=name, type=type, project=project).exists():
+                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
+            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
+            analysis_id = analysis_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
+                analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
             if source == 'osm':
-                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance)
+                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
                 response = 'not implemented'
@@ -1433,6 +1444,7 @@ class NetworkAnalysisAPIView(APIView):
             clear_dir('cache/')
             return Response(status=200, data={'message': 'Performing Network Analysis', 'task_id': response.task_id})
         except Exception as e:
+            analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
             # result = {}
@@ -1554,10 +1566,10 @@ def get_analysis_task_response(request):
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class NetworkRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
+class ShortestRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Maps Layer
-    url:"http://0.0.0.0:8000/api/maps/network_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
+    url:"http://0.0.0.0:8000/api/maps/shortest_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = None
     vector_tile_fields = ('id','route_no','length','travel_time')
@@ -1613,3 +1625,30 @@ def feature_popup(request, *args, **kwargs):
         return Response(data=result, status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+'''Analysis layers api for map page'''
+@api_view(['GET'])
+def analysis_layers(request, *args, **kwargs):
+    options={}
+    try:
+        project = request.query_params.get('project', None)
+        if not project or project == '':
+            return Response(data={'message': 'project params is missing!'}, status=400)
+        analysis_types = Analysis.active.filter(project=project).values_list('type', flat=True).distinct()
+        for ana_type in analysis_types:
+            print(ana_type, type(ana_type), "is ana type")
+            '''say network analysis'''
+            ana_type_list=[]
+            analys_qs = Analysis.active.filter(project=project, type=ana_type)
+            for analysis in analys_qs:
+                analysis_dict={}
+                analysis_dict['id'] = analysis.id
+                analysis_dict['name'] = analysis.name
+                analysis_dict['geom_type'] = analysis.geom_type
+                analysis_dict['bbox'] = analysis.bbox
+                analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'style', 'bbox')
+                ana_type_list.append(analysis_dict)
+            options[ana_type]=ana_type_list
+        return Response(options,status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})

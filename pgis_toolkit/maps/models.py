@@ -16,6 +16,7 @@ from pgis_toolkit.projects.models import (
     TemplateAttribute,
 )
 from pgis_toolkit.utils.constants import (
+    ANALYSIS_TYPE_CHOICES,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
@@ -343,13 +344,57 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     @property
     def get_std_icon_url(self):
         return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+'''similar to Layer'''
+class Analysis(DateTimeStamp,IsDeleted):
+    name = models.CharField(max_length=254)
+    project = models.IntegerField(db_index=True)
+    display = models.BooleanField(default=False)
+    type = models.CharField(max_length=100, choices=ANALYSIS_TYPE_CHOICES)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
 
+    class Meta:
+        app_label = 'maps'
+
+'''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
-    analysis_id = models.UUIDField()
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
     travel_time = models.FloatField(max_length=10, verbose_name='Travel Time in seconds')
+    style = models.JSONField(default=dict, blank=True, null=True) #route style
+    bbox = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'
+
+    def save(self, *args, **kwargs):
+        '''Update bbox of Analysis'''
+        try:
+            if self.geometry:
+                route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
+                route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
+
+                analysis_instance=Analysis.active.get(id=self.analysis_id)
+                analysis_bbox= analysis_instance.bbox
+
+                if analysis_bbox and route_bbox:
+                    if route_bbox[0]<analysis_bbox[0]:
+                        analysis_bbox[0]=route_bbox[0]
+
+                    if route_bbox[1]<analysis_bbox[1]:
+                        analysis_bbox[1]=route_bbox[1]
+
+                    if route_bbox[2]>analysis_bbox[2]:
+                        analysis_bbox[2]=route_bbox[2]
+
+                    if route_bbox[3]>analysis_bbox[3]:
+                        analysis_bbox[3]=route_bbox[3]
+
+                elif route_bbox:
+                    analysis_bbox.bbox=route_bbox
+                analysis_instance.save()
+        except Exception as e:
+            print(f'error in def save of NetworkRoutes: {str(e)}')
+        super(NetworkRoutes, self).save(*args, **kwargs)

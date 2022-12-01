@@ -443,7 +443,7 @@ def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
         return ('Error: ' + str(e))
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance):
+def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id):
 
     import osmnx as ox
     ox.config(log_console=True, use_cache=True)
@@ -455,7 +455,7 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
         # lat = 0.319363
         # long = 34.572876
         G = ox.graph_from_point((lat, long), dist=distance)
-        response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G)
+        response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G, analysis_id)
         return response, status
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))
