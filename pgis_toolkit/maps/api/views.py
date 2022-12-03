@@ -643,6 +643,9 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 if 'std_icon' in request_dict.keys():
                     sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
                 sub_layer_style_instance.save()
+                icon = f'{env("BACKEND_URL")}{sub_layer_style_instance.icon.url}' if sub_layer_style_instance.icon else None
+                style = sub_layer_style_instance.style
+                std_icon = f'{env("BACKEND_URL")}{sub_layer_style_instance.std_icon.icon.url}' if sub_layer_style_instance.std_icon else None
                 return Response(data={"message":"successful","id":serializer.data['id'],'layer':sub_layer_instance.layer.id,'theme':sub_layer_instance.layer.theme.id, 'icon': icon, 'style': style, 'std_icon': std_icon},status=200)
             else:
                 for er in serializer._errors:
