@@ -127,10 +127,11 @@ def UploadVectorLayer(layer_id,request_data):
 #     except Exception as e:
 #         print(str(e),"error in bbox calculation")
 
-def UpdateVectorLayer(layer_instance, request_data):
+def UpdateVectorLayer(layer_instance, request_data, request):
     try:
         # geoserver.create_workspace(workspace="custom_workspace")
         errors=[]
+        update_dict = {}
         vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
         vector_layer_serializer = VectorLayerUpdateSerializer(vector_layer_instance, data=request_data, partial=True)
         if vector_layer_serializer.is_valid():
@@ -140,7 +141,7 @@ def UpdateVectorLayer(layer_instance, request_data):
             for er in vector_layer_serializer._errors:
                 errors.append(
                     {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
-            return errors
+            return errors, update_dict
 
         '''Save vector layer style'''
         project_style=None if request_data['project_style']=="default" else request_data['project_style']
@@ -160,6 +161,10 @@ def UpdateVectorLayer(layer_instance, request_data):
         if 'std_icon' in request_data.keys():
             layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
         layerstyle_instance.save()
+        update_dict['icon'] = request.build_absolute_uri(layerstyle_instance.icon.url)
+        # update_dict['icon_size'] = layerstyle_instance.icon_size
+        update_dict['style'] = layerstyle_instance.style
+        update_dict['std_icon'] = layerstyle_instance.std_icon
 
         if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
             # with transaction.atomic():
@@ -189,9 +194,9 @@ def UpdateVectorLayer(layer_instance, request_data):
                         feature.save()
                         # print(feature.sub_layer,"after save")
             # update_bbox(layer_instance)
-        return "successful"
+        return "successful", update_dict
     except Exception as e:
-        return str(e)
+        return str(e), update_dict
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UploadRasterLayer(layer_id, request_dict):

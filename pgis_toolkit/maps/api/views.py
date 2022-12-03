@@ -535,9 +535,11 @@ class LayerViewSet(viewsets.ModelViewSet):
                         project_style=request_dict['project_style']
                     request_dict._mutable=True
                     request_dict['project_style']=project_style
-                    response=UpdateVectorLayer(layer_instance,request_dict)
+                    response, update_dict=UpdateVectorLayer(layer_instance,request_dict, request)
                     if response=="successful":
-                        return Response(data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']},status=200)
+                        data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']}
+                        data.update(update_dict)
+                        return Response(data=data,status=200)
                     else:
                         return Response(data={'message': 'error occured',"error":response},status=status.HTTP_400_BAD_REQUEST)
 
