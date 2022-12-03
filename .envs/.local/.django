@@ -4,6 +4,8 @@ USE_DOCKER=no
 IPYTHONDIR=/app/.ipython
 #URL=http://0.0.0.0:8000
 URL=https://usafiri-beta.naxa.com.np
+BACKEND_URL=https://pgis.naxa.com.np
+
 CELERY_BROKER_URL=redis://redis//
 DJANGO_SECRET_KEY="4kB9ZhkXY3FNuQfd4kNEAX5AeF6sCzg9nFfWmwIu9oBAepjQrBEt3VpDBjJQh60k"
 

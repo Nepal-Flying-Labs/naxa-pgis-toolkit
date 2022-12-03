@@ -333,10 +333,10 @@ class LayerStyle(DateTimeStamp,IsDeleted):
 
     @property
     def get_icon_url(self):
-        return f'{env("URL")}{self.icon.url}' if self.icon else None
+        return f'{env("BACKEND_URL")}{self.icon.url}' if self.icon else None
     @property
     def get_std_icon_url(self):
-        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+        return f'{env("BACKEND_URL")}{self.std_icon.icon.url}' if self.std_icon else None
 
 class SubLayerStyle(DateTimeStamp,IsDeleted):
     project_style=models.ForeignKey(ProjectStyle,on_delete=models.CASCADE,blank=True,null=True)
@@ -351,10 +351,10 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
 
     @property
     def get_icon_url(self):
-        return f'{env("URL")}{self.icon.url}' if self.icon else None
+        return f'{env("BACKEND_URL")}{self.icon.url}' if self.icon else None
     @property
     def get_std_icon_url(self):
-        return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+        return f'{env("BACKEND_URL")}{self.std_icon.icon.url}' if self.std_icon else None
 
 class ProjectMapConfig(DateTimeStamp,IsDeleted):
     project = models.IntegerField(db_index=True)
