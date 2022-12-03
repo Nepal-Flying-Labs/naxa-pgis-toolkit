@@ -161,10 +161,10 @@ def UpdateVectorLayer(layer_instance, request_data):
         if 'std_icon' in request_data.keys():
             layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
         layerstyle_instance.save()
-        update_dict['icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.icon.url}"
+        update_dict['icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.icon.url}" if layerstyle_instance.icon else None
         # update_dict['icon_size'] = layerstyle_instance.icon_size
         update_dict['style'] = layerstyle_instance.style
-        update_dict['std_icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.std_icon.icon.url}"
+        update_dict['std_icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.std_icon.icon.url}" if layerstyle_instance.std_icon else None
 
         if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
             # with transaction.atomic():
