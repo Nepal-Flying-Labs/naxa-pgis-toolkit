@@ -363,9 +363,6 @@ class ProjectMapConfig(DateTimeStamp,IsDeleted):
 
     class Meta:
         app_label = 'maps'
-        permissions = (
-            ("update_mapconfig", "update or create Map Config"),
-        )
 
 '''similar to Layer'''
 class Analysis(DateTimeStamp,IsDeleted):
