@@ -404,8 +404,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
-                results['std_icon']=env("URL")+vector_layer_instance.std_icon.icon.url if vector_layer_instance.std_icon else None
-                results['icon']=env("URL")+vector_layer_instance.icon.url if vector_layer_instance.icon else None
+                results['std_icon']=request.build_absolute_uri(vector_layer_instance.std_icon.icon.url) if vector_layer_instance.std_icon else None
+                results['icon']=request.build_absolute_uri(vector_layer_instance.icon.url) if vector_layer_instance.icon else None
             elif layer_instance.layer_type=="Raster":
                 raster_layer_instance=RasterLayer.objects.select_related('layer').get(layer=layer_instance.id)
                 raster_layer_keys=['geoserver_workspace', 'geoserver_layer_name']
