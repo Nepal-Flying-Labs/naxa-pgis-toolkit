@@ -769,7 +769,7 @@ def landing_page(request, *args, **kwargs):
         page = '/organizations' #'organization_list'
     elif organization_ids.exists() and not project_ids.exists():
         organization = organization_ids.first()
-        page =  f'organizations/{organization}/home' #'organization_home'
+        page =  f'/organizations/{organization}/home' #'organization_home'
     elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
     elif project_ids.count() > 1:
         organization = organization_ids.first()

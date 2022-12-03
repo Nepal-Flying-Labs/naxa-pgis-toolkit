@@ -259,6 +259,14 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
             print(f'error in def save of feature collection: {str(e)}')
         super(FeatureCollection, self).save(*args, **kwargs)
 
+class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
+    layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
+    sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature_mirror")
+    attributes=models.JSONField(blank=True, null=True)
+    geometry=md.GeometryField(srid=4326, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
 
 class LayerAttribute(DateTimeStamp):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE)
