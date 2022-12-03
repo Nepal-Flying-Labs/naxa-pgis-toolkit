@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from config.settings import base as settings
+from pgis_toolkit.maps.models import ProjectMapConfig
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.users.permissions import IsAuthorizedInviter

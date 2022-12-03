@@ -26,7 +26,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 
-from pgis_toolkit.maps.models import Theme
+from pgis_toolkit.maps.models import ProjectMapConfig, Theme
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
     Country,
@@ -431,10 +431,16 @@ class ProjectViewset(viewsets.ModelViewSet):
 @api_view(['GET'])
 def get_project_detail(request, *args, **kwargs):
     project = request.query_params.get('project', None)
+    user = request.query_params.get('user', None)
     if project:
         if Project.active.filter(id=project).exists():
             project_instance = Project.active.get(id=project)
             data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox}
+            map_config_qs = ProjectMapConfig.active.filter(project=project, user=user) if user else ProjectMapConfig.active.filter(project=project)
+            if map_config_qs.exists():
+                data['map_config'] = map_config_qs[0].map_config
+            else:
+                data['map_config'] = {}
             return Response(status=status.HTTP_200_OK, data={'message': 'success', 'data': data})
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Project Matching queryset not found!"})
