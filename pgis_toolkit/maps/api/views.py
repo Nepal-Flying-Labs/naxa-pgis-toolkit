@@ -404,8 +404,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 vector_layer_keys=['geom_type', 'bbox','sub_layers_mapping_field', 'style', 'show_label', 'label_field', 'label_style']
                 for key in vector_layer_keys:
                     results[key]=vector_layer_instance.__dict__[key]
-                results['std_icon']=env("URL")+vector_layer_instance.std_icon.icon.url if vector_layer_instance.std_icon else None
-                results['icon']=env("URL")+vector_layer_instance.icon.url if vector_layer_instance.icon else None
+                results['std_icon']=f"{env('BACKEND_URL')}{vector_layer_instance.std_icon.icon.url}" if vector_layer_instance.std_icon else None
+                results['icon']=f"{env('BACKEND_URL')}{vector_layer_instance.icon.url}" if vector_layer_instance.icon else None
             elif layer_instance.layer_type=="Raster":
                 raster_layer_instance=RasterLayer.objects.select_related('layer').get(layer=layer_instance.id)
                 raster_layer_keys=['geoserver_workspace', 'geoserver_layer_name']
@@ -536,7 +536,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                         project_style=request_dict['project_style']
                     request_dict._mutable=True
                     request_dict['project_style']=project_style
-                    response, update_dict=UpdateVectorLayer(layer_instance,request_dict, request)
+                    response, update_dict=UpdateVectorLayer(layer_instance,request_dict)
                     if response=="successful":
                         data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']}
                         data.update(update_dict)
@@ -643,7 +643,7 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 if 'std_icon' in request_dict.keys():
                     sub_layer_style_instance.std_icon=StandardIcon.objects.get(id=request_dict['std_icon']) if request_dict['std_icon'] else None
                 sub_layer_style_instance.save()
-                return Response(data={"message":"successful","id":serializer.data['id'],'layer':sub_layer_instance.layer.id,'theme':sub_layer_instance.layer.theme.id},status=200)
+                return Response(data={"message":"successful","id":serializer.data['id'],'layer':sub_layer_instance.layer.id,'theme':sub_layer_instance.layer.theme.id, 'icon': icon, 'style': style, 'std_icon': std_icon},status=200)
             else:
                 for er in serializer._errors:
                     errors.append(

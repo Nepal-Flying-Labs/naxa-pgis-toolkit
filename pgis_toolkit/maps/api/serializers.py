@@ -68,10 +68,10 @@ class SubLayerRetrieveSerializer(serializers.ModelSerializer):
         representation = super(SubLayerRetrieveSerializer,self).to_representation(instance)
         layer_id=self.context.get('layer_id')
         project_style=self.context.get('project_style')
-        icon,icon_size,style,std_icon=get_style_detail(layer_id,instance.id,project_style)
+        icon,style,std_icon=get_style_detail(layer_id,instance.id,project_style)
         representation['icon']=icon
         representation['std_icon']=std_icon
-        representation['icon_size']=icon_size
+        # representation['icon_size']=icon_size
         representation['style']=style
         return representation
 
