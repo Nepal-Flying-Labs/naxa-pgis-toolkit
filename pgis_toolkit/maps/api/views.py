@@ -40,6 +40,7 @@ from pgis_toolkit.maps.models import (
     LayerGroup,
     LayerStyle,
     NetworkRoutes,
+    ProjectMapConfig,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
@@ -1652,3 +1653,27 @@ def analysis_layers(request, *args, **kwargs):
         return Response(options,status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+class ProjectMapConfigAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def patch(self, request, *args, **kwargs):
+        try:
+            project = request.query_params.get('project', None)
+            user = request.query_params.get('user', None)
+            project_config_qs = ProjectMapConfig.active.filter(project=project, user=user) if user else ProjectMapConfig.active.filter(project=project)
+            if project_config_qs.exists():
+                instance = project_config_qs[0]
+            else:
+                instance = ProjectMapConfig.active.create(project=project, user=user) if user else ProjectMapConfig.active.create(project=project)
+            request_dict = request.data
+            if 'map_config' in request_dict and request_dict['map_config'] != '':
+                map_config = json.loads(request_dict['map_config'])
+                instance.map_config = map_config
+            if 'user' in request_dict and request_dict['user'] != '':
+                user = int(request_dict['user'])
+                instance.user = user
+            instance.save()
+            result = {'id': instance.id, 'map_config': instance.map_config, 'user': user}
+            return Response(data=result, status=200)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})

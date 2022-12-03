@@ -12,6 +12,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     LayerViewSet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
+    ProjectMapConfigAPIView,
     ProjectStyleViewset,
     ShortestPathAPIView,
     ShortestRoutesTileQuerySet,
@@ -61,5 +62,6 @@ urlpatterns = [
     path('get_analysis_task_response/', get_analysis_task_response),
     path('shortest_routes_vectortile/<int:z>/<int:x>/<int:y>/', ShortestRoutesTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('feature_popup/', feature_popup, name='feature_popup'),
-    path('analysis_layers/', analysis_layers, name='analysis_layers')
+    path('analysis_layers/', analysis_layers, name='analysis_layers'),
+    path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
 ]
