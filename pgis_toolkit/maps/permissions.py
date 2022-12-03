@@ -482,3 +482,25 @@ class FeatureGeoJSONPermission(BasePermission):
         except Exception as e:
             print("Error occured in FeatureGeoJSONPermission Check. Error Details: ", str(e))
             return False
+
+class ProjectMapConfigPermission(BasePermission):
+    """
+    Permission check for Template Import.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            project_id=request.query_params.get('project', None)
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "change_projectmapconfig" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectMapConfigPermission Check. Error Details: ", str(e))
+            return False

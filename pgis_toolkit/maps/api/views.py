@@ -61,6 +61,7 @@ from pgis_toolkit.maps.permissions import (
     LayerGroupPermission,
     LayerPermission,
     ProjectLayerTemplatePermission,
+    ProjectMapConfigPermission,
     ProjectsLayerTemplateAttributePermission,
     ProjectStylePermission,
     ProjectThemeLayerPermission,
@@ -1657,7 +1658,7 @@ def analysis_layers(request, *args, **kwargs):
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 class ProjectMapConfigAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
     def patch(self, request, *args, **kwargs):
         try:
             project = request.query_params.get('project', None)
@@ -1671,11 +1672,8 @@ class ProjectMapConfigAPIView(APIView):
             if 'map_config' in request_dict and request_dict['map_config'] != '':
                 map_config = json.loads(request_dict['map_config'])
                 instance.map_config = map_config
-            if 'user' in request_dict and request_dict['user'] != '':
-                user = int(request_dict['user'])
-                instance.user = user
-            instance.save()
-            result = {'id': instance.id, 'map_config': instance.map_config, 'user': user}
+                instance.save()
+            result = {'id': instance.id, 'map_config': instance.map_config, 'user': instance.user}
             return Response(data=result, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
