@@ -355,6 +355,15 @@ class SubLayerStyle(DateTimeStamp,IsDeleted):
     @property
     def get_std_icon_url(self):
         return f'{env("URL")}{self.std_icon.icon.url}' if self.std_icon else None
+
+class ProjectMapConfig(DateTimeStamp,IsDeleted):
+    project = models.IntegerField(db_index=True)
+    map_config = models.JSONField(default=dict, blank=True, null=True)
+    user = models.IntegerField(db_index=True, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
 '''similar to Layer'''
 class Analysis(DateTimeStamp,IsDeleted):
     name = models.CharField(max_length=254)

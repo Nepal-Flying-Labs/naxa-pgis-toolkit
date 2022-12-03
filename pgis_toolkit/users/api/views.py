@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from config.settings import base as settings
+from pgis_toolkit.maps.models import ProjectMapConfig
 from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.users.permissions import IsAuthorizedInviter
@@ -72,7 +73,7 @@ class PreliminaryUserAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         errors=[]
-        project_instance, organization_instance = None, None
+        project_instance, organization_instance, map_config_inst = None, None, None
         try:
             verify_url = settings.URL + '/verify-user/?token='
             request.data._mutable = True
@@ -112,6 +113,8 @@ class PreliminaryUserAPIView(APIView):
                 if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_inst)).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
+                '''create projectmapconfig object'''
+                map_config_inst = ProjectMapConfig.active.create(project=project_instance.id)
                 request.data['project'] = project_instance.id
                 # '''checking if group exists already'''
                 # if Group.objects.filter(name='Project Manager').exists():
@@ -166,6 +169,8 @@ class PreliminaryUserAPIView(APIView):
                         organization_instance.delete()
                     if project_instance:
                         project_instance.delete()
+                    if map_config_inst:
+                        map_config_inst.delete()
                     for obj in created_object_list:
                         obj.delete()
                     return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
