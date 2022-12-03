@@ -22,7 +22,10 @@ from pgis_toolkit.utils.constants import (
     LAYER_TYPE_CHOICES,
     UNIT_CHOICES,
 )
-from pgis_toolkit.utils.validators import validate_std_icon_extension
+from pgis_toolkit.utils.validators import (
+    validate_icon_extension,
+    validate_std_icon_extension,
+)
 
 
 # Create your models here.
@@ -121,7 +124,7 @@ class Vectorlayer(DateTimeStamp):
     sub_layers_mapping_field=models.CharField(max_length=100,blank=True,null=True) #field name on which basis sublayer is generated
 
     style = models.JSONField(default=dict, blank=True, null=True) #layer styling
-    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_std_icon_extension]) #icon for point datatype
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_icon_extension]) #icon for point datatype
     icon_size = models.JSONField(default=dict,blank=True, null=True)
     # icon_url=models.URLField(blank=True,null=True)
     std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="layer_std_icon",blank=True,null=True)
