@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from config.settings.base import env
+from config.settings.base import MONGO_DB, env
 from pgis_toolkit.projects.models import (
     DateTimeStamp,
     IsDeleted,
@@ -258,9 +258,23 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                 vector_layer_instance.save()
                 if sub_layer_instance:
                     sub_layer_instance.save()
+            super(FeatureCollection, self).save(*args, **kwargs)
+            feature = FeatureCollection.active.filter(id=self.id).values('id', 'layer', 'sub_layer', 'attributes')[0]
+            if feature:
+                feature_coll = MONGO_DB['featurecollections']
+                feature_count = feature_coll.count_documents({'id':feature['id']})
+                if feature_count == 0:
+                    feature_coll.insert_one(feature)
+                else:
+                    feature_coll.update_one({'id': feature['id']}, {'$set': feature})
+                # Print on the terminal
+                # qs = feature_coll.find({'id':feature['id']})
+                # for r in qs:
+                #     print(r["id"], r["layer"], r["sub_layer"], r["attributes"])
+
+
         except Exception as e:
             print(f'error in def save of feature collection: {str(e)}')
-        super(FeatureCollection, self).save(*args, **kwargs)
 
 class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
