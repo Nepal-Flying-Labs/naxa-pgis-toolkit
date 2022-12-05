@@ -79,3 +79,6 @@ descartes==1.1.0
 # matplotlib==3.6.2
 mapclassify==2.4.3
 # folium==0.13.0 #not needed
+
+#mongo
+pymongo==4.3.3
