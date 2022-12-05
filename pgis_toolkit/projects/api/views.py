@@ -889,5 +889,20 @@ def get_state_choices(request, *args, **kwargs):
 class ContactPersonViewset(viewsets.ModelViewSet):
     queryset = ContactPerson.active.all()
     permission_classes = [IsAuthenticated]
-    http_method_names = ['post', 'patch']
+    http_method_names = ['get', 'post', 'patch']
     serializer_class = ContactPersonSerializer
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            queryset=ContactPerson.active.all()
+            organization = self.request.query_params.get('organization', None)
+            project = self.request.query_params.get('project', None)
+            if organization:
+                queryset=queryset.filter(organization=organization)
+            elif project:
+                queryset=queryset.filter(project=project)
+            else:
+                queryset=[]
+            return queryset
+        except Exception as e:
+            return str(e)
