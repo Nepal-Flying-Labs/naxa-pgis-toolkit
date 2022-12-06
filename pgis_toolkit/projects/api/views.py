@@ -901,8 +901,6 @@ class ContactPersonViewset(viewsets.ModelViewSet):
                 queryset=queryset.filter(organization=organization)
             elif project:
                 queryset=queryset.filter(project=project)
-            else:
-                queryset=[]
             return queryset
         except Exception as e:
             return str(e)
