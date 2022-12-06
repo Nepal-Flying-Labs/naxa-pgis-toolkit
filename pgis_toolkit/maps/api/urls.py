@@ -20,6 +20,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     SubLayerViewset,
     ThemeViewset,
     analysis_layers,
+    category,
     feature_popup,
     get_analysis_task_response,
     get_data_merge_update_task_response,
@@ -64,4 +65,5 @@ urlpatterns = [
     path('feature_popup/', feature_popup, name='feature_popup'),
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
+    path('category/', category, name='category')
 ]

@@ -72,6 +72,7 @@ class Layer(IsDeleted,DateTimeStamp):
     display=models.BooleanField(default=True) #add to map
     status = models.CharField(max_length=20, default='unchecked', choices=LAYER_STATUS_CHOICES)
     source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name='LayerCategory', blank=True, null=True)
 
     def __str__(self):
         return f'{self.id} {self.name}'

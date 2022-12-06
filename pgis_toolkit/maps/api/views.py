@@ -33,6 +33,7 @@ from config.settings.base import MEDIA_ROOT, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    Category,
     FeatureCollection,
     Layer,
     LayerAttribute,
@@ -1680,3 +1681,12 @@ class ProjectMapConfigAPIView(APIView):
             return Response(data=result, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+'''category api for layers'''
+@api_view(['GET'])
+def category(request, *args, **kwargs):
+    try:
+        qs=Category.objects.all().values('id', 'name')
+        return Response(data=qs, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
