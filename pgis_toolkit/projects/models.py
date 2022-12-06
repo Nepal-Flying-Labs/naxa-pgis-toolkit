@@ -149,6 +149,7 @@ class Project(IsDeleted,DateTimeStamp):
     file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
     partners = models.JSONField(default=list, blank=True, null=True)
+    cover_image = models.ImageField(upload_to='project_cover_image/', blank=True, null=True)
 
     class Meta:
         app_label = 'projects'

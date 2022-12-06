@@ -36,6 +36,7 @@ class UserListSerializer(serializers.ModelSerializer):
     #     return User.active.get(id=instance.user.id).image_thumbnail
     def to_representation(self, instance):
         representation = super().to_representation(instance)
+        representation['user_id'] = instance.user.id
         representation['full_name'] = instance.user.full_name
         representation['image_thumbnail'] = self.context['request'].build_absolute_uri(instance.user.image_thumbnail.url) if instance.user.image_thumbnail else None
         # representation['image_thumbnail'] = instance.user.get_image_thumbnail
@@ -44,6 +45,7 @@ class UserListSerializer(serializers.ModelSerializer):
         representation['organization'] = instance.organization.name if instance.organization else None
         representation['project'] = instance.project.name if instance.project else None
         representation['group'] = instance.group.name if instance.group else None
+        representation['active'] = instance.active
         return representation
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
