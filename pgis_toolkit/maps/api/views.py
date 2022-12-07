@@ -385,7 +385,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             if not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Project not found!'}, status=400)
             theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
-            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'category', 'source', 'status', 'display', 'layer_type')
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'category', 'source', 'status', 'display_on_map', 'layer_type')
             for layer in layer_qs:
                 layer_dict=layer
                 if layer['layer_type']=='Vector':
