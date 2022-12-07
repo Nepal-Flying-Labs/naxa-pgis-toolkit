@@ -69,3 +69,15 @@ PROJECT_STATUS_CHOICES = (
 ANALYSIS_TYPE_CHOICES = (
     ('Nearest Path Analysis', _('Nearest Path Analysis')),
 )
+
+LAYER_STATUS_CHOICES = (
+    ('valid', _('Valid')),
+    ('invalid', _('Invalid')),
+    ('unchecked', _('Unchecked')),
+)
+
+LAYER_SOURCE_CHOICES = (
+    ('osm', _('OSM')),
+    ('survey', _('Survey')),
+    ('computer', _('Computer')),
+)
