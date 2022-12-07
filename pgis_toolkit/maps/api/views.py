@@ -297,7 +297,7 @@ def project_theme_layers(request):
         if not theme_id:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
 
-        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id, display_on_map=True).order_by('order')
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
@@ -416,9 +416,10 @@ class LayerViewSet(viewsets.ModelViewSet):
             layer_instance = Layer.active.get(pk=pk)
             results={}
             '''layer detail'''
-            layer_keys=['id','name','default_load','layer_type','is_osm_layer']
+            layer_keys=['id','name', 'source','display','default_load', 'status', 'layer_type','is_osm_layer']
             for key in layer_keys:
                 results[key]=layer_instance.__dict__[key]
+            results['category'] = layer_instance.category.id if layer_instance.category else None
             results['theme']=layer_instance.theme.id if layer_instance.theme else None
             results['group']=layer_instance.group.id if layer_instance.group else None
 
