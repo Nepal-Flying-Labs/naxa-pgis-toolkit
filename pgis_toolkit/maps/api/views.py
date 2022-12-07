@@ -96,6 +96,7 @@ from .serializers import (
     LayerAttributeSerializer,
     LayerGroupListSerializer,
     LayerGroupSerializer,
+    LayerListSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
     ProjectLayerTemplateListSerializer,
@@ -309,7 +310,7 @@ def project_theme_layers(request):
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['style']=style
-                    vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
                         layer_item['geom_type'] = vector_layer[0].geom_type
@@ -375,6 +376,28 @@ class LayerViewSet(viewsets.ModelViewSet):
     #         return Layer.active.get(pk=pk)
     #     except Layer.DoesNotExist:
     #         raise Http404
+    def list(self, request, *args, **kwargs):
+        try:
+            result = []
+            project = request.query_params.get('project', None)
+            if not project:
+                return Response(data={'message': 'project params is required!'}, status=400)
+            if not Project.active.filter(id=project).exists():
+                return Response(data={'message': 'Project not found!'}, status=400)
+            theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'category', 'source', 'status', 'display', 'layer_type')
+            for layer in layer_qs:
+                layer_dict=layer
+                if layer['layer_type']=='Vector':
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
+                    if vector_layer.exists():
+                        layer_dict['geom_type'] = vector_layer[0]['geom_type']
+                    feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
+                    layer_dict['features'] = feature_count
+                result.append(layer_dict)
+            return Response(data=result, status=200)
+        except Exception as e:
+            return Response(data={'error': str(e)}, status=400)
 
     def retrieve(self, request, pk=None):
 

@@ -9,6 +9,21 @@ class LayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
         fields = '__all__'
+class LayerListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Layer
+        fields = ('id', 'name', 'category', 'source', 'status', 'display')
+
+    def to_representation(self, instance):
+        representation = super(LayerListSerializer,self).to_representation(instance)
+        if instance.layer_type=='Vector':
+            vector_layer = Vectorlayer.objects.filter(layer=instance).values('geom_type')
+            if vector_layer.exists():
+                representation['geom_type'] = vector_layer[0]['geom_type']
+            feature_count = FeatureCollection.active.filter(layer=instance).count()
+            representation['features'] = feature_count
+        return representation
+
 
 class LayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
