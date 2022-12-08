@@ -81,3 +81,9 @@ LAYER_SOURCE_CHOICES = (
     ('survey', _('Survey')),
     ('computer', _('Computer')),
 )
+
+LAYER_UPLOAD_STATUS = (
+    ('uploading', _('Uploading')),
+    ('successful', _('Successful')),
+    ('failed', _('Failure')),
+)

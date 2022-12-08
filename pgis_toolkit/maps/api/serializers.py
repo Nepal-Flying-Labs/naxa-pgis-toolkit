@@ -12,7 +12,7 @@ class LayerSerializer(serializers.ModelSerializer):
 class LayerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
-        fields = ('id', 'name', 'category', 'source', 'status', 'display')
+        fields = ('id', 'name', 'source', 'status', 'display')
 
     def to_representation(self, instance):
         representation = super(LayerListSerializer,self).to_representation(instance)

@@ -385,7 +385,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             if not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Project not found!'}, status=400)
             theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
-            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'category', 'source', 'status', 'display_on_map', 'layer_type')
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type')
             for layer in layer_qs:
                 layer_dict=layer
                 if layer['layer_type']=='Vector':
@@ -419,7 +419,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             layer_keys=['id','name', 'source','display','default_load', 'status', 'layer_type','is_osm_layer']
             for key in layer_keys:
                 results[key]=layer_instance.__dict__[key]
-            results['category'] = layer_instance.category.id if layer_instance.category else None
+            # results['category'] = layer_instance.category.id if layer_instance.category else None
             results['theme']=layer_instance.theme.id if layer_instance.theme else None
             results['group']=layer_instance.group.id if layer_instance.group else None
 
@@ -529,7 +529,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                 else:
                     Layer.objects.get(id=created_object.id).delete()
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-                return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                # return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 for er in serializer._errors:
                     errors.append(

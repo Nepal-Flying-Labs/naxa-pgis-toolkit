@@ -302,7 +302,7 @@ def upload_feature(geodataframe, layer_instance, geom_type):
                                                              attributes=dropped_geometry_dict,
                                                              )
             except Exception as e:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return ("error : "+str(e))
         try:
             for col_name in geodataframe.columns:
@@ -312,7 +312,7 @@ def upload_feature(geodataframe, layer_instance, geom_type):
                     LayerAttribute.objects.create(
                         layer=layer_instance, name=col_name, data_type=data_type)
         except Exception as e:
-            Layer.objects.filter(id=layer_id).delete()
+            # Layer.objects.filter(id=layer_id).delete()
             return ("attribute_error : "+str(e))
 
         # '''Geoserver layer publish'''
@@ -379,7 +379,7 @@ def handleShapeFile(layer_id):
             if utm_zone:
                 return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
             else:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
         '''validaing geometry type'''
         response,geom_type=validate_geometry_type(geodataframe)
@@ -433,7 +433,7 @@ def handleCSV(layer_id,lat_field,lon_field):
             geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 def handleKML(layer_id):
@@ -458,10 +458,10 @@ def handleKML(layer_id):
         utm_zone = geodataframe.crs.utm_zone,
         if epsg != 4326:
             if utm_zone:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
             else:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
 
         # gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'raw'
@@ -491,7 +491,7 @@ def handleKML(layer_id):
             geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 def handleGPX(layer_id):
@@ -510,10 +510,10 @@ def handleGPX(layer_id):
         utm_zone = geodataframe.crs.utm_zone,
         if epsg != 4326:
             if utm_zone:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
             else:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
 
         '''validaing geometry type'''
@@ -534,7 +534,7 @@ def handleGPX(layer_id):
             geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 
@@ -552,10 +552,10 @@ def handleGeoJSON(layer_id):
         utm_zone = geodataframe.crs.utm_zone,
         if epsg != 4326:
             if utm_zone:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
             else:
-                Layer.objects.filter(id=layer_id).delete()
+                # Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
 
         '''validaing geometry type'''
@@ -576,7 +576,7 @@ def handleGeoJSON(layer_id):
             geodataframe, layer_instance,geom_type)
         return response
     except Exception as e:
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         return ("error occured : " + str(e))
 
 def handleShapeFileForDataMerge(layer_file_path):
