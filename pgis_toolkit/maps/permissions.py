@@ -57,10 +57,6 @@ class LayerPermission(BasePermission):
                 project_id = request.query_params.get('project', None)
                 organization_id=Project.active.get(id=project_id).organization.id
 
-                layer_id=request.query_params.get("layer")
-                project_id=Layer.objects.get(id=layer_id).theme.project.id
-                organization_id=Project.active.get(id=project_id).organization.id
-
             elif action in ['retrieve','partial_update']:
                 layer_id=request.resolver_match.kwargs.get('pk')
                 project_id=Layer.objects.get(id=layer_id).theme.project.id

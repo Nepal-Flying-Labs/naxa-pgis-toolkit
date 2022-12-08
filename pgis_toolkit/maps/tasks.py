@@ -85,14 +85,20 @@ def UploadVectorLayer(layer_id,request_data):
 
         clear_dir(dir)
         if response=="successful":
+            layer = Layer.active.get(id=layer_id)
+            layer.upload_status='successful'
+            layer.save()
             return "successful", layer_id
         else:
-            Layer.objects.filter(id=layer_id).delete()
+            layer = Layer.active.get(id=layer_id)
+            layer.upload_status='failed'
+            layer.save()
+            # Layer.objects.filter(id=layer_id).delete()
             return response, None
 
     except Exception as e:
         clear_dir(dir)
-        Layer.objects.filter(id=layer_id).delete()
+        # Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
@@ -258,8 +264,8 @@ def UploadRasterLayer(layer_id, request_dict):
         clear_dir(dir)
         return "successful", layer_id
     except Exception as e:
-        layer_instance.delete()
-        layer_file_instance.delete()
+        # layer_instance.delete()
+        # layer_file_instance.delete()
         return str(e), None
 
 @shared_task(max_retries=1, soft_time_limit=8000)
