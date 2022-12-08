@@ -447,3 +447,11 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
         except Exception as e:
             print(f'error in def save of NetworkRoutes: {str(e)}')
         super(NetworkRoutes, self).save(*args, **kwargs)
+
+'''Celery Task'''
+class CeleryTask(models.Model):
+    task_id = models.UUIDField()
+    layer_id = models.IntegerField(db_index=True, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'

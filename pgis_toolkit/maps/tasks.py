@@ -85,8 +85,14 @@ def UploadVectorLayer(layer_id,request_data):
 
         clear_dir(dir)
         if response=="successful":
+            layer = Layer.active.get(id=layer_id)
+            layer.upload_status='successful'
+            layer.save()
             return "successful", layer_id
         else:
+            layer = Layer.active.get(id=layer_id)
+            layer.upload_status='failed'
+            layer.save()
             # Layer.objects.filter(id=layer_id).delete()
             return response, None
 
