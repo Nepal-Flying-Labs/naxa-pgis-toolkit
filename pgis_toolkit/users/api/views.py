@@ -299,6 +299,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     created_object.save()
                     '''send email for verification'''
                     data = {
+                    'user': created_object.full_name,
                     'paragraph_1': f'Click in the link to verify and activate your account: {verify_url}{uuid_code}',
                     }
                     template = 'email/email_request_demo.html'
