@@ -24,8 +24,14 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from config.settings import base as settings
-from pgis_toolkit.maps.models import ProjectMapConfig
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
+from pgis_toolkit.maps.models import ProjectMapConfig, Theme
+from pgis_toolkit.projects.models import (
+    DateTimeStamp,
+    DefaultTheme,
+    IsDeleted,
+    Organization,
+    Project,
+)
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
@@ -113,6 +119,9 @@ class PreliminaryUserAPIView(APIView):
                 if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_inst)).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
+                theme_qs = DefaultTheme.objects.all().values('name')
+                for theme in theme_qs:
+                    Theme.objects.create(name=theme['name'], project=project_instance)
                 request.data['project'] = project_instance.id
                 # '''checking if group exists already'''
                 # if Group.objects.filter(name='Project Manager').exists():
