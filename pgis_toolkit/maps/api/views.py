@@ -47,6 +47,8 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
+    QueryFeatureCollection,
+    QueryLayer,
     RasterLayer,
     StandardIcon,
     SubLayer,
@@ -107,6 +109,7 @@ from .serializers import (
     ProjectsLayerTemplateAttributeSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
     SubLayerRetrieveSerializer,
@@ -922,59 +925,82 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
-@api_view(['GET'])
-def advance_query(request, *args, **kwargs):
-    try:
-        layer_id = int(request.GET['layer'])
-        expr_params = request.GET['expression']
-        operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
-                         5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
-        if layer_id and expr_params:
-            expressions = json.loads(expr_params)
-            join = ''
-            query={}
-            for expr in expressions:
-                if 'join' not in expr.keys():
-                    field = expr['field']
-                    operator = expr['operator']
-                    value = expr['value']
-                    if join == "OR":
-                        OR_query = advance_filter_data(layer_id,
-                            field, operator, value)
-                        if query:
-                            query = { "$or" : [query, OR_query] }
-                    elif join == "AND":
-                        AND_query = advance_filter_data(layer_id,
-                            field, operator, value)
-                        query = { "$and" : [query, AND_query] }
-                    else:
+'''{{baseURL}}api/maps/advance_query/?layer=102&expression=[{"field":"OBJECTID","operator":1,"value":6262},{"join":"OR"},{"field":"OBJECTID","operator":1,"value":6263}]'''
+class AdvanceQueryAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            feature_ids=[]
+            layer_id = int(request.query_params.get('layer', None))
+            expr_params = request.query_params.get('expression', None)
+            operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
+                            5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
+            query_layer = None
+            if layer_id and expr_params:
+                layer = Layer.active.get(id=layer_id)
+                vector_layer = Vectorlayer.objects.get(id=layer_id)
+                name = request.data.get('name', None)
+                display_on_map = request.data.get('display_on_map', True)
+                if not name or name == "":
+                    return Response(data={'message': "QueryLayer name field is required"}, status=400)
+                if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
+                    return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
+                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
+                expressions = json.loads(expr_params)
+                join = ''
+                query={}
+                for expr in expressions:
+                    if 'join' not in expr.keys():
+                        field = expr['field']
+                        operator = expr['operator']
+                        value = expr['value']
+                        if join == "OR":
+                            OR_query = advance_filter_data(layer_id,
+                                field, operator, value)
+                            if query:
+                                query = { "$or" : [query, OR_query] }
+                        elif join == "AND":
+                            AND_query = advance_filter_data(layer_id,
+                                field, operator, value)
+                            query = { "$and" : [query, AND_query] }
+                        else:
 
-                        query = advance_filter_data(layer_id,
-                            field, operator, value)
-                else:
-                    join = expr['join']
-            print(query, "is query")
-            feature_coll = MONGO_DB['featurecollections']
-            result = feature_coll.find(query, {"id":1, "_id":0})
-            json_data = json.loads(dumps(result))
-            print(json_data, "is json data")
-            id_list = []
-            for data in json_data:
-                id_list.append(data['id'])
-            queryset = FeatureCollection.active.filter(id__in=id_list)
-        return Response(data=queryset, status=200)
-    except Exception as e:
-        return Response(data=str(e), status=400)
+                            query = advance_filter_data(layer_id,
+                                field, operator, value)
+                    else:
+                        join = expr['join']
+                feature_coll = MONGO_DB['featurecollections']
+                result = feature_coll.find(query, {"id":1, "_id":0})
+                json_data = json.loads(dumps(result))
+                for data in json_data:
+                    feature = FeatureCollection.objects.get(id=data['id'])
+                    serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
+                    if serializer.is_valid():
+                        created_obj=serializer.save()
+                        feature_ids.append(created_obj.id)
+                    else:
+                        for er in serializer._errors:
+                            errors.append(
+                                {'errorName': er, 'details': serializer._errors[er][0]})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                bbox = QueryLayer.objects.get(id=query_layer.id).bbox
+                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
+        except Exception as e:
+            if query_layer:
+                query_layer.delete()
+            if feature_ids:
+                QueryFeatureCollection.active.filter(id__in=feature_ids).delete()
+            return Response(data=str(e), status=400)
 
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     VectorTile Generation for Advance Filter Layer
-    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=1
     '''
 
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk', 'layer')
+    vector_tile_fields = ('pk', 'layer', 'attributes')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -992,65 +1018,12 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
-        if 'layer' not in request_keys or request.GET['layer'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
+        if 'layer' not in request_keys or request.GET['layer'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id = int(request.GET['layer'])
         if not Layer.active.filter(id=layer_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        layer_instance = Layer.objects.get(id=layer_id)
-        expr_params = request.GET['expression']
-        operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
-                         5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
-        if layer_id and expr_params:
-            expressions = json.loads(expr_params)
-            print(expressions, "is expressions")
-            join = ''
-            query={}
-            for expr in expressions:
-                if 'join' not in expr.keys():
-                    field = expr['field']
-                    operator = expr['operator']
-                    value = expr['value']
-                    if join == "OR":
-                        OR_query = advance_filter_data(layer_id,
-                            field, operator, value)
-                        if query:
-                            query = { "$or" : [query, OR_query] }
-                    elif join == "AND":
-                        AND_query = advance_filter_data(layer_id,
-                            field, operator, value)
-                        query = { "$and" : [query, AND_query] }
-                    else:
-
-                        query = advance_filter_data(layer_id,
-                            field, operator, value)
-                else:
-                    join = expr['join']
-            feature_coll = MONGO_DB['featurecollections']
-            result = feature_coll.find(query, {"id":1, "_id":0})
-            json_data = json.loads(dumps(result))
-            id_list = []
-            for data in json_data:
-                id_list.append(data['id'])
-            queryset = FeatureCollection.active.filter(id__in=id_list)
-            # result_dataset = []
-            # for expr in expressions:
-            #     if 'join' not in expr.keys():
-            #         field = expr['field']
-            #         operator = expr['operator']
-            #         value = expr['value']
-            #         if join == "OR":
-            #             OR_dataset = advance_filter_data(
-            #                 field, operator, value, dataset)
-            #             result_dataset = result_dataset | OR_dataset
-            #         elif join == "AND":
-            #             result_dataset = advance_filter_data(
-            #                 field, operator, value, result_dataset)
-            #         else:
-            #             result_dataset = advance_filter_data(
-            #                 field, operator, value, dataset)
-            #     else:
-            #         join = expr['join']
+        queryset = FeatureCollection.active.filter(layer=layer_id)
         if queryset is None:
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         self.vector_tile_queryset = queryset.distinct()
