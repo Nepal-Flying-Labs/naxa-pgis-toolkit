@@ -364,7 +364,7 @@ def project_theme_layers(request):
 
 class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
-    http_method_names=['get','post', 'patch']
+    http_method_names=['get','post', 'patch', 'delete']
     permission_classes=[LayerPermission]
     serializer_class=LayerSerializer
     '''
@@ -598,6 +598,27 @@ class LayerViewSet(viewsets.ModelViewSet):
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            layer_type=instance.layer_type
+            '''delete layer'''
+            self.perform_destroy(instance)
+            if layer_type=="Vector":
+                Vectorlayer.objects.filter(layer=instance.id).delete()
+                FeatureCollection.objects.filter(layer=instance).delete()
+                LayerAttribute.objects.filter(layer=instance).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+                LayerStyle.objects.filter(layer=instance).delete()
+            elif layer_type=="Raster":
+                RasterLayer.objects.filter(layer=instance.id).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+            elif layer_type=="WMS":
+                WMSLayer.objects.filter(layer=instance).delete()
+
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'Message': 'Layer Data deleted'})
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
