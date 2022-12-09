@@ -455,3 +455,26 @@ class CeleryTask(models.Model):
 
     class Meta:
         app_label = 'maps'
+
+class QueryLayer(IsDeleted, DateTimeStamp):
+    theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="querylayer_theme")
+    group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='querylayer_group')
+    name=models.CharField(max_length=254)
+    display_on_map=models.BooleanField(default=True) #add to map
+    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_icon_extension]) #icon for point datatype
+    bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
+    geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="querylayer_std_icon",blank=True,null=True)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+
+    class Meta:
+        app_label = 'maps'
+
+class QueryFeatureCollection(DateTimeStamp,IsDeleted):
+    layer=models.ForeignKey(QueryLayer,on_delete=models.CASCADE,related_name="querylayer_feature")
+    attributes=models.JSONField(blank=True, null=True)
+    geometry=md.GeometryField(srid=4326, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
