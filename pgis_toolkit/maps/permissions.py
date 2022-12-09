@@ -53,12 +53,16 @@ class LayerPermission(BasePermission):
             user_id=request.user.id
             if request.user.is_superuser:
                 return True
-            if action in ['retrieve','partial_update']:
+            if action =="list":
+                project_id = request.query_params.get('project', None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update', 'destroy']:
                 layer_id=request.resolver_match.kwargs.get('pk')
                 project_id=Layer.objects.get(id=layer_id).theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
-            if action=="create":
+            elif action=="create":
                 theme_id=request.data.get("theme",None)
                 project_id=Theme.active.get(id=theme_id).project.id
                 organization_id=Project.active.get(id=project_id).organization.id
@@ -67,11 +71,15 @@ class LayerPermission(BasePermission):
 
             if group_id:
                 permission_list=get_permission_list(group_id)
-                if action=="create" and "add_layer" in permission_list:
+                if action=="list" and "view_layer" in permission_list:
+                    return True
+                elif action=="create" and "add_layer" in permission_list:
                     return True
                 elif action=="partial_update" and "change_layer" in permission_list:
                     return True
                 elif action=="retrieve" and "view_layer" in permission_list:
+                    return True
+                elif action=="destroy" and "delete_layer" in permission_list:
                     return True
             return False
         except Exception as e:

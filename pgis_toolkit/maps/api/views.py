@@ -34,6 +34,8 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    Category,
+    CeleryTask,
     FeatureCollection,
     Layer,
     LayerAttribute,
@@ -96,6 +98,7 @@ from .serializers import (
     LayerAttributeSerializer,
     LayerGroupListSerializer,
     LayerGroupSerializer,
+    LayerListSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
     ProjectLayerTemplateListSerializer,
@@ -296,12 +299,12 @@ def project_theme_layers(request):
         if not theme_id:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
 
-        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id, display_on_map=True).order_by('order')
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status')
             for layer in group_layer_qs:
                 layer_item=layer
                 if layer['layer_type']=="Vector":
@@ -309,7 +312,7 @@ def project_theme_layers(request):
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['style']=style
-                    vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
                         layer_item['geom_type'] = vector_layer[0].geom_type
@@ -321,7 +324,7 @@ def project_theme_layers(request):
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
 
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type')
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status')
         for layer in layer_qs:
             layer_item=layer
             if layer['layer_type']=="Vector":
@@ -362,7 +365,7 @@ def project_theme_layers(request):
 
 class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
-    http_method_names=['get','post', 'patch']
+    http_method_names=['get','post', 'patch', 'delete']
     permission_classes=[LayerPermission]
     serializer_class=LayerSerializer
     '''
@@ -375,6 +378,28 @@ class LayerViewSet(viewsets.ModelViewSet):
     #         return Layer.active.get(pk=pk)
     #     except Layer.DoesNotExist:
     #         raise Http404
+    def list(self, request, *args, **kwargs):
+        try:
+            result = []
+            project = request.query_params.get('project', None)
+            if not project:
+                return Response(data={'message': 'project params is required!'}, status=400)
+            if not Project.active.filter(id=project).exists():
+                return Response(data={'message': 'Project not found!'}, status=400)
+            theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status')
+            for layer in layer_qs:
+                layer_dict=layer
+                if layer['layer_type']=='Vector':
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
+                    if vector_layer.exists():
+                        layer_dict['geom_type'] = vector_layer[0]['geom_type']
+                    feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
+                    layer_dict['features'] = feature_count
+                result.append(layer_dict)
+            return Response(data=result, status=200)
+        except Exception as e:
+            return Response(data={'error': str(e)}, status=400)
 
     def retrieve(self, request, pk=None):
 
@@ -393,9 +418,10 @@ class LayerViewSet(viewsets.ModelViewSet):
             layer_instance = Layer.active.get(pk=pk)
             results={}
             '''layer detail'''
-            layer_keys=['id','name','default_load','layer_type','is_osm_layer']
+            layer_keys=['id','name', 'source','display_on_map','default_load', 'status', 'layer_type', 'upload_status', 'is_osm_layer']
             for key in layer_keys:
                 results[key]=layer_instance.__dict__[key]
+            # results['category'] = layer_instance.category.id if layer_instance.category else None
             results['theme']=layer_instance.theme.id if layer_instance.theme else None
             results['group']=layer_instance.group.id if layer_instance.group else None
 
@@ -469,9 +495,10 @@ class LayerViewSet(viewsets.ModelViewSet):
 
                     print("reached here123")
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
+                    CeleryTask.objects.create(layer_id=created_object.id, task_id=response.task_id)
                     # return Response(response)
                     return Response(status=200,
-                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id, 'layer_id': created_object.id})
 
                 elif layer_type == "Raster":
                     is_working=get_celery_worker_status()
@@ -505,7 +532,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                 else:
                     Layer.objects.get(id=created_object.id).delete()
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-                return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                # return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 for er in serializer._errors:
                     errors.append(
@@ -572,6 +599,27 @@ class LayerViewSet(viewsets.ModelViewSet):
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            layer_type=instance.layer_type
+            '''delete layer'''
+            self.perform_destroy(instance)
+            if layer_type=="Vector":
+                Vectorlayer.objects.filter(layer=instance.id).delete()
+                FeatureCollection.objects.filter(layer=instance).delete()
+                LayerAttribute.objects.filter(layer=instance).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+                LayerStyle.objects.filter(layer=instance).delete()
+            elif layer_type=="Raster":
+                RasterLayer.objects.filter(layer=instance.id).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+            elif layer_type=="WMS":
+                WMSLayer.objects.filter(layer=instance).delete()
+
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'Message': 'Layer Data deleted'})
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
@@ -658,30 +706,71 @@ class SubLayerViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 
+# @api_view(['GET'])
+# def get_layer_upload_task_response(request):
+#     '''
+#     View to get the response of aynchronous task run for vector and raster layer upload
+#     '''
+#     try:
+#         task_id = request.query_params.get('task_id', None)
+#         result = AsyncResult(task_id, app=app)
+#         if result.ready():   # check task state: true/false
+#             try:
+#                 response, layer_id = result.get()
+#                 if response == "successful":
+#                     layer_instance=Layer.active.get(id=int(layer_id))
+#                     theme_id=layer_instance.theme.id if layer_instance.theme else None
+#                     group_id = layer_instance.group.id if layer_instance.group else None
+#                     return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+#                 else:
+#                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+#             except Exception as e:
+#                 return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+#         return Response({'message': "Please wait result"}, status=200)
+#     except Exception as e:
+#         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
     '''
     View to get the response of aynchronous task run for vector and raster layer upload
     '''
     try:
-        task_id = request.query_params.get('task_id', None)
-        result = AsyncResult(task_id, app=app)
-        if result.ready():   # check task state: true/false
-            try:
-                response, layer_id = result.get()
-                if response == "successful":
-                    layer_instance=Layer.active.get(id=int(layer_id))
-                    theme_id=layer_instance.theme.id if layer_instance.theme else None
-                    group_id = layer_instance.group.id if layer_instance.group else None
-                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
-                else:
-                    return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
-                return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': "Please wait result"}, status=200)
+        layer_id = int(request.query_params.get('layer', None))
+        task_qs= CeleryTask.objects.filter(layer_id=layer_id)
+        if not task_qs.exists():
+            return Response({'message': 'Task not found for the layer'}, status=400)
+        task_id = task_qs[0].task_id
+        result =  AsyncResult(task_id, app=app)
+        if result.ready():
+            response, layer_id = result.get()
+            if response == "successful":
+                layer_instance=Layer.active.get(id=int(layer_id))
+                theme_id=layer_instance.theme.id if layer_instance.theme else None
+                group_id = layer_instance.group.id if layer_instance.group else None
+                return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+            else:
+                return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'message': "Please wait result"}, status=200)
+
+
+        # result = AsyncResult(layer_id, app=app)
+        # if result.ready():   # check task state: true/false
+        #     try:
+        #         response, layer_id = result.get()
+        #         if response == "successful":
+        #             layer_instance=Layer.active.get(id=int(layer_id))
+        #             theme_id=layer_instance.theme.id if layer_instance.theme else None
+        #             group_id = layer_instance.group.id if layer_instance.group else None
+        #             return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+        #         else:
+        #             return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        #     except Exception as e:
+        #         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        # return Response({'message': "Please wait result"}, status=200)
     except Exception as e:
         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ThemeViewset(viewsets.ModelViewSet):
     '''
@@ -1754,3 +1843,12 @@ class ProjectMapConfigAPIView(APIView):
             return Response(data=result, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+'''category api for layers'''
+@api_view(['GET'])
+def category(request, *args, **kwargs):
+    try:
+        qs=Category.objects.all().values('id', 'name')
+        return Response(data=qs, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})

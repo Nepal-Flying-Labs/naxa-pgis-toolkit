@@ -19,7 +19,10 @@ from pgis_toolkit.utils.constants import (
     ANALYSIS_TYPE_CHOICES,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
+    LAYER_SOURCE_CHOICES,
+    LAYER_STATUS_CHOICES,
     LAYER_TYPE_CHOICES,
+    LAYER_UPLOAD_STATUS,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.validators import (
@@ -51,6 +54,13 @@ class LayerGroup(IsDeleted,DateTimeStamp):
         app_label = 'maps'
         unique_together = (("theme", "name"),)
 
+class Category(models.Model):
+    name = models.CharField(max_length=50)
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
+    class Meta:
+        app_label = 'maps'
 
 class Layer(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
@@ -60,6 +70,11 @@ class Layer(IsDeleted,DateTimeStamp):
     default_load=models.BooleanField(default=False)
     layer_type=models.CharField(max_length=20,choices=LAYER_TYPE_CHOICES)
     is_osm_layer=models.BooleanField(default=False)
+    display_on_map=models.BooleanField(default=True) #add to map
+    status = models.CharField(max_length=20, default='unchecked', choices=LAYER_STATUS_CHOICES)
+    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    # category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name='LayerCategory', blank=True, null=True)
+    upload_status = models.CharField(max_length=20, default='uploading', choices=LAYER_UPLOAD_STATUS)
 
     def __str__(self):
         return f'{self.id} {self.name}'
@@ -432,3 +447,11 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
         except Exception as e:
             print(f'error in def save of NetworkRoutes: {str(e)}')
         super(NetworkRoutes, self).save(*args, **kwargs)
+
+'''Celery Task'''
+class CeleryTask(models.Model):
+    task_id = models.UUIDField()
+    layer_id = models.IntegerField(db_index=True, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'

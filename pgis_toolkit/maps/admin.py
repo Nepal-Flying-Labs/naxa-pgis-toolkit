@@ -13,6 +13,10 @@ class LayerGroupAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('theme',)
 
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('id', 'name')
+
 class LayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'order','name','group', 'layer_type', 'is_osm_layer')
     search_fields = ('id', 'name')
@@ -99,6 +103,9 @@ class NetworkRoutesAdmin(admin.ModelAdmin):
     list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
     list_filter = ('route_no', 'analysis_id')
 
+class CeleryTaskAdmin(admin.ModelAdmin):
+    list_display = ('id', 'task_id')
+
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(LayerGroup, LayerGroupAdmin)
@@ -118,3 +125,5 @@ admin.site.register(LayerStyle,LayerStyleAdmin)
 admin.site.register(SubLayerStyle,SubLayerStyleAdmin)
 admin.site.register(NetworkRoutes, NetworkRoutesAdmin)
 admin.site.register(Analysis, AnalysisAdmin)
+admin.site.register(Category, CategoryAdmin)
+admin.site.register(CeleryTask, CeleryTaskAdmin)
