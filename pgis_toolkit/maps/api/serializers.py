@@ -179,3 +179,8 @@ class NetworkRoutesSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkRoutes
         fields = '__all__'
+
+class QueryFeatureCollectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QueryFeatureCollection
+        fields = '__all__'

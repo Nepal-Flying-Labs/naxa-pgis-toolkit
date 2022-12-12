@@ -418,35 +418,35 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
-    def save(self, *args, **kwargs):
-        '''Update bbox of Analysis'''
-        try:
-            if self.geometry:
-                route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
-                route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
+    # def save(self, *args, **kwargs):
+    #     '''Update bbox of Analysis'''
+    #     try:
+    #         if self.geometry:
+    #             route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
+    #             route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
 
-                analysis_instance=Analysis.active.get(id=self.analysis_id)
-                analysis_bbox= analysis_instance.bbox
+    #             analysis_instance=Analysis.active.get(id=self.analysis_id)
+    #             analysis_bbox= analysis_instance.bbox
 
-                if analysis_bbox and route_bbox:
-                    if route_bbox[0]<analysis_bbox[0]:
-                        analysis_bbox[0]=route_bbox[0]
+    #             if analysis_bbox and route_bbox:
+    #                 if route_bbox[0]<analysis_bbox[0]:
+    #                     analysis_bbox[0]=route_bbox[0]
 
-                    if route_bbox[1]<analysis_bbox[1]:
-                        analysis_bbox[1]=route_bbox[1]
+    #                 if route_bbox[1]<analysis_bbox[1]:
+    #                     analysis_bbox[1]=route_bbox[1]
 
-                    if route_bbox[2]>analysis_bbox[2]:
-                        analysis_bbox[2]=route_bbox[2]
+    #                 if route_bbox[2]>analysis_bbox[2]:
+    #                     analysis_bbox[2]=route_bbox[2]
 
-                    if route_bbox[3]>analysis_bbox[3]:
-                        analysis_bbox[3]=route_bbox[3]
+    #                 if route_bbox[3]>analysis_bbox[3]:
+    #                     analysis_bbox[3]=route_bbox[3]
 
-                elif route_bbox:
-                    analysis_bbox.bbox=route_bbox
-                analysis_instance.save()
-        except Exception as e:
-            print(f'error in def save of NetworkRoutes: {str(e)}')
-        super(NetworkRoutes, self).save(*args, **kwargs)
+    #             elif route_bbox:
+    #                 analysis_instance.bbox=route_bbox
+    #             analysis_instance.save()
+    #     except Exception as e:
+    #         print(f'error in def save of NetworkRoutes: {str(e)}')
+    #     super(NetworkRoutes, self).save(*args, **kwargs)
 
 '''Celery Task'''
 class CeleryTask(models.Model):
@@ -455,3 +455,59 @@ class CeleryTask(models.Model):
 
     class Meta:
         app_label = 'maps'
+
+class QueryLayer(IsDeleted, DateTimeStamp):
+    theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="querylayer_theme")
+    group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='querylayer_group')
+    name=models.CharField(max_length=254)
+    display_on_map=models.BooleanField(default=True) #add to map
+    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_icon_extension]) #icon for point datatype
+    bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
+    geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="querylayer_std_icon",blank=True,null=True)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+
+    class Meta:
+        app_label = 'maps'
+
+class QueryFeatureCollection(DateTimeStamp,IsDeleted):
+    layer=models.ForeignKey(QueryLayer,on_delete=models.CASCADE,related_name="querylayer_feature")
+    attributes=models.JSONField(blank=True, null=True)
+    geometry=md.GeometryField(srid=4326, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+    def save(self, *args, **kwargs):
+        '''Update bbox of QueryFeatureCollection'''
+        try:
+            if self.geometry:
+                if self.geometry.geom_type=="Point":
+                    coords=self.geometry.coords
+                    feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+                else:
+                    feature_bbox = self.geometry.extent
+
+                layer_instance=QueryLayer.active.get(id=self.layer.id)
+                layer_bbox= layer_instance.bbox
+
+                if layer_bbox and feature_bbox:
+                    if feature_bbox[0]<layer_bbox[0]:
+                        layer_bbox[0]=feature_bbox[0]
+
+                    if feature_bbox[1]<layer_bbox[1]:
+                        layer_bbox[1]=feature_bbox[1]
+
+                    if feature_bbox[2]>layer_bbox[2]:
+                        layer_bbox[2]=feature_bbox[2]
+
+                    if feature_bbox[3]>layer_bbox[3]:
+                        layer_bbox[3]=feature_bbox[3]
+
+                elif feature_bbox:
+                    layer_instance.bbox=list(feature_bbox)
+                layer_instance.save()
+        except Exception as e:
+            print(f'error in def save of QueryFeatureCollection: {str(e)}')
+        super(QueryFeatureCollection, self).save(*args, **kwargs)
