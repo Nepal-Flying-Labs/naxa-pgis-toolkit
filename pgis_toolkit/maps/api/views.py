@@ -925,14 +925,42 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
-'''{{baseURL}}api/maps/advance_query/?layer=102&expression=[{"field":"OBJECTID","operator":1,"value":6262},{"join":"OR"},{"field":"OBJECTID","operator":1,"value":6263}]'''
+'''{{baseURL}}api/maps/advance_query/
+    layer=102
+    expression=[{"field":"OBJECTID","operator":1,"value":6262},{"join":"OR"},{"field":"OBJECTID","operator":1,"value":6263}]'''
 class AdvanceQueryAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        '''{{baseURL}}api/maps/advance_query/?layer=1&field=DISTRICT'''
+        try:
+            layer_id = request.query_params.get('layer', None)
+            field = request.query_params.get('field', None)
+            if layer_id and field:
+                feature_qs = FeatureCollection.active.filter(layer=int(layer_id))
+                values = []
+                attrbue_keys = feature_qs[0].attributes.keys()
+                for feature in feature_qs:
+                    value=feature.attributes[field]
+                    if field in attrbue_keys and value not in values:
+                        values.append(value)
+                return Response (data=values, status=200)
+            elif layer_id:
+                layer = Layer.active.get(id=layer_id)
+                if LayerAttribute.objects.filter(layer=layer_id).exists():
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    return Response (data=attribute_qs, status=200)
+                else:
+                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+            else:
+                return Response(data={'message': 'layer or field params is missing!'}, status=400)
+        except Exception as e:
+            return Response(data=str(e), status=400)
+
     def post(self, request, *args, **kwargs):
         try:
             errors=[]
             feature_ids=[]
-            layer_id = int(request.query_params.get('layer', None))
-            expr_params = request.query_params.get('expression', None)
+            layer_id = int(request.data.get('layer', None))
+            expr_params = request.data.get('expression', None)
             operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
                             5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
             query_layer = None
