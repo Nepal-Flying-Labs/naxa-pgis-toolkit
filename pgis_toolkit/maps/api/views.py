@@ -1049,9 +1049,9 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         if 'layer' not in request_keys or request.GET['layer'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id = int(request.GET['layer'])
-        if not Layer.active.filter(id=layer_id).exists():
+        if not QueryLayer.active.filter(id=layer_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        queryset = FeatureCollection.active.filter(layer=layer_id)
+        queryset = QueryFeatureCollection.active.filter(layer=layer_id)
         if queryset is None:
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         self.vector_tile_queryset = queryset.distinct()
