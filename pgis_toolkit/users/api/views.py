@@ -1,5 +1,6 @@
 import json
 import operator
+import time
 import uuid
 from functools import reduce
 from itertools import groupby
@@ -116,12 +117,9 @@ class PreliminaryUserAPIView(APIView):
                 if not organization or not Organization.active.filter(id=organization).exists():
                     return Response(data={'message': 'Valid Organization params is compulsory for a project related role!'}, status=status.HTTP_400_BAD_REQUEST)
                 organization_inst = Organization.active.get(id=organization)
-                if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_inst)).exists():
+                if Project.active.filter(name=project_name[0],organization=organization_inst).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
-                theme_qs = DefaultTheme.objects.all().values('name')
-                for theme in theme_qs:
-                    Theme.objects.create(name=theme['name'], project=project_instance)
                 request.data['project'] = project_instance.id
                 # '''checking if group exists already'''
                 # if Group.objects.filter(name='Project Manager').exists():
@@ -149,6 +147,9 @@ class PreliminaryUserAPIView(APIView):
                     request.data['organization'] = project_inst.organization.id
             '''create multiple or single preliminary user instances'''
             # created_object_list = []
+            if PreliminaryUser.active.filter(status='Pending', email__in=email_list).exists():
+                # return Response(data={'message': 'Preliminary User instance for the email already exists!'}, status=400)
+                raise Exception('Preliminary User instance for the email already exists!')
             for email in email_list:
                 request.data['email'] = email
                 request.data['email_verification_token'] = uuid.uuid4()
