@@ -352,7 +352,7 @@ def project_theme_layers(request):
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
                 layer_item['style']=style
-                vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
                     layer_item['geom_type'] = vector_layer[0].geom_type
@@ -966,7 +966,7 @@ class AdvanceQueryAPIView(APIView):
             query_layer = None
             if layer_id and expr_params:
                 layer = Layer.active.get(id=layer_id)
-                vector_layer = Vectorlayer.objects.get(id=layer_id)
+                vector_layer = Vectorlayer.objects.get(layer=layer_id)
                 name = request.data.get('name', None)
                 display_on_map = request.data.get('display_on_map', True)
                 if not name or name == "":
