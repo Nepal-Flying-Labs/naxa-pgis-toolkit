@@ -22,6 +22,7 @@ from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -371,6 +372,12 @@ class LayerViewSet(viewsets.ModelViewSet):
     http_method_names=['get','post', 'patch', 'delete']
     permission_classes=[LayerPermission]
     serializer_class=LayerSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['group', 'theme', 'status']
+    search_fields = ['id', 'name']
+    ordering_fields = ['id', 'name']
+    pagination_class = CustomPageNumberPagination
+
     '''
     View for Layer instance
     http://0.0.0.0:8000/api/maps/layer/
@@ -383,14 +390,18 @@ class LayerViewSet(viewsets.ModelViewSet):
     #         raise Http404
     def list(self, request, *args, **kwargs):
         try:
+            paginator = CustomPageNumberPagination()
+
             result = []
             project = request.query_params.get('project', None)
+            ordering = request.query_params.get('ordering', None)
             if not project:
                 return Response(data={'message': 'project params is required!'}, status=400)
             if not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Project not found!'}, status=400)
             theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
-            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status')
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').order_by('-id')
+            layer_qs = self.filter_queryset(layer_qs)
             for layer in layer_qs:
                 layer_dict=layer
                 if layer['layer_type']=='Vector':
@@ -400,7 +411,13 @@ class LayerViewSet(viewsets.ModelViewSet):
                     feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
                     layer_dict['features'] = feature_count
                 result.append(layer_dict)
-            return Response(data=result, status=200)
+            if ordering and ordering=='features':
+                result = sorted(result, key=lambda x:x[ordering])
+            elif ordering and ordering == '-features':
+                result = sorted(result, key=lambda x:x['features'], reverse=True)
+            paginated_queryset = paginator.paginate_queryset(result, request)
+            return paginator.get_paginated_response(data=paginated_queryset)
+            # return Response(data=result, status=200)
         except Exception as e:
             return Response(data={'error': str(e)}, status=400)
 
