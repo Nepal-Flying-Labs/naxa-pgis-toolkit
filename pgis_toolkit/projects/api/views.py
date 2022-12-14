@@ -12,6 +12,7 @@ import geopandas as gpd
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.serializers import serialize
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
 from django.http import Http404, HttpResponse
@@ -630,6 +631,32 @@ class LayerTemplateUploadAPIView(APIView):
             clear_dir(FILE_UPLOAD_DIR) #clearing directory
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
+'''GeoJSON API for Project Location | convers line and polygon to point | used only for clustering'''
+@api_view(['GET'])
+def project_location_geojson(request, *args, **kwargs):
+    try:
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'project params is missing!'}, status=400)
+        if Project.active.filter(id=project).exists():
+            location_qs = ProjectLocationFeatureCollection.active.filter(project=project).exclude(geometry=None)
+            if location_qs.exists():
+                for location in location_qs:
+                    # if location.geometry:
+                    geom_type = location.geometry.geom_type
+                    if geom_type != 'Point' or geom_type != 'MultiPoint':
+                        geometry = location.geometry.centroid
+                        location.geometry = geometry
+                        # do not save
+                data = serialize('geojson', location_qs, geometry_field='geometry', fields=('id', 'project', 'attributes'))
+                geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=200)
+            else:
+                return Response(data={'message': 'Location not found for the project!'}, status=400)
+        else:
+            return Response(data={'message': 'Project matching queryset does not exist!'}, status=400)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 
