@@ -179,7 +179,7 @@ class PreliminaryUserAPIView(APIView):
                         project_instance.delete()
                     for obj in created_object_list:
                         obj.delete()
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
             if organization_instance:
                 return Response(data={'message': 'Email Invitation Successful!', 'organization': organization_instance.id}, status=status.HTTP_200_OK)
             elif project_instance:
@@ -192,7 +192,7 @@ class PreliminaryUserAPIView(APIView):
             if project_instance:
                 project_instance.delete()
             errors.append({'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Dataset not created', 'Error': errors})
 
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
@@ -223,7 +223,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in project '{project_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists"})
 
                 elif data_dict['organization']:
                     user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
@@ -233,7 +233,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
 
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
@@ -622,7 +622,7 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             # result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": permissions_list})
         except Exception as error:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(error)})
 
 '''users group list'''
 @api_view(['GET'])
@@ -687,7 +687,7 @@ class ForgotPasswordEmailView(APIView):
                     return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''Reset password from the reset link sent to email'''
 class ResetPasswordView(APIView):
@@ -710,7 +710,7 @@ class ResetPasswordView(APIView):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Invalid token!"})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''change password'''
 class ChangePasswordView(APIView):
@@ -781,7 +781,8 @@ def landing_page(request, *args, **kwargs):
         page = '/organizations' #'organization_list'
     elif organization_ids.exists() and not project_ids.exists():
         organization = organization_ids.first()
-        page =  f'/organizations/{organization}/home' #'organization_home'
+        # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
+        page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
     elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
     elif project_ids.count() > 1:
         organization = organization_ids.first()

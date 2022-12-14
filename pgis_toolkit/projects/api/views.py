@@ -242,6 +242,7 @@ class ProjectViewset(viewsets.ModelViewSet):
     #         return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
+        errors = []
         try:
             project = Project.active.get(pk=pk)
             request.data._mutable = True
@@ -338,7 +339,13 @@ class ProjectViewset(viewsets.ModelViewSet):
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er]})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'message': 'Error Occured', 'error': errors})
+            # return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
