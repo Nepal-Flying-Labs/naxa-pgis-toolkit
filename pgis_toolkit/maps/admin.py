@@ -66,6 +66,11 @@ class FeatureCollectionAdmin(admin.ModelAdmin):
     list_filter = ('layer', )
     search_fields=('layer__id',)
 
+class FeatureCollectionMirrorAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer','sub_layer')
+    list_filter = ('layer', )
+    search_fields=('layer__id',)
+
 class ProjectLayerTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'geometry_type', 'project')
     search_fields = ('id', 'name')
@@ -110,6 +115,7 @@ admin.site.register(WMSLayer,WMSLayerAdmin)
 admin.site.register(LayerAttribute,LayerAttributeAdmin)
 admin.site.register(LayerFile,LayerFileAdmin)
 admin.site.register(FeatureCollection,FeatureCollectionAdmin)
+admin.site.register(FeatureCollectionMirror,FeatureCollectionAdmin)
 admin.site.register(ProjectsLayerTemplate,ProjectLayerTemplateAdmin)
 admin.site.register(ProjectsLayerTemplateAttribute,ProjectLayerTemplateAttributeAdmin)
 admin.site.register(StandardIcon,StandardIconAdmin)

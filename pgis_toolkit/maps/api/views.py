@@ -113,6 +113,14 @@ from .serializers import (
     WMSLayerSerializer,
 )
 
+from pgis_toolkit.maps.utils.data_cleaning import (
+    check_multipart,
+    check_null_geometry,
+    check_duplicate,
+    check_self_intersection,
+    check_snapping,
+)
+
 User = get_user_model()
 
 class StandardIconViewset(viewsets.ModelViewSet):
@@ -1680,3 +1688,27 @@ class ProjectMapConfigAPIView(APIView):
             return Response(data=result, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_layer(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+            con = create_engine(db_connection_url)
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            null_message, null_data = check_null_geometry(gdf)
+            multipart_message, multipart_data = check_multipart(gdf)
+            duplicate_message, duplicate_data = check_duplicate(gdf)
+            intersection_message, intersection_data = check_self_intersection(gdf)
+            return Response(data={'message': [multipart_message]}, status=200)
+        else:
+            return Response(data={'exists': False}, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})

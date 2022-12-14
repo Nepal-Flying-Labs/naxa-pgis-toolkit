@@ -28,6 +28,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     layer_download,
     project_theme_layers,
     reorder,
+    check_layer,
 )
 
 router = DefaultRouter()
@@ -64,4 +65,5 @@ urlpatterns = [
     path('feature_popup/', feature_popup, name='feature_popup'),
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
+    path('check_layer/', check_layer, name='check_layer'),
 ]
