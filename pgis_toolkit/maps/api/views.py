@@ -764,13 +764,18 @@ def get_layer_upload_task_response(request):
         result =  AsyncResult(task_id, app=app)
         if result.ready():
             response, layer_id = result.get()
-            if response == "successful":
-                layer_instance=Layer.active.get(id=int(layer_id))
-                theme_id=layer_instance.theme.id if layer_instance.theme else None
-                group_id = layer_instance.group.id if layer_instance.group else None
-                return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
-            else:
-                return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+            # if response == "successful":
+            #     layer_instance=Layer.active.get(id=int(layer_id))
+            #     theme_id=layer_instance.theme.id if layer_instance.theme else None
+            #     group_id = layer_instance.group.id if layer_instance.group else None
+            #     return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+            # else:
+            if response != "successful":
+                if isinstance(response, list):
+                    response=response[0]
+                elif isinstance(response, dict):
+                    response=list(response.values())[0]
+                return Response(data=response, status=200)
         else:
             return Response({'message': "Please wait result"}, status=200)
 
