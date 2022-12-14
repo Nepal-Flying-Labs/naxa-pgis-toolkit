@@ -376,7 +376,7 @@ class LayerViewSet(viewsets.ModelViewSet):
     filterset_fields = ['group', 'theme', 'status']
     search_fields = ['id', 'name']
     ordering_fields = ['id', 'name']
-    pagination_class = CustomPageNumberPagination
+    # pagination_class = CustomPageNumberPagination
 
     '''
     View for Layer instance
@@ -390,7 +390,7 @@ class LayerViewSet(viewsets.ModelViewSet):
     #         raise Http404
     def list(self, request, *args, **kwargs):
         try:
-            paginator = CustomPageNumberPagination()
+            # paginator = CustomPageNumberPagination()
 
             result = []
             project = request.query_params.get('project', None)
@@ -415,9 +415,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                 result = sorted(result, key=lambda x:x[ordering])
             elif ordering and ordering == '-features':
                 result = sorted(result, key=lambda x:x['features'], reverse=True)
-            paginated_queryset = paginator.paginate_queryset(result, request)
-            return paginator.get_paginated_response(data=paginated_queryset)
-            # return Response(data=result, status=200)
+            # paginated_queryset = paginator.paginate_queryset(result, request)
+            # return paginator.get_paginated_response(data=paginated_queryset)
+            return Response(data=result, status=200)
         except Exception as e:
             return Response(data={'error': str(e)}, status=400)
 
