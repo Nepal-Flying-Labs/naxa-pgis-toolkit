@@ -94,7 +94,10 @@ class PreliminaryUserAPIView(APIView):
             organization = request.data.get('organization', None)
             project = request.data.get('project', None)
             created_object_list = []
+            email_org_name=None
+            email_proj_name=None
             if organization_name:
+                email_org_name=organization_name[0]
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
                     return Response(data={'message': 'Your organization is already registered!'}, status=status.HTTP_400_BAD_REQUEST)
@@ -110,6 +113,7 @@ class PreliminaryUserAPIView(APIView):
                 #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
             elif project_name:
+                email_proj_name=project_name[0]
                 # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
@@ -140,12 +144,15 @@ class PreliminaryUserAPIView(APIView):
                     request.data.pop('project', None)
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
+                    email_org_name = Organization.active.get(id=int(organization)).name
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
+                    email_proj_name=project_inst.name
             '''create multiple or single preliminary user instances'''
+
             # created_object_list = []
             if PreliminaryUser.active.filter(status='Pending', email__in=email_list).exists():
                 # return Response(data={'message': 'Preliminary User instance for the email already exists!'}, status=400)
@@ -159,12 +166,17 @@ class PreliminaryUserAPIView(APIView):
                     created_object_list.append(created_object)
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    'role': created_object.group.name,
+                    'proj_org': email_org_name if email_org_name else email_proj_name,
+                    'link': f'{verify_url}{created_object.email_verification_token}',
+                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
+                    # 'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/email_invitation.html'
+                    # template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Email Verification, USAFIRI'
+                    subject = 'Email Invitation, USAFIRI'
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
