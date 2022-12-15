@@ -81,7 +81,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'state', 'country', 'status')
+        fields = ('id', 'name', 'state', 'country', 'status', 'start_date', 'end_date', 'thematic_areas' , 'cover_image')
         # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
         # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
