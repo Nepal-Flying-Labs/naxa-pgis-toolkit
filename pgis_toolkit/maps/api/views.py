@@ -1703,6 +1703,7 @@ def check_layer(request, *args, **kwargs):
         con = create_engine(db_connection_url)
         sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
         gdf = geopandas.read_postgis(sql, con)
+        print(gdf)
         null_check = check_null_geometry(gdf)
         print("null check")
         multipart_check = check_multipart(gdf)
