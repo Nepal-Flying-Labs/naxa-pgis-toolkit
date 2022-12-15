@@ -1693,22 +1693,48 @@ class ProjectMapConfigAPIView(APIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_layer(request, *args, **kwargs):
-    try:
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'layer params is missing!'}, status=400)
-        layer_qs = Vectorlayer.objects.filter(layer=layer)
-        if layer_qs.exists():
-            db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-            con = create_engine(db_connection_url)
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            null_message, null_data = check_null_geometry(gdf)
-            multipart_message, multipart_data = check_multipart(gdf)
-            duplicate_message, duplicate_data = check_duplicate(gdf)
-            intersection_message, intersection_data = check_self_intersection(gdf)
-            return Response(data={'message': [multipart_message]}, status=200)
-        else:
-            return Response(data={'exists': False}, status=200)
-    except Exception as e:
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+    # try:
+    layer = request.query_params.get('layer', None)
+    if not layer:
+        return Response(data={'message': 'layer params is missing!'}, status=400)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+        gdf = geopandas.read_postgis(sql, con)
+        null_check = check_null_geometry(gdf)
+        print("null check")
+        multipart_check = check_multipart(gdf)
+        print("multipart check")
+        duplicate_check = check_duplicate(gdf)
+        print("duplicate")
+        intersection_check = check_self_intersection(gdf)
+        print("intersection")
+        return Response(data={'messages': [null_check["message"], multipart_check["message"], duplicate_check["message"], intersection_check["message"]]}, status=200)
+    else:
+        return Response(data={'messages': ["Data does not exists"]}, status=200)
+    # except Exception as e:
+    #     return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dry_fix_layer(request, *args, **kwargs):
+    layer = request.query_params.get('layer', None)
+    if not layer:
+        return Response(data={'message': 'layer params is missing!'}, status=400)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        pass
+    return Response(data={"message": "Dry Run"}, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_layer(request, *args, **kwargs):
+    layer = request.query_params.get('layer', None)
+    if not layer:
+        return Response(data={'message': 'layer params is missing!'}, status=400)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        pass
+    return Response(data={"message": "Fixed Layer"}, status=200)
