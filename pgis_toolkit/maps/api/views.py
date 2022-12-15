@@ -867,9 +867,10 @@ class ThemeViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        self.queryset=self.filter_queryset(self.queryset)
+        queryset=self.filter_queryset(self.queryset)
+        queryset =queryset.order_by('order')
         # queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(self.queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
