@@ -176,7 +176,9 @@ class PreliminaryUserAPIView(APIView):
                     # template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Email Invitation, USAFIRI'
+                    # subject = 'Email Invitation, USAFIRI'
+                    name = data['proj_org']
+                    subject = f"You're invited! to join {name}, USAFIRI."
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
