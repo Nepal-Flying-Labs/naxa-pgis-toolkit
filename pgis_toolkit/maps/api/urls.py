@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     AdvanceFilterVectorTileQuerySet,
+    AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
@@ -20,6 +21,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     SubLayerViewset,
     ThemeViewset,
     analysis_layers,
+    category,
     feature_popup,
     get_analysis_task_response,
     get_data_merge_update_task_response,
@@ -70,4 +72,6 @@ urlpatterns = [
     path('check_layer/', check_layer, name='check_layer'),
     path('dry_fix_layer', dry_fix_layer, name="dry_fix_layer"),
     path('fix_layer', fix_layer, name='fix_layer'),
+    path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
+    path('category/', category, name='category')
 ]

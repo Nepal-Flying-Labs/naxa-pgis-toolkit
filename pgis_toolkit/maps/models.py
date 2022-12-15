@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from config.settings.base import env
+from config.settings.base import MONGO_DB, env
 from pgis_toolkit.projects.models import (
     DateTimeStamp,
     IsDeleted,
@@ -19,7 +19,10 @@ from pgis_toolkit.utils.constants import (
     ANALYSIS_TYPE_CHOICES,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
+    LAYER_SOURCE_CHOICES,
+    LAYER_STATUS_CHOICES,
     LAYER_TYPE_CHOICES,
+    LAYER_UPLOAD_STATUS,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.validators import (
@@ -51,6 +54,13 @@ class LayerGroup(IsDeleted,DateTimeStamp):
         app_label = 'maps'
         unique_together = (("theme", "name"),)
 
+class Category(models.Model):
+    name = models.CharField(max_length=50)
+
+    def __str__(self):
+        return f'{self.id} {self.name}'
+    class Meta:
+        app_label = 'maps'
 
 class Layer(IsDeleted,DateTimeStamp):
     theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="layer_theme")
@@ -60,6 +70,11 @@ class Layer(IsDeleted,DateTimeStamp):
     default_load=models.BooleanField(default=False)
     layer_type=models.CharField(max_length=20,choices=LAYER_TYPE_CHOICES)
     is_osm_layer=models.BooleanField(default=False)
+    display_on_map=models.BooleanField(default=True) #add to map
+    status = models.CharField(max_length=20, default='unchecked', choices=LAYER_STATUS_CHOICES)
+    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    # category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name='LayerCategory', blank=True, null=True)
+    upload_status = models.CharField(max_length=20, default='uploading', choices=LAYER_UPLOAD_STATUS)
 
     def __str__(self):
         return f'{self.id} {self.name}'
@@ -258,9 +273,23 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                 vector_layer_instance.save()
                 if sub_layer_instance:
                     sub_layer_instance.save()
+            super(FeatureCollection, self).save(*args, **kwargs)
+            feature = FeatureCollection.active.filter(id=self.id).values('id', 'layer', 'sub_layer', 'attributes')[0]
+            if feature:
+                feature_coll = MONGO_DB['featurecollections']
+                feature_count = feature_coll.count_documents({'id':feature['id']})
+                if feature_count == 0:
+                    feature_coll.insert_one(feature)
+                else:
+                    feature_coll.update_one({'id': feature['id']}, {'$set': feature})
+                # Print on the terminal
+                # qs = feature_coll.find({'id':feature['id']})
+                # for r in qs:
+                #     print(r["id"], r["layer"], r["sub_layer"], r["attributes"])
+
+
         except Exception as e:
             print(f'error in def save of feature collection: {str(e)}')
-        super(FeatureCollection, self).save(*args, **kwargs)
 
 class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
@@ -389,32 +418,96 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+    # def save(self, *args, **kwargs):
+    #     '''Update bbox of Analysis'''
+    #     try:
+    #         if self.geometry:
+    #             route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
+    #             route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
+
+    #             analysis_instance=Analysis.active.get(id=self.analysis_id)
+    #             analysis_bbox= analysis_instance.bbox
+
+    #             if analysis_bbox and route_bbox:
+    #                 if route_bbox[0]<analysis_bbox[0]:
+    #                     analysis_bbox[0]=route_bbox[0]
+
+    #                 if route_bbox[1]<analysis_bbox[1]:
+    #                     analysis_bbox[1]=route_bbox[1]
+
+    #                 if route_bbox[2]>analysis_bbox[2]:
+    #                     analysis_bbox[2]=route_bbox[2]
+
+    #                 if route_bbox[3]>analysis_bbox[3]:
+    #                     analysis_bbox[3]=route_bbox[3]
+
+    #             elif route_bbox:
+    #                 analysis_instance.bbox=route_bbox
+    #             analysis_instance.save()
+    #     except Exception as e:
+    #         print(f'error in def save of NetworkRoutes: {str(e)}')
+    #     super(NetworkRoutes, self).save(*args, **kwargs)
+
+'''Celery Task'''
+class CeleryTask(models.Model):
+    task_id = models.UUIDField()
+    layer_id = models.IntegerField(db_index=True, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+class QueryLayer(IsDeleted, DateTimeStamp):
+    theme=models.ForeignKey(Theme,on_delete=models.SET_NULL,null=True,related_name="querylayer_theme")
+    group=models.ForeignKey(LayerGroup,on_delete=models.SET_NULL,null=True,blank=True,related_name='querylayer_group')
+    name=models.CharField(max_length=254)
+    display_on_map=models.BooleanField(default=True) #add to map
+    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    icon = models.FileField(upload_to="icons", blank=True, null=True,validators=[validate_icon_extension]) #icon for point datatype
+    bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
+    geom_type=models.CharField(max_length=20,choices=GEOMETRY_TYPE_CHOICES,blank=True,null=True) #geometry type of the layer
+    std_icon=models.ForeignKey(StandardIcon,on_delete=models.SET_NULL,related_name="querylayer_std_icon",blank=True,null=True)
+    style = models.JSONField(default=dict, blank=True, null=True) #layer styling
+
+    class Meta:
+        app_label = 'maps'
+
+class QueryFeatureCollection(DateTimeStamp,IsDeleted):
+    layer=models.ForeignKey(QueryLayer,on_delete=models.CASCADE,related_name="querylayer_feature")
+    attributes=models.JSONField(blank=True, null=True)
+    geometry=md.GeometryField(srid=4326, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
     def save(self, *args, **kwargs):
-        '''Update bbox of Analysis'''
+        '''Update bbox of QueryFeatureCollection'''
         try:
             if self.geometry:
-                route=NetworkRoutes.active.filter(id=self.id).aggregate(Extent('geometry'))
-                route_bbox = list(route['geometry__extent']) if route['geometry__extent'] else None
+                if self.geometry.geom_type=="Point":
+                    coords=self.geometry.coords
+                    feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+                else:
+                    feature_bbox = self.geometry.extent
 
-                analysis_instance=Analysis.active.get(id=self.analysis_id)
-                analysis_bbox= analysis_instance.bbox
+                layer_instance=QueryLayer.active.get(id=self.layer.id)
+                layer_bbox= layer_instance.bbox
 
-                if analysis_bbox and route_bbox:
-                    if route_bbox[0]<analysis_bbox[0]:
-                        analysis_bbox[0]=route_bbox[0]
+                if layer_bbox and feature_bbox:
+                    if feature_bbox[0]<layer_bbox[0]:
+                        layer_bbox[0]=feature_bbox[0]
 
-                    if route_bbox[1]<analysis_bbox[1]:
-                        analysis_bbox[1]=route_bbox[1]
+                    if feature_bbox[1]<layer_bbox[1]:
+                        layer_bbox[1]=feature_bbox[1]
 
-                    if route_bbox[2]>analysis_bbox[2]:
-                        analysis_bbox[2]=route_bbox[2]
+                    if feature_bbox[2]>layer_bbox[2]:
+                        layer_bbox[2]=feature_bbox[2]
 
-                    if route_bbox[3]>analysis_bbox[3]:
-                        analysis_bbox[3]=route_bbox[3]
+                    if feature_bbox[3]>layer_bbox[3]:
+                        layer_bbox[3]=feature_bbox[3]
 
-                elif route_bbox:
-                    analysis_bbox.bbox=route_bbox
-                analysis_instance.save()
+                elif feature_bbox:
+                    layer_instance.bbox=list(feature_bbox)
+                layer_instance.save()
         except Exception as e:
-            print(f'error in def save of NetworkRoutes: {str(e)}')
-        super(NetworkRoutes, self).save(*args, **kwargs)
+            print(f'error in def save of QueryFeatureCollection: {str(e)}')
+        super(QueryFeatureCollection, self).save(*args, **kwargs)

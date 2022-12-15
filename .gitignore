@@ -285,4 +285,5 @@ cache/
 
 
 to-do.txt
-vectortile api
+pgis_toolkit_local_mongo_data
+pgis_toolkit_local_postgres_data

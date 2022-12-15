@@ -10,3 +10,4 @@
 venv
 pgis_toolkit_local_postgres_data
 .ipython
+pgis_toolkit_local_mongo_data

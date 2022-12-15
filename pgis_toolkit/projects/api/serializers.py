@@ -12,6 +12,7 @@ from pgis_toolkit.projects.models import (
     Project,
     RequestDemo,
 )
+from pgis_toolkit.users.models import UserRole
 
 
 class OrganizationCategoryListSerializer(serializers.ModelSerializer):
@@ -56,6 +57,7 @@ class OrganizationRetrieveSerializer(serializers.ModelSerializer):
         representation['completed'] = project_qs.filter(status='completed').count()
         contact_person_qs = ContactPerson.active.filter(organization=instance).values('id', 'name', 'email')
         representation['contact_person'] = contact_person_qs if contact_person_qs else []
+        representation['users_count'] = UserRole.active.filter(organization=instance).count()
         return representation
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -79,7 +81,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'state', 'country', 'status')
+        fields = ('id', 'name', 'state', 'country', 'status', 'start_date', 'end_date', 'thematic_areas' , 'cover_image')
         # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
         # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 

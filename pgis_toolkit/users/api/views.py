@@ -1,5 +1,6 @@
 import json
 import operator
+import time
 import uuid
 from functools import reduce
 from itertools import groupby
@@ -24,8 +25,14 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from config.settings import base as settings
-from pgis_toolkit.maps.models import ProjectMapConfig
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
+from pgis_toolkit.maps.models import ProjectMapConfig, Theme
+from pgis_toolkit.projects.models import (
+    DateTimeStamp,
+    DefaultTheme,
+    IsDeleted,
+    Organization,
+    Project,
+)
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 from pgis_toolkit.users.permissions import IsAuthorizedInviter
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
@@ -87,7 +94,10 @@ class PreliminaryUserAPIView(APIView):
             organization = request.data.get('organization', None)
             project = request.data.get('project', None)
             created_object_list = []
+            email_org_name=None
+            email_proj_name=None
             if organization_name:
+                email_org_name=organization_name[0]
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
                     return Response(data={'message': 'Your organization is already registered!'}, status=status.HTTP_400_BAD_REQUEST)
@@ -103,6 +113,7 @@ class PreliminaryUserAPIView(APIView):
                 #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
             elif project_name:
+                email_proj_name=project_name[0]
                 # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
@@ -110,7 +121,7 @@ class PreliminaryUserAPIView(APIView):
                 if not organization or not Organization.active.filter(id=organization).exists():
                     return Response(data={'message': 'Valid Organization params is compulsory for a project related role!'}, status=status.HTTP_400_BAD_REQUEST)
                 organization_inst = Organization.active.get(id=organization)
-                if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_inst)).exists():
+                if Project.active.filter(name=project_name[0],organization=organization_inst).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
                 request.data['project'] = project_instance.id
@@ -133,13 +144,19 @@ class PreliminaryUserAPIView(APIView):
                     request.data.pop('project', None)
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
+                    email_org_name = Organization.active.get(id=int(organization)).name
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
+                    email_proj_name=project_inst.name
             '''create multiple or single preliminary user instances'''
+
             # created_object_list = []
+            if PreliminaryUser.active.filter(status='Pending', email__in=email_list).exists():
+                # return Response(data={'message': 'Preliminary User instance for the email already exists!'}, status=400)
+                raise Exception('Preliminary User instance for the email already exists!')
             for email in email_list:
                 request.data['email'] = email
                 request.data['email_verification_token'] = uuid.uuid4()
@@ -149,12 +166,19 @@ class PreliminaryUserAPIView(APIView):
                     created_object_list.append(created_object)
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    'role': created_object.group.name,
+                    'proj_org': email_org_name if email_org_name else email_proj_name,
+                    'link': f'{verify_url}{created_object.email_verification_token}',
+                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
+                    # 'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/email_invitation.html'
+                    # template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Email Verification, USAFIRI'
+                    # subject = 'Email Invitation, USAFIRI'
+                    name = data['proj_org']
+                    subject = f"You're invited! to join {name}, USAFIRI."
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
@@ -169,7 +193,7 @@ class PreliminaryUserAPIView(APIView):
                         project_instance.delete()
                     for obj in created_object_list:
                         obj.delete()
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
             if organization_instance:
                 return Response(data={'message': 'Email Invitation Successful!', 'organization': organization_instance.id}, status=status.HTTP_200_OK)
             elif project_instance:
@@ -182,7 +206,7 @@ class PreliminaryUserAPIView(APIView):
             if project_instance:
                 project_instance.delete()
             errors.append({'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Dataset not created', 'Error': errors})
 
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
@@ -213,7 +237,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in project '{project_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists"})
 
                 elif data_dict['organization']:
                     user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
@@ -223,7 +247,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
 
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
@@ -290,6 +314,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     created_object.save()
                     '''send email for verification'''
                     data = {
+                    'user': created_object.full_name,
                     'paragraph_1': f'Click in the link to verify and activate your account: {verify_url}{uuid_code}',
                     }
                     template = 'email/email_request_demo.html'
@@ -512,7 +537,7 @@ class RequestUserDetailAPIView(APIView):
         if not user_instance:
             return Response(data={'message': 'Not logged in!'}, status=400)
         serializer = UserDetailSerializer(user_instance)
-        return Response(data=serializer.data, status=400)
+        return Response(data=serializer.data, status=200)
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
@@ -611,7 +636,7 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             # result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": permissions_list})
         except Exception as error:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(error)})
 
 '''users group list'''
 @api_view(['GET'])
@@ -676,7 +701,7 @@ class ForgotPasswordEmailView(APIView):
                     return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''Reset password from the reset link sent to email'''
 class ResetPasswordView(APIView):
@@ -699,7 +724,7 @@ class ResetPasswordView(APIView):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Invalid token!"})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''change password'''
 class ChangePasswordView(APIView):
@@ -770,7 +795,8 @@ def landing_page(request, *args, **kwargs):
         page = '/organizations' #'organization_list'
     elif organization_ids.exists() and not project_ids.exists():
         organization = organization_ids.first()
-        page =  f'/organizations/{organization}/home' #'organization_home'
+        # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
+        page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
     elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
     elif project_ids.count() > 1:
         organization = organization_ids.first()

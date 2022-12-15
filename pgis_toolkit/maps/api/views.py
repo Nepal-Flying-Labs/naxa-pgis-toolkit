@@ -8,6 +8,7 @@ from functools import reduce
 import fiona
 import geopandas
 import pandas
+from bson.json_util import dumps, loads
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -21,6 +22,7 @@ from requests import ReadTimeout
 from rest_framework import filters, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,10 +31,12 @@ from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
 from sqlalchemy import create_engine
 
-from config.settings.base import MEDIA_ROOT, env
+from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    Category,
+    CeleryTask,
     FeatureCollection,
     Layer,
     LayerAttribute,
@@ -44,6 +48,8 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
+    QueryFeatureCollection,
+    QueryLayer,
     RasterLayer,
     StandardIcon,
     SubLayer,
@@ -95,6 +101,7 @@ from .serializers import (
     LayerAttributeSerializer,
     LayerGroupListSerializer,
     LayerGroupSerializer,
+    LayerListSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
     ProjectLayerTemplateListSerializer,
@@ -103,6 +110,7 @@ from .serializers import (
     ProjectsLayerTemplateAttributeSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
     SubLayerRetrieveSerializer,
@@ -303,12 +311,12 @@ def project_theme_layers(request):
         if not theme_id:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params theme is missing"})
 
-        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id).order_by('order')
+        layer_queryset=Layer.active.select_related('theme','group').filter(theme=theme_id, display_on_map=True).order_by('order')
         layer_group_queryset=LayerGroup.active.select_related('theme').filter(theme=theme_id).order_by("order")
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status')
             for layer in group_layer_qs:
                 layer_item=layer
                 if layer['layer_type']=="Vector":
@@ -316,7 +324,7 @@ def project_theme_layers(request):
                     layer_item['icon']=icon
                     layer_item['std_icon']=std_icon
                     layer_item['style']=style
-                    vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
                         layer_item['geom_type'] = vector_layer[0].geom_type
@@ -328,7 +336,7 @@ def project_theme_layers(request):
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
 
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type')
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status')
         for layer in layer_qs:
             layer_item=layer
             if layer['layer_type']=="Vector":
@@ -353,7 +361,7 @@ def project_theme_layers(request):
                 layer_item['icon']=icon
                 layer_item['std_icon']=std_icon
                 layer_item['style']=style
-                vector_layer = Vectorlayer.objects.filter(id=layer['id'])
+                vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
                     layer_item['geom_type'] = vector_layer[0].geom_type
@@ -369,9 +377,15 @@ def project_theme_layers(request):
 
 class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
-    http_method_names=['get','post', 'patch']
+    http_method_names=['get','post', 'patch', 'delete']
     permission_classes=[LayerPermission]
     serializer_class=LayerSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['group', 'theme', 'status']
+    search_fields = ['id', 'name']
+    ordering_fields = ['id', 'name']
+    # pagination_class = CustomPageNumberPagination
+
     '''
     View for Layer instance
     http://0.0.0.0:8000/api/maps/layer/
@@ -382,6 +396,38 @@ class LayerViewSet(viewsets.ModelViewSet):
     #         return Layer.active.get(pk=pk)
     #     except Layer.DoesNotExist:
     #         raise Http404
+    def list(self, request, *args, **kwargs):
+        try:
+            # paginator = CustomPageNumberPagination()
+
+            result = []
+            project = request.query_params.get('project', None)
+            ordering = request.query_params.get('ordering', None)
+            if not project:
+                return Response(data={'message': 'project params is required!'}, status=400)
+            if not Project.active.filter(id=project).exists():
+                return Response(data={'message': 'Project not found!'}, status=400)
+            theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').order_by('-id')
+            layer_qs = self.filter_queryset(layer_qs)
+            for layer in layer_qs:
+                layer_dict=layer
+                if layer['layer_type']=='Vector':
+                    vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
+                    if vector_layer.exists():
+                        layer_dict['geom_type'] = vector_layer[0]['geom_type']
+                    feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
+                    layer_dict['features'] = feature_count
+                result.append(layer_dict)
+            if ordering and ordering=='features':
+                result = sorted(result, key=lambda x:x[ordering])
+            elif ordering and ordering == '-features':
+                result = sorted(result, key=lambda x:x['features'], reverse=True)
+            # paginated_queryset = paginator.paginate_queryset(result, request)
+            # return paginator.get_paginated_response(data=paginated_queryset)
+            return Response(data=result, status=200)
+        except Exception as e:
+            return Response(data={'error': str(e)}, status=400)
 
     def retrieve(self, request, pk=None):
 
@@ -400,9 +446,10 @@ class LayerViewSet(viewsets.ModelViewSet):
             layer_instance = Layer.active.get(pk=pk)
             results={}
             '''layer detail'''
-            layer_keys=['id','name','default_load','layer_type','is_osm_layer']
+            layer_keys=['id','name', 'source','display_on_map','default_load', 'status', 'layer_type', 'upload_status', 'is_osm_layer']
             for key in layer_keys:
                 results[key]=layer_instance.__dict__[key]
+            # results['category'] = layer_instance.category.id if layer_instance.category else None
             results['theme']=layer_instance.theme.id if layer_instance.theme else None
             results['group']=layer_instance.group.id if layer_instance.group else None
 
@@ -476,9 +523,10 @@ class LayerViewSet(viewsets.ModelViewSet):
 
                     print("reached here123")
                     response=UploadVectorLayer.delay(created_object.id,request_dict)
+                    CeleryTask.objects.create(layer_id=created_object.id, task_id=response.task_id)
                     # return Response(response)
                     return Response(status=200,
-                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id, 'layer_id': created_object.id})
 
                 elif layer_type == "Raster":
                     is_working=get_celery_worker_status()
@@ -512,7 +560,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                 else:
                     Layer.objects.get(id=created_object.id).delete()
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'})
-                return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+                # return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 for er in serializer._errors:
                     errors.append(
@@ -579,6 +627,27 @@ class LayerViewSet(viewsets.ModelViewSet):
             errors.append({'errorName': str(e), 'details': str(e)})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            layer_type=instance.layer_type
+            '''delete layer'''
+            self.perform_destroy(instance)
+            if layer_type=="Vector":
+                Vectorlayer.objects.filter(layer=instance.id).delete()
+                FeatureCollection.objects.filter(layer=instance).delete()
+                LayerAttribute.objects.filter(layer=instance).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+                LayerStyle.objects.filter(layer=instance).delete()
+            elif layer_type=="Raster":
+                RasterLayer.objects.filter(layer=instance.id).delete()
+                LayerFile.objects.filter(layer=instance).delete()
+            elif layer_type=="WMS":
+                WMSLayer.objects.filter(layer=instance).delete()
+
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'Message': 'Layer Data deleted'})
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
@@ -665,30 +734,76 @@ class SubLayerViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
 
 
+# @api_view(['GET'])
+# def get_layer_upload_task_response(request):
+#     '''
+#     View to get the response of aynchronous task run for vector and raster layer upload
+#     '''
+#     try:
+#         task_id = request.query_params.get('task_id', None)
+#         result = AsyncResult(task_id, app=app)
+#         if result.ready():   # check task state: true/false
+#             try:
+#                 response, layer_id = result.get()
+#                 if response == "successful":
+#                     layer_instance=Layer.active.get(id=int(layer_id))
+#                     theme_id=layer_instance.theme.id if layer_instance.theme else None
+#                     group_id = layer_instance.group.id if layer_instance.group else None
+#                     return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+#                 else:
+#                     return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+#             except Exception as e:
+#                 return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+#         return Response({'message': "Please wait result"}, status=200)
+#     except Exception as e:
+#         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 def get_layer_upload_task_response(request):
     '''
     View to get the response of aynchronous task run for vector and raster layer upload
     '''
     try:
-        task_id = request.query_params.get('task_id', None)
-        result = AsyncResult(task_id, app=app)
-        if result.ready():   # check task state: true/false
-            try:
-                response, layer_id = result.get()
-                if response == "successful":
-                    layer_instance=Layer.active.get(id=int(layer_id))
-                    theme_id=layer_instance.theme.id if layer_instance.theme else None
-                    group_id = layer_instance.group.id if layer_instance.group else None
-                    return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
-                else:
-                    return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
-                return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': "Please wait result"}, status=200)
+        layer_id = int(request.query_params.get('layer', None))
+        task_qs= CeleryTask.objects.filter(layer_id=layer_id)
+        if not task_qs.exists():
+            return Response({'message': 'Task not found for the layer'}, status=400)
+        task_id = task_qs[0].task_id
+        result =  AsyncResult(task_id, app=app)
+        if result.ready():
+            response, layer_id = result.get()
+            # if response == "successful":
+            #     layer_instance=Layer.active.get(id=int(layer_id))
+            #     theme_id=layer_instance.theme.id if layer_instance.theme else None
+            #     group_id = layer_instance.group.id if layer_instance.group else None
+            #     return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+            # else:
+            if response != "successful":
+                if isinstance(response, list):
+                    response=response[0]
+                elif isinstance(response, dict):
+                    response=list(response.values())[0]
+                return Response(data=response, status=200)
+        else:
+            return Response({'message': "Please wait result"}, status=200)
+
+
+        # result = AsyncResult(layer_id, app=app)
+        # if result.ready():   # check task state: true/false
+        #     try:
+        #         response, layer_id = result.get()
+        #         if response == "successful":
+        #             layer_instance=Layer.active.get(id=int(layer_id))
+        #             theme_id=layer_instance.theme.id if layer_instance.theme else None
+        #             group_id = layer_instance.group.id if layer_instance.group else None
+        #             return Response({"message": response, "layer_id": layer_id,"name":layer_instance.name,"theme":theme_id, "group": group_id}, status=200)
+        #         else:
+        #             return Response({"error": response, "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        #     except Exception as e:
+        #         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
+        # return Response({'message': "Please wait result"}, status=200)
     except Exception as e:
         return Response({"error": str(e), "layer_id": None}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ThemeViewset(viewsets.ModelViewSet):
     '''
@@ -760,9 +875,10 @@ class ThemeViewset(viewsets.ModelViewSet):
         project = request.query_params.get('project', None)
         if not project:
             return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        self.queryset=self.filter_queryset(self.queryset)
+        queryset=self.filter_queryset(self.queryset)
+        queryset =queryset.order_by('order')
         # queryset = self.queryset.filter(project__id=project)
-        serializer = self.get_serializer(self.queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
@@ -840,15 +956,110 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
+'''{{baseURL}}api/maps/advance_query/
+    layer=102
+    expression=[{"field":"OBJECTID","operator":1,"value":6262},{"join":"OR"},{"field":"OBJECTID","operator":1,"value":6263}]'''
+class AdvanceQueryAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        '''{{baseURL}}api/maps/advance_query/?layer=1&field=DISTRICT'''
+        try:
+            layer_id = request.query_params.get('layer', None)
+            field = request.query_params.get('field', None)
+            if layer_id and field:
+                feature_qs = FeatureCollection.active.filter(layer=int(layer_id))
+                values = []
+                attrbue_keys = feature_qs[0].attributes.keys()
+                for feature in feature_qs:
+                    value=feature.attributes[field]
+                    if field in attrbue_keys and value not in values:
+                        values.append(value)
+                return Response (data=values, status=200)
+            elif layer_id:
+                layer = Layer.active.get(id=layer_id)
+                if LayerAttribute.objects.filter(layer=layer_id).exists():
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    return Response (data=attribute_qs, status=200)
+                else:
+                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+            else:
+                return Response(data={'message': 'layer or field params is missing!'}, status=400)
+        except Exception as e:
+            return Response(data=str(e), status=400)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            feature_ids=[]
+            layer_id = int(request.data.get('layer', None))
+            expr_params = request.data.get('expression', None)
+            operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
+                            5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
+            query_layer = None
+            if layer_id and expr_params:
+                layer = Layer.active.get(id=layer_id)
+                vector_layer = Vectorlayer.objects.get(layer=layer_id)
+                name = request.data.get('name', None)
+                display_on_map = request.data.get('display_on_map', True)
+                if not name or name == "":
+                    return Response(data={'message': "QueryLayer name field is required"}, status=400)
+                if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
+                    return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
+                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
+                expressions = json.loads(expr_params)
+                join = ''
+                query={}
+                for expr in expressions:
+                    if 'join' not in expr.keys():
+                        field = expr['field']
+                        operator = expr['operator']
+                        value = expr['value']
+                        if join == "OR":
+                            OR_query = advance_filter_data(layer_id,
+                                field, operator, value)
+                            if query:
+                                query = { "$or" : [query, OR_query] }
+                        elif join == "AND":
+                            AND_query = advance_filter_data(layer_id,
+                                field, operator, value)
+                            query = { "$and" : [query, AND_query] }
+                        else:
+
+                            query = advance_filter_data(layer_id,
+                                field, operator, value)
+                    else:
+                        join = expr['join']
+                feature_coll = MONGO_DB['featurecollections']
+                result = feature_coll.find(query, {"id":1, "_id":0})
+                json_data = json.loads(dumps(result))
+                for data in json_data:
+                    feature = FeatureCollection.objects.get(id=data['id'])
+                    serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
+                    if serializer.is_valid():
+                        created_obj=serializer.save()
+                        feature_ids.append(created_obj.id)
+                    else:
+                        for er in serializer._errors:
+                            errors.append(
+                                {'errorName': er, 'details': serializer._errors[er][0]})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                bbox = QueryLayer.objects.get(id=query_layer.id).bbox
+                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
+        except Exception as e:
+            if query_layer:
+                query_layer.delete()
+            if feature_ids:
+                QueryFeatureCollection.active.filter(id__in=feature_ids).delete()
+            return Response(data=str(e), status=400)
+
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
     VectorTile Generation for Advance Filter Layer
-    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=200&expression=[{"field":"Tap","operator":1,"value":"सकिने"},{"join":"OR"},{"field":"Name","operator":1,"value":"Balmiki Secondary School"}]
+    http://localhost:8000/api/maps/advance_filter_vectortile/{z}/{x}/{y}/?layer=1
     '''
 
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk', 'layer')
+    vector_tile_fields = ('pk', 'layer', 'attributes')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -866,41 +1077,17 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         if not request.GET.keys():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         request_keys = request.GET.keys()
-        if 'layer' not in request_keys or request.GET['layer'] == "" or 'expression' not in request_keys or request.GET['expression'] == "":
+        if 'layer' not in request_keys or request.GET['layer'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        layer_id = request.GET['layer']
-        if not Layer.active.filter(id=layer_id).exists():
+        layer_id = int(request.GET['layer'])
+        if not QueryLayer.active.filter(id=layer_id).exists():
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        layer_instance = Layer.objects.get(id=layer_id)
-        expr_params = request.GET['expression']
-        operator_list = {1: "equal_to", 2: "less_than", 3: "greater_than", 4: "not_equal_to",
-                         5: "less_than_or_equal_to", 6: "greater_than_or_equal_to", 7: "like"}
-        if layer_id and expr_params:
-            expressions = json.loads(expr_params)
-            join = ''
-            dataset = FeatureCollection.active.filter(layer=int(layer_id))
-            result_dataset = []
-            for expr in expressions:
-                if 'join' not in expr.keys():
-                    field = expr['field']
-                    operator = expr['operator']
-                    value = expr['value']
-                    if join == "OR":
-                        OR_dataset = advance_filter_data(
-                            field, operator, value, dataset)
-                        result_dataset = result_dataset | OR_dataset
-                    elif join == "AND":
-                        result_dataset = advance_filter_data(
-                            field, operator, value, result_dataset)
-                    else:
-                        result_dataset = advance_filter_data(
-                            field, operator, value, dataset)
-                else:
-                    join = expr['join']
-        if result_dataset is None:
+        queryset = QueryFeatureCollection.active.filter(layer=layer_id)
+        if queryset is None:
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        self.vector_tile_queryset = result_dataset.distinct()
+        self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
 
 @api_view(['GET'])
 @permission_classes([LayerDownloadPermission])
@@ -1688,6 +1875,15 @@ class ProjectMapConfigAPIView(APIView):
             return Response(data=result, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+
+'''category api for layers'''
+@api_view(['GET'])
+def category(request, *args, **kwargs):
+    try:
+        qs=Category.objects.all().values('id', 'name')
+        return Response(data=qs, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 
 @api_view(['GET'])

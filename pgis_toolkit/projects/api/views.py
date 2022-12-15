@@ -12,6 +12,7 @@ import geopandas as gpd
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.serializers import serialize
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
 from django.http import Http404, HttpResponse
@@ -241,6 +242,7 @@ class ProjectViewset(viewsets.ModelViewSet):
     #         return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None):
+        errors = []
         try:
             project = Project.active.get(pk=pk)
             request.data._mutable = True
@@ -288,9 +290,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectShapeFile(project_id)
                             if response == "successful":
-                                '''change project status to ongoing'''
-                                project.status='ongoing'
-                                project.save()
+                                # '''change project status to ongoing'''
+                                # project.status='ongoing'
+                                # project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -305,9 +307,9 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 is_deleted=True)  # Archive existing features
                             response = handleProjectGeoJSON(project_id)
                             if response == "successful":
-                                '''change project status to ongoing'''
-                                project.status='ongoing'
-                                project.save()
+                                # '''change project status to ongoing'''
+                                # project.status='ongoing'
+                                # project.save()
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -331,13 +333,19 @@ class ProjectViewset(viewsets.ModelViewSet):
                                                                             geometry=geom)
                             merged_geom = merged_geom.union(geom)
                         project.bbox = merged_geom.extent
-                        '''change project status to ongoing'''
-                        project.status='ongoing'
+                        # '''change project status to ongoing'''
+                        # project.status='ongoing'
                         project.save()
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er]})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'message': 'Error Occured', 'error': errors})
+            # return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -630,6 +638,32 @@ class LayerTemplateUploadAPIView(APIView):
             clear_dir(FILE_UPLOAD_DIR) #clearing directory
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
+'''GeoJSON API for Project Location | convers line and polygon to point | used only for clustering'''
+@api_view(['GET'])
+def project_location_geojson(request, *args, **kwargs):
+    try:
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(data={'message': 'project params is missing!'}, status=400)
+        if Project.active.filter(id=project).exists():
+            location_qs = ProjectLocationFeatureCollection.active.filter(project=project).exclude(geometry=None)
+            if location_qs.exists():
+                for location in location_qs:
+                    # if location.geometry:
+                    geom_type = location.geometry.geom_type
+                    if geom_type != 'Point' or geom_type != 'MultiPoint':
+                        geometry = location.geometry.centroid
+                        location.geometry = geometry
+                        # do not save
+                data = serialize('geojson', location_qs, geometry_field='geometry', fields=('id', 'project', 'attributes'))
+                geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=200)
+            else:
+                return Response(data={'message': 'Location not found for the project!'}, status=400)
+        else:
+            return Response(data={'message': 'Project matching queryset does not exist!'}, status=400)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
 '''VextorTile Generation for ProjectLocationFeatureCollection'''
 
@@ -889,5 +923,18 @@ def get_state_choices(request, *args, **kwargs):
 class ContactPersonViewset(viewsets.ModelViewSet):
     queryset = ContactPerson.active.all()
     permission_classes = [IsAuthenticated]
-    http_method_names = ['post', 'patch']
+    http_method_names = ['get', 'post', 'patch']
     serializer_class = ContactPersonSerializer
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            queryset=ContactPerson.active.all()
+            organization = self.request.query_params.get('organization', None)
+            project = self.request.query_params.get('project', None)
+            if organization:
+                queryset=queryset.filter(organization=organization)
+            elif project:
+                queryset=queryset.filter(project=project)
+            return queryset
+        except Exception as e:
+            return str(e)
