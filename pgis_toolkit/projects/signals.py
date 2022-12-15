@@ -27,7 +27,7 @@ def post_save_project(sender, created, instance,**kwargs):
         if created:
             default_themes = DefaultTheme.objects.all()
             for theme in default_themes:
-                Theme.objects.create(project=instance, name=theme.name)
+                Theme.objects.create(project=instance, name=theme.name, order=theme.order)
             return Response(status=status.HTTP_200_OK, data={"Message": "Theme Successfully created"})
     except Exception as e:
         errors.append({'errorName': str(e), 'details': str(e)})
