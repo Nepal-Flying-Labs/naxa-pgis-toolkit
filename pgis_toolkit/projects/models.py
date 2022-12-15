@@ -81,6 +81,7 @@ class Organization(IsDeleted,DateTimeStamp):
     thematic_areas=models.JSONField(default=list, blank=True, null=True)
     description = models.CharField(max_length=254, blank=True, null=True)
     size = models.CharField(max_length=10,blank=True, null=True)
+    bbox = models.JSONField(blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -163,6 +164,36 @@ class Project(IsDeleted,DateTimeStamp):
         """
         if Project.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Project with name {self.name} already exists.')
+
+    def save(self, *args, **kwargs):
+        '''Update bbox of Organization'''
+        try:
+            if self.bbox:
+                project_bbox=self.bbox
+                project_qs = Project.active.filter(id=self.id)
+                if project_qs.exists():
+                    organization_instance = project_qs[0].organization
+                    org_bbox=organization_instance.bbox
+
+                    if org_bbox and project_bbox:
+                        if project_bbox[0]<org_bbox[0]:
+                            org_bbox[0]=project_bbox[0]
+
+                        if project_bbox[1]<org_bbox[1]:
+                            org_bbox[1]=project_bbox[1]
+
+                        if project_bbox[2]>org_bbox[2]:
+                            org_bbox[2]=project_bbox[2]
+
+                        if project_bbox[3]>org_bbox[3]:
+                            org_bbox[3]=project_bbox[3]
+
+                    elif project_bbox:
+                        organization_instance.bbox=list(project_bbox)
+                    organization_instance.save()
+        except Exception as e:
+            print(f'error in def save of Project: {str(e)}')
+        super(Project, self).save(*args, **kwargs)
 
 class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     project = models.ForeignKey(
