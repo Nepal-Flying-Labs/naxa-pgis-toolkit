@@ -6,6 +6,9 @@ from pgis_toolkit.users.models import PreliminaryUser, UserRole
 
 User = get_user_model()
 
+import environ
+
+env = environ.Env()
 
 # class UserSerializer(serializers.ModelSerializer):
 #     class Meta:
@@ -24,7 +27,25 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        exclude = ('password',)
+        exclude = ('password', 'user_permissions', 'groups', 'email_verification_token', 'is_staff', 'is_superuser')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        role_list = list(UserRole.active.filter(user=instance, active=True).distinct().values_list('group', flat=True))
+        if instance.is_superuser:
+            role = 'Super Admin'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in role_list:
+            role= 'PGIS Web App Administrator'
+        elif int(env('ORGANIZATION_ADMIN')) in role_list:
+            role = 'Organization Admin'
+        elif int(env('PROJECT_MANAGER')) in role_list:
+            role = 'Project Manager'
+        elif int(env('DATA_COLLECTOR')) in role_list:
+            role = 'Data Collector'
+        else:
+            role = ''
+        representation['role'] = role
+        return representation
 
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()

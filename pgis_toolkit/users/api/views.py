@@ -537,7 +537,7 @@ class RequestUserDetailAPIView(APIView):
         if not user_instance:
             return Response(data={'message': 'Not logged in!'}, status=400)
         serializer = UserDetailSerializer(user_instance)
-        return Response(data=serializer.data, status=400)
+        return Response(data=serializer.data, status=200)
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
