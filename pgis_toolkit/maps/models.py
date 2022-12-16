@@ -223,9 +223,9 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                     coords=self.geometry.coords
                     feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
                 else:
-                    feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
-                    feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
-
+                    # feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
+                    # feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+                    feature_bbox=self.geometry.extent
                 vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
                 layer_bbox= vector_layer_instance.bbox
 

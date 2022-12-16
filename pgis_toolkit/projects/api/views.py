@@ -27,7 +27,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 
-from pgis_toolkit.maps.models import ProjectMapConfig, Theme
+from pgis_toolkit.maps.models import (
+    FeatureCollection,
+    Layer,
+    ProjectMapConfig,
+    Theme,
+    Vectorlayer,
+)
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
     Country,
@@ -327,15 +333,42 @@ class ProjectViewset(viewsets.ModelViewSet):
                         wkt_name = request_dict['location_wkt']
                         wkt_list = json.loads(request_dict['location_wkt'])
                         merged_geom = GEOSGeometry(wkt_list[0])
-                        for wkt in wkt_list:
-                            geom = GEOSGeometry(wkt)
-                            ProjectLocationFeatureCollection.active.create(project=project,
-                                                                            geometry=geom)
-                            merged_geom = merged_geom.union(geom)
-                        project.bbox = merged_geom.extent
-                        # '''change project status to ongoing'''
-                        # project.status='ongoing'
-                        project.save()
+                        geom_type=merged_geom.geom_type
+                        ''''''
+                        theme_qs = Theme.active.filter(project=project, name='Baseline')
+                        if theme_qs.exists():
+                            '''create a layer of project location in baseline theme'''
+                            layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+                            vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance})
+                            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+                            for wkt in wkt_list:
+                                geom = GEOSGeometry(wkt)
+                                ProjectLocationFeatureCollection.active.create(project=project,
+                                                                                geometry=geom)
+                                FeatureCollection.active.create(layer=layer_instance, geometry=geom)
+                                merged_geom = merged_geom.union(geom)
+                            bbox = merged_geom.extent
+                            project.bbox = bbox
+                            # '''change project status to ongoing'''
+                            # project.status='ongoing'
+                            project.geometry_type=geom_type
+                            project.save()
+                            vector_layer_instance.bbox=bbox
+                            vector_layer_instance.geom_type=geom_type
+                            vector_layer_instance.save()
+                        else:
+                            for wkt in wkt_list:
+                                geom = GEOSGeometry(wkt)
+                                ProjectLocationFeatureCollection.active.create(project=project,
+                                                                                geometry=geom)
+                                merged_geom = merged_geom.union(geom)
+                            bbox = merged_geom.extent
+                            project.bbox = bbox
+                            # '''change project status to ongoing'''
+                            # project.status='ongoing'
+                            project.geometry_type=geom_type
+                            project.save()
+                        ''''''
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)

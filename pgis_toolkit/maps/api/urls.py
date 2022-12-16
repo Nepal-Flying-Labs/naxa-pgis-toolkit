@@ -8,6 +8,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
+    LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     LayerViewSet,
@@ -15,6 +16,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
     ProjectStyleViewset,
+    QueryFeatureCollectionViewset,
     ShortestPathAPIView,
     ShortestRoutesTileQuerySet,
     StandardIconViewset,
@@ -46,6 +48,8 @@ router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
+router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
+
 app_name = "projects"
 
 urlpatterns = [
@@ -73,5 +77,6 @@ urlpatterns = [
     path('dry_fix_layer', dry_fix_layer, name="dry_fix_layer"),
     path('fix_layer', fix_layer, name='fix_layer'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
+    path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
     path('category/', category, name='category')
 ]

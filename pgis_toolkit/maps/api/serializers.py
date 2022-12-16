@@ -184,3 +184,13 @@ class QueryFeatureCollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QueryFeatureCollection
         fields = '__all__'
+
+class QueryFeatureCollectionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QueryFeatureCollection
+        fields = ('id',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation |= instance.attributes
+        return representation
