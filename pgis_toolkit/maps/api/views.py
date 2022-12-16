@@ -71,6 +71,7 @@ from pgis_toolkit.maps.permissions import (
     ProjectsLayerTemplateAttributePermission,
     ProjectStylePermission,
     ProjectThemeLayerPermission,
+    QueryFeatureCollectionPermission,
     SubLayerPermission,
     ThemePermission,
 )
@@ -110,6 +111,7 @@ from .serializers import (
     ProjectsLayerTemplateAttributeSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    QueryFeatureCollectionListSerializer,
     QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
@@ -1080,6 +1082,52 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
+class QueryFeatureCollectionViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for QueryFeatureCollection innstance
+    '''
+    queryset = QueryFeatureCollection.active.all()
+    http_method_names = ['get', 'retrieve']
+    default_serializer_class = QueryFeatureCollectionSerializer
+    serializer_classes = {
+        'list': QueryFeatureCollectionListSerializer,
+        'retrieve': QueryFeatureCollectionSerializer
+    }
+    # permission_classes=[QueryFeatureCollectionPermission]
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
+        layer_id = request.query_params.get('layer', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer__id=layer_id)
+        '''search_key'''
+        search_key = request.query_params.get('search', None)
+        if search_key:
+            search_fields = list(queryset.first().attributes.keys())
+            filter_kwargs = {}
+            for field in search_fields:
+                filter_kwargs['attributes__'+field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            queryset = queryset.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else queryset
+        ''''order_by'''
+        order_by = request.query_params.get('ordering', None)
+        if order_by:
+            if 'id' in order_by:
+                queryset = queryset.order_by(order_by)
+            elif '-' in order_by:
+                queryset = queryset.order_by('-attributes__'+order_by)
+            else:
+                queryset = queryset.order_by('attributes__'+order_by)
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True, context={})
+        return paginator.get_paginated_response(data=serializer.data)
 
 @api_view(['GET'])
 @permission_classes([LayerDownloadPermission])

@@ -15,6 +15,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
     ProjectStyleViewset,
+    QueryFeatureCollectionViewset,
     ShortestPathAPIView,
     ShortestRoutesTileQuerySet,
     StandardIconViewset,
@@ -43,6 +44,8 @@ router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
+router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
+
 app_name = "projects"
 
 urlpatterns = [
