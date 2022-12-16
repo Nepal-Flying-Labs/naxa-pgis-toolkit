@@ -8,6 +8,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
+    LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     LayerViewSet,
@@ -70,5 +71,6 @@ urlpatterns = [
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
+    path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
     path('category/', category, name='category')
 ]

@@ -3,25 +3,32 @@ version: '3'
 volumes:
   pgis_toolkit_local_postgres_data: {}
   pgis_toolkit_local_postgres_data_backups: {}
+  pgis_toolkit_local_mongo_data: {}
 
 services:
   django:
     build:
       context: .
-      dockerfile: ./compose/local/django/Dockerfile
+      dockerfile: ./compose/local_run/django/Dockerfile
+    restart: always
     image: pgis_toolkit_local_django
     container_name: pgis_toolkit_local_django
     # platform: linux/x86_64
     depends_on:
       - postgres
+      - mongo
     volumes:
       - .:/app:z
     env_file:
-      - ./.envs/.local/.django
-      - ./.envs/.local/.postgres
+      - ./.envs/.local_run/.django
+      - ./.envs/.local_run/.postgres
+      - ./.envs/.local_run/.mongo
+
+
     ports:
       - "8000:8000"
     command: /start
+
 
   postgres:
     build:
@@ -33,7 +40,25 @@ services:
       - pgis_toolkit_local_postgres_data:/var/lib/postgresql/data:Z
       - pgis_toolkit_local_postgres_data_backups:/backups:z
     env_file:
-      - ./.envs/.local/.postgres
+      - ./.envs/.local_run/.postgres
+    ports:
+      - 5432:5432
+
+  mongo:
+    image: mongo
+    container_name: pgis_toolkit_local_mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: pgis_toolkit_mongo
+
+    # env_file:
+    #   - ./.envs/.local_run/.mongo
+    volumes:
+      - ./pgis_toolkit_local_mongo_data:/data/db
+    ports:
+      - 27017:27017
 
   redis:
     container_name: pgis_toolkit_local_redis
@@ -50,31 +75,43 @@ services:
     container_name: pgis_toolkit_worker_django
     build:
       context: .
-      dockerfile: ./compose/local/django/Dockerfile
+      dockerfile: ./compose/local_run/django/Dockerfile
     restart: always
-    command : "celery -A pgis_toolkit.celery_app worker -f /logs/worker.log -l DEBUG"
-    # celery -A app.celery_module.celeryapp worker --loglevel=info
+    command : "celery -A pgis_toolkit worker -f logs/worker.log -l DEBUG"
     # entrypoint : "celery -A pgis_toolkit worker -l DEBUG -Q default --pool=solo"
+    healthcheck:
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - "celery --broker=redis://redis:6379/ inspect ping | grep OK"
     depends_on:
       - django
       - redis
-      - postgres
     volumes:
       - .:/app:z
       - ./logs/:/logs/
     env_file:
-      - ./.envs/.local/.django
-      - ./.envs/.local/.postgres
+      - ./.envs/.local_run/.django
+      - ./.envs/.local_run/.postgres
+      - ./.envs/.local_run/.mongo
 
-  geoserver:
-    image: kartoza/geoserver:2.19.0
+  beat:
+    build:
+      context: .
+      dockerfile: ./compose/local_run/django/Dockerfile
+    restart: always
+    entrypoint : "celery -A pgis_toolkit beat --loglevel=debug"
+    depends_on:
+      - django
+      # - db
+      - worker
     volumes:
-      - ./geoserver-data:/opt/geoserver/data_dir
+      - .:/code
+      - ./logs/:/logs/
     env_file:
-      - ./.envs/.local/.geoserver
-    ports:
-      - 8080:8080
-    restart: on-failure
+      - ./.envs/.local_run/.django
+      - ./.envs/.local_run/.postgres
 
   # pgadmin:
   #   image: dpage/pgadmin4
@@ -84,3 +121,13 @@ services:
   #   restart: always
   #   depends_on:
   #     - postgres
+
+  # geoserver:
+  #     image: kartoza/geoserver:2.19.0
+  #     volumes:
+  #       - ./geoserver-data:/opt/geoserver/data_dir
+  #     env_file:
+  #       - ./.envs/.local_run/.geoserver
+  #     ports:
+  #       - 8080:8080
+  #     restart: on-failure

@@ -1129,6 +1129,40 @@ class QueryFeatureCollectionViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(paginated_queryset, many=True, context={})
         return paginator.get_paginated_response(data=serializer.data)
 
+'''Save Query Layer into main Layer Table'''
+class LayerFromQueryAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            layer = request.data.get('layer', None)
+            if not layer:
+                return Response(data={'message': "layer params is missing!"}, status=400)
+            query_layer_qs = QueryLayer.active.filter(id=layer)
+            if query_layer_qs.exists():
+                layer_instance,vector_layer_instance = None, None
+                query_layer = query_layer_qs[0]
+                query_features = QueryFeatureCollection.active.filter(layer=query_layer)
+                if query_features:
+                    layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=query_layer.name, layer_type='Vector',display_on_map=True)
+                    vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
+                    vector_layer_instance.bbox=query_layer.bbox
+                    vector_layer_instance.geom_type=query_layer.geom_type
+                    vector_layer_instance.save()
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
+                        raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
+                        cursor = connection.cursor()
+                        cursor.execute(raw_query)
+                else:
+                    return Response(data={'message': "Query features not found for the layer"}, status=404)
+            else:
+                return Response(data={'message': "QueryLayer matching queryset does not exist!"}, status=404)
+
+            return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
+        except Exception as e:
+            if layer_instance: layer_instance.delete()
+            if vector_layer_instance: vector_layer_instance.delete()
+            return Response(data={'message': str(e)}, status=400)
 @api_view(['GET'])
 @permission_classes([LayerDownloadPermission])
 def layer_download(request):
