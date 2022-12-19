@@ -24,6 +24,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     ThemeViewset,
     analysis_layers,
     category,
+    delete_sequence,
     feature_popup,
     get_analysis_task_response,
     get_data_merge_update_task_response,
@@ -72,5 +73,6 @@ urlpatterns = [
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
     path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
-    path('category/', category, name='category')
+    path('category/', category, name='category'),
+    path('delete_sequence/', delete_sequence, name='delete_sequence'),
 ]

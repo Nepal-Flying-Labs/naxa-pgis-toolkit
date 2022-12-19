@@ -29,6 +29,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
+from sequences.models import Sequence
 from sqlalchemy import create_engine
 
 from config.settings.base import MEDIA_ROOT, MONGO_DB, env
@@ -1179,6 +1180,15 @@ class LayerFromQueryAPIView(APIView):
             if layer_instance: layer_instance.delete()
             if vector_layer_instance: vector_layer_instance.delete()
             return Response(data={'message': str(e)}, status=400)
+
+@api_view(['POST'])
+def delete_sequence(request, *args, **kwargs):
+    try:
+        Sequence.objects.all().delete()
+        return Response(data={'message': 'All sequence objects are deleted successfully.'}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
 @api_view(['GET'])
 @permission_classes([LayerDownloadPermission])
 def layer_download(request):
