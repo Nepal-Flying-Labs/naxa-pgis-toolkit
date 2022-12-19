@@ -979,7 +979,7 @@ class AdvanceQueryAPIView(APIView):
             elif layer_id:
                 layer = Layer.active.get(id=layer_id)
                 if LayerAttribute.objects.filter(layer=layer_id).exists():
-                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias', 'data_type')
                     return Response (data=attribute_qs, status=200)
                 else:
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
@@ -1574,7 +1574,7 @@ class FeatureGeoJSONAPIView(APIView):
         try:
             feature_qs = FeatureCollection.active.filter(id=pk)
             if feature_qs.exists():
-                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer', 'sub_layer'))
                 geojson_data = json.loads(data)
                 return Response(data=geojson_data, status=status.HTTP_200_OK)
             else:
