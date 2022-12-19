@@ -169,8 +169,8 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     http_method_names = ['get']
     permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ('layer', )
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_fields = ('layer', )
 
     serializer_classes = {
         'list': LayerAttributeListSerializer,
@@ -180,12 +180,24 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        self.queryset = self.filter_queryset(self.queryset)
-        serializer = self.get_serializer(self.queryset, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        try:
+            layer = request.query_params.get('layer', None)
+            check_mandatory = request.query_params.get('check_mandatory', False)
+            if not layer:
+                return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type')
+            if check_mandatory == True or check_mandatory == 'True':
+                mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
+                if mandatory_fields:
+                    for data in queryset:
+                        data['mandatory'] = True if data['name'] in mandatory_fields else False
+                else:
+                    for data in queryset:
+                        data['mandatory'] = True
+            # serializer = self.get_serializer(self.queryset, many=True)
+            return Response(data=queryset, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 '''
 #not in use
 @api_view(['GET'])
@@ -971,7 +983,7 @@ class AdvanceQueryAPIView(APIView):
             elif layer_id:
                 layer = Layer.active.get(id=layer_id)
                 if LayerAttribute.objects.filter(layer=layer_id).exists():
-                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias', 'data_type')
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
                     return Response (data=attribute_qs, status=200)
                 else:
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
