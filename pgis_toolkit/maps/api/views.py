@@ -13,7 +13,7 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.serializers import serialize
-from django.db.models import Q
+from django.db.models import Count, F, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -389,7 +389,7 @@ class LayerViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['group', 'theme', 'status']
     search_fields = ['id', 'name']
-    ordering_fields = ['id', 'name']
+    ordering_fields = ['id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status', 'geom_type', 'features', 'theme']
     # pagination_class = CustomPageNumberPagination
 
     '''
@@ -414,24 +414,28 @@ class LayerViewSet(viewsets.ModelViewSet):
             if not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Project not found!'}, status=400)
             theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
-            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').order_by('-id')
+            # layer_qs = Layer.objects.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status')
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').annotate(geom_type=F('vector_layer__geom_type')).annotate(theme=F('theme__name')).annotate(features=Count("layer_feature"))
+            if not ordering:
+                layer_qs = layer_qs.order_by('-id')
             layer_qs = self.filter_queryset(layer_qs)
-            for layer in layer_qs:
-                layer_dict=layer
-                if layer['layer_type']=='Vector':
-                    vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
-                    if vector_layer.exists():
-                        layer_dict['geom_type'] = vector_layer[0]['geom_type']
-                    feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
-                    layer_dict['features'] = feature_count
-                result.append(layer_dict)
-            if ordering and ordering=='features':
-                result = sorted(result, key=lambda x:x[ordering])
-            elif ordering and ordering == '-features':
-                result = sorted(result, key=lambda x:x['features'], reverse=True)
+            # for layer in layer_qs:
+            #     layer_dict=layer
+            #     if layer['layer_type']=='Vector':
+            #         vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
+            #         if vector_layer.exists():
+            #             layer_dict['geom_type'] = vector_layer[0]['geom_type']
+            #         feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
+            #         layer_dict['features'] = feature_count
+            #     result.append(layer_dict)
+            # if ordering and ordering=='features':
+            #     result = sorted(result, key=lambda x:x[ordering])
+            # elif ordering and ordering == '-features':
+            #     result = sorted(result, key=lambda x:x['features'], reverse=True)
+            ''''''
             # paginated_queryset = paginator.paginate_queryset(result, request)
             # return paginator.get_paginated_response(data=paginated_queryset)
-            return Response(data=result, status=200)
+            return Response(data=layer_qs, status=200)
         except Exception as e:
             return Response(data={'error': str(e)}, status=400)
 
