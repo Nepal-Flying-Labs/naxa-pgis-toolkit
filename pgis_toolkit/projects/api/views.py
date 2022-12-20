@@ -684,13 +684,13 @@ def project_location_geojson(request, *args, **kwargs):
         if Project.active.filter(id=project).exists():
             location_qs = ProjectLocationFeatureCollection.active.filter(project=project).exclude(geometry=None)
             if location_qs.exists():
-                for location in location_qs:
-                    # if location.geometry:
-                    geom_type = location.geometry.geom_type
-                    if geom_type != 'Point' or geom_type != 'MultiPoint':
-                        geometry = location.geometry.centroid
-                        location.geometry = geometry
-                        # do not save
+                # for location in location_qs:
+                #     # if location.geometry:
+                #     geom_type = location.geometry.geom_type
+                #     if geom_type != 'Point' or geom_type != 'MultiPoint':
+                #         geometry = location.geometry.centroid
+                #         location.geometry = geometry
+                #         # do not save
                 data = serialize('geojson', location_qs, geometry_field='geometry', fields=('id', 'project', 'attributes'))
                 geojson_data = json.loads(data)
                 return Response(data=geojson_data, status=200)
