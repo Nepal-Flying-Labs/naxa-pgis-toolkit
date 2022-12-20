@@ -277,7 +277,7 @@ class UserInvitationAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            user_qs = PreliminaryUser.active.all().values('id', 'email','organization__name', 'project__name', 'group__name', 'status', 'uploaded_date')
+            user_qs = PreliminaryUser.active.all()
             group_ids = UserRole.active.filter(active=True, user=request.user).values_list('group', flat=True)
             organization = request.query_params.get('organization', None)
             project = request.query_params.get('project', None)
@@ -286,9 +286,9 @@ class UserInvitationAPIView(APIView):
             elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
                 user_qs=user_qs
             elif organization:
-                user_qs.filter(organization=organization)
-            if project:
-                user_qs.filter(project=project)
+                user_qs=user_qs.filter(organization=organization)
+            elif project:
+                user_qs=user_qs.filter(project=project)
             else:
                 return Response (data={'message': 'organization or project params is missing!'}, status=400)
 
@@ -319,6 +319,7 @@ class UserInvitationAPIView(APIView):
                                 for key, val in filter_kwargs.items()]
                 user_qs = user_qs.filter(
                     reduce(operator.or_, list_of_Q)) if search_fields else user_qs
+            user_qs=user_qs.values('id', 'email','organization__name', 'project__name', 'group__name', 'status', 'uploaded_date')
             return Response(data=user_qs, status=200)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
