@@ -339,6 +339,7 @@ class ProjectViewset(viewsets.ModelViewSet):
                         if theme_qs.exists():
                             '''create a layer of project location in baseline theme'''
                             layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+                            if not layer_created: upload_status='uploading'
                             vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance})
                             FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
                             for wkt in wkt_list:
@@ -356,6 +357,8 @@ class ProjectViewset(viewsets.ModelViewSet):
                             vector_layer_instance.bbox=bbox
                             vector_layer_instance.geom_type=geom_type
                             vector_layer_instance.save()
+                            layer_instance.upload_status='successful'
+                            layer_instance.save()
                         else:
                             for wkt in wkt_list:
                                 geom = GEOSGeometry(wkt)

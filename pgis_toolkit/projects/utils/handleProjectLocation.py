@@ -41,6 +41,7 @@ def handleProjectGeoJSON(project_id):
         if theme_qs.exists():
             '''create a layer of project location in baseline theme'''
             layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+            if not layer_created: layer_instance.upload_status='uploading'
             vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance, 'geom_type':geometry_type, 'bbox':total_bounds.tolist()})
             if not vector_created:
                 vector_layer_instance.bbox = []
@@ -56,6 +57,8 @@ def handleProjectGeoJSON(project_id):
                                                                 attributes=dropped_geometry_dict,
                                                                 geometry=geometry)
                 FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
+                layer_instance.upload_status='successful'
+                layer_instance.save()
         else:
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
@@ -98,6 +101,7 @@ def handleProjectShapeFile(project_id):
         if theme_qs.exists():
             '''create a layer of project location in baseline theme'''
             layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+            if not layer_created: layer_instance.upload_status='uploading'
             vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance, 'geom_type':geometry_type, 'bbox':total_bounds.tolist()})
             if not vector_created:
                 vector_layer_instance.bbox = []
@@ -113,6 +117,8 @@ def handleProjectShapeFile(project_id):
                                                                 attributes=dropped_geometry_dict,
                                                                 geometry=geometry)
                 FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
+            layer_instance.upload_status='successful'
+            layer_instance.save()
         else:
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
