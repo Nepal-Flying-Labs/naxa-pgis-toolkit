@@ -479,7 +479,7 @@ def get_project_detail(request, *args, **kwargs):
     if project:
         if Project.active.filter(id=project).exists():
             project_instance = Project.active.get(id=project)
-            data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox}
+            data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox, 'organization_name': project_instance.organization.name}
             map_config_qs = ProjectMapConfig.active.filter(project=project, user=user) if user else ProjectMapConfig.active.filter(project=project)
             if map_config_qs.exists():
                 data['map_config'] = map_config_qs[0].map_config
