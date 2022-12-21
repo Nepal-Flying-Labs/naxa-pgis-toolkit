@@ -49,6 +49,11 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('project', 'published_year')
 
+class ImageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'project')
+    search_fields = ('id', 'title')
+    list_filter = ('project',)
+
 class RequestDemoAdmin(admin.ModelAdmin):
     list_display = ('id', 'full_name', 'email', 'organization_name')
     search_fields = ('id', 'full_name', 'email', 'organization_name')
@@ -74,6 +79,7 @@ admin.site.register(Country, CountryAdmin)
 admin.site.register(State, StateAdmin)
 admin.site.register(ProjectLocationFeatureCollection, ProjectLocationFeatureCollectionAdmin)
 admin.site.register(Document, DocumentAdmin)
+admin.site.register(Image, ImageAdmin)
 admin.site.register(RequestDemo, RequestDemoAdmin)
 admin.site.register(RequestDemoAlert, RequestDemoAlertAdmin)
 admin.site.register(ContactPerson, ContactPersonAdmin)
