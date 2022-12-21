@@ -1,11 +1,14 @@
 import geopandas as gpd
+from geopandas import GeoDataFrame
 import pandas as pd
+import networkx as nx
 from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint
 import collections
+import momepy
 
 # Checking data
-def check_null_geometry(data: gpd.GeoDataFrame) -> dict:
+def check_null_geometry(data: GeoDataFrame) -> dict:
     """Check if the geometry is null or not
 
     Parameters
@@ -31,7 +34,7 @@ def check_null_geometry(data: gpd.GeoDataFrame) -> dict:
     content = {"message": f"Total {null_rows} geometries were found empty", "data": data}
     return content
 
-def check_multipart(data: gpd.GeoDataFrame) -> dict:
+def check_multipart(data: GeoDataFrame) -> dict:
     """Check if the data is multipart or not
     
     Parameters
@@ -57,7 +60,7 @@ def check_multipart(data: gpd.GeoDataFrame) -> dict:
     content = {"message": f"Total {multipart_rows} geometry were found multipart", "data": data}
     return content
 
-def check_duplicate(data: gpd.GeoDataFrame) -> dict:
+def check_duplicate(data: GeoDataFrame) -> dict:
     """Check if the geometry is duplicate or not
 
     Parameters
@@ -72,15 +75,12 @@ def check_duplicate(data: gpd.GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    print("data", data)
-    print(type(data))
-    sum = data.duplicated()
-    print(type(sum))
+    data = data.drop(axis=1, columns=["attributes"])
+    sum = data.duplicated().sum()
     content = {"message": f"Total {sum} geometries were found duplicate", "data": data}
-    print(content)
     return content
 
-def check_self_intersection(data: gpd.GeoDataFrame) -> dict:
+def check_self_intersection(data: GeoDataFrame) -> dict:
     """Check if the geometry has self intersection or not
 
     Parameters
@@ -106,7 +106,7 @@ def check_self_intersection(data: gpd.GeoDataFrame) -> dict:
     content = {"message": f"Total {self_intersection_rows} geometries were found with self intersection", "data": data}
     return content
 
-def check_snapping(data: gpd.GeoDataFrame) -> dict:
+def check_snapping(layer, con) -> dict:
     """Check for isolated points
 
     Parameters
@@ -121,35 +121,48 @@ def check_snapping(data: gpd.GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    pass
+    sql = f'''WITH segments AS (
+        SELECT id as id, (
+        ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollection WHERE layer_id={layer}) as dumps
+        )
+        SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+    data = gpd.read_postgis(sql, con, geom_col="geometry")
+    graph = momepy.gdf_to_nx(data, approach='primal')
+    components = list(nx.connected_components(graph))
+    components.sort(key=len, reverse=True)
+    largest = components.pop(0)
+    isolated = list( g for cc in components for g in cc )
+    content = {"message": f"Total {len(isolated)} points were found isolated", "data": data}
+    return content
 
 
 # Dry run for cleaning data
-def dry_fix_null_geometry(data: gpd.GeoDataFrame) -> dict:
+def dry_fix_null_geometry(data: GeoDataFrame) -> dict:
     pass
 
-def dry_fix_multipart(data: gpd.GeoDataFrame) -> dict:
+def dry_fix_multipart(data: GeoDataFrame) -> dict:
     pass
 
-def dry_fix_duplicate(data: gpd.GeoDataFrame) -> dict:
+def dry_fix_duplicate(data: GeoDataFrame) -> dict:
     pass
 
-def dry_fix_intersection(data: gpd.GeoDataFrame) -> dict:
+def dry_fix_intersection(data: GeoDataFrame) -> dict:
     pass
 
-def dry_fix_snapping(data: gpd.GeoDataFrame) -> dict:
+def dry_fix_snapping(data: GeoDataFrame) -> dict:
     pass
 
 
 # Cleaning data
-def fix_null_geometry(data: gpd.GeoDataFrame) -> dict:
+def fix_null_geometry(data: GeoDataFrame) -> dict:
     try:
         data = data[~data.is_empty]
         return "Successfully fixed null geometry", data
     except:
         return "Failed to fix null geometry", data
 
-def fix_multipart(data: gpd.GeoDataFrame) -> dict:
+def fix_multipart(data: GeoDataFrame) -> dict:
     try:
         df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
         for i, row in data.iterrows():
@@ -164,7 +177,7 @@ def fix_multipart(data: gpd.GeoDataFrame) -> dict:
     except:
         return "Failed to fix multipart geometry", data
 
-def fix_duplicate(data: gpd.GeoDataFrame) -> dict:
+def fix_duplicate(data: GeoDataFrame) -> dict:
     try:
         data = data.drop_duplicates(keep='last')
         return "Successfully fixed duplicate geometry", data
@@ -184,7 +197,7 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
-def fix_self_intersection(data: gpd.GeoDataFrame) -> dict:
+def fix_self_intersection(data: GeoDataFrame) -> dict:
     try:
         df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
         for i, row in data.iterrows():
@@ -207,5 +220,5 @@ def fix_self_intersection(data: gpd.GeoDataFrame) -> dict:
     except:
         return "Failed to fix self intersection", data
 
-def fix_snapping(data: gpd.GeoDataFrame) -> dict:
+def fix_snapping(data: GeoDataFrame) -> dict:
     pass
