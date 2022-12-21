@@ -67,6 +67,7 @@ class UserListSerializer(serializers.ModelSerializer):
         representation['project'] = instance.project.name if instance.project else None
         representation['group'] = instance.group.name if instance.group else None
         representation['active'] = instance.active
+        representation['status'] = None
         return representation
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
@@ -75,21 +76,36 @@ class PreliminaryUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PreliminaryUserListSerializer(serializers.ModelSerializer):
-    organization = serializers.SerializerMethodField()
-    project = serializers.SerializerMethodField()
-    group = serializers.SerializerMethodField()
+    # organization = serializers.SerializerMethodField()
+    # project = serializers.SerializerMethodField()
+    # group = serializers.SerializerMethodField()
     class Meta:
         model = PreliminaryUser
-        fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        # fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        fields = ('id',)
 
-    def get_organization(self, instance):
-        return instance.organization.name if instance.organization else None
 
-    def get_project(self, instance):
-        return instance.project.name if instance.project else None
+    # def get_organization(self, instance):
+    #     return instance.organization.name if instance.organization else None
 
-    def get_group(self, instance):
-        return instance.group.name if instance.group else None
+    # def get_project(self, instance):
+    #     return instance.project.name if instance.project else None
+
+    # def get_group(self, instance):
+    #     return instance.group.name if instance.group else None
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['user_id'] = None
+        representation['full_name'] = None
+        representation['image_thumbnail'] = None
+        representation['contact'] = None
+        representation['email'] = instance.email
+        representation['organization'] = instance.organization.name if instance.organization else None
+        representation['project'] = instance.project.name if instance.project else None
+        representation['group'] = instance.group.name if instance.group else None
+        representation['active'] = None
+        representation['status'] = instance.status
+        return representation
 
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:

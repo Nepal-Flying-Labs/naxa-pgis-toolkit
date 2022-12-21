@@ -433,90 +433,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
 
-    # def list(self, request, *args, **kwargs):
-    #     '''
-    #     Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
-    #     For other roles, User can have multiple roles with different organizations but must have single role within each organization.
-    #     http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
-    #     '''
-    #     try:
-    #         paginator = CustomPageNumberPagination()
-    #         if not request.user.is_authenticated:
-    #             return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-    #         request_dict = request.query_params
-    #         request_keys = request_dict.keys()
-    #         '''removing the request user from user queryset'''
-    #         queryset = self.queryset.exclude(id=request.user.id)
-    #         '''checking if the requesting user has a role assigned'''
-    #         if not UserRole.active.filter(user__id=request.user.id).exists():
-    #             return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-    #         user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
-    #         organization = None
-    #         '''filtering queryset for web app administrator'''
-    #         if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-    #             queryset = queryset
-    #         elif 'organization' in request_keys and request_dict['organization'] != "":
-    #             organization = request_dict['organization']
-    #             '''making organization compulsory and checking if any role of the request exists for the given organization'''
-    #             if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
-    #                 user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
-    #             else:
-    #                 return Response(data={'message': 'No any user role of the requesting user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-    #             '''filtering queryset according to the role of the user in the organization'''
-    #             if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
-    #                 org_user_ids = UserRole.active.filter(organization__id=organization).values_list('user__id', flat=True)
-    #                 queryset = queryset.filter(id__in=org_user_ids)
-    #                 '''filtering queryset according to users in a project'''
-    #             elif 'project' in request_keys and request_dict['project'] != "":
-    #                 project = request_dict['project']
-    #                 if user_role_instance.group.id == int(env('PROJECT_MANAGER')):
-    #                     project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
-    #                     queryset = queryset.filter(id__in=project_user_ids)
-    #                     '''filtering queryset in a project of the same role i.e. data collector'''
-    #                 elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):
-    #                     group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
-    #                     queryset = queryset.filter(id__in=group_user_ids)
-    #                 else:
-    #                     '''return empty queryset when no any role is validated '''
-    #                     queryset = None
-    #             else:
-    #                 return Response(data={'message': 'Params project is required!'}, status=status.HTTP_400_BAD_REQUEST)
-    #         else:
-    #             return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
-
-    #         '''Search'''
-    #         if 'search_key' in request_keys and request_dict['search_key'] != '':
-    #             searched_queryset = None
-    #             search_fields = ['full_name', 'contact', 'email']
-    #             filter_kwargs = {}
-    #             for field in search_fields:
-    #                 filter_kwargs[field+'__icontains'] = request_dict['search_key']
-    #             list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
-    #             queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
-
-    #         '''Sorting'''
-    #         if 'order_by' in request_keys and request_dict['order_by'] != '':
-    #             queryset = queryset.order_by(request_dict['order_by'] )
-
-    #         '''Group by'''
-    #         if 'group_by' in request_keys and request_dict['group_by'] != '':
-    #             group_by = request_dict['group_by']
-    #             if group_by == "project":
-    #                 user_ids = list(queryset.values_list('id', flat=True))
-    #                 user_role_qs = UserRole.active.filter(user__id__in=user_ids)
-    #                 project_list = list(user_role_qs.values_list('project', flat=True).distinct())
-    #                 data_dict = {}
-    #                 for project in project_list:
-    #                     project_name = Project.active.get(id=project).name
-    #                     data_dict[project_name] = user_role_qs.filter(project__id=project).values('user__image_thumbnail', 'user__full_name', 'project__name', 'group__name')
-    #                 return Response(data_dict, status=status.HTTP_200_OK)
-    #         '''Paginate Queryset'''
-    #         paginated_queryset = paginator.paginate_queryset(queryset, request)
-    #         serializer = UserListSerializer(
-    #             paginated_queryset, many=True, context={"request": request})
-    #         return paginator.get_paginated_response(data=serializer.data)
-    #     except Exception as e:
-    #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def list(self, request, *args, **kwargs):
         '''
@@ -528,57 +444,87 @@ class UserViewSet(viewsets.ModelViewSet):
         http://localhost:8000/api/users/user/?organization=&project=&group=&ordering=&search=
         '''
         try:
-            # if not request.user.is_authenticated:
-            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-            request_dict = request.query_params
-            request_keys = request_dict.keys()
+            ''''''
+            # request_dict = request.query_params
+            # request_keys = request_dict.keys()
+            # '''removing the requesting user roles from userrole queryset'''
+            # queryset = UserRole.active.exclude(user__id=request.user.id)
+            # '''checking if the requesting user has a role assigned'''
+            # if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+            #     return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            # userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+            # user_role_list = userrole_qs.values_list('group__id', flat=True)
+            # '''filtering queryset for web app administrator'''
+            # if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+            #     queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
+            # elif 'organization' in request_keys and request_dict['organization'] != "":
+            #     organization = request_dict['organization']
+            #     '''exclude all the pgis web administrator user roles'''
+            #     queryset = queryset.exclude(group__id=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+            #     if not userrole_qs.filter(organization__id=organization).exists():
+            #         return Response(data={'message': 'No any role of the user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     userrole_qs = userrole_qs.filter(organization__id=organization)
+            #     user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+            #     if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+            #         queryset = queryset.filter(organization__id=organization)
+            #     elif 'project' in request_keys and request_dict['project'] != "":
+            #         project = request_dict['project']
+            #         '''exclude all the organization admin user roles'''
+            #         queryset = queryset.exclude(group__id=int(env('ORGANIZATION_ADMIN')))
+            #         if not userrole_qs.filter(project__id=project).exists():
+            #             return Response(data={'message': 'No any role of the user found for the project in the organization!'}, status=status.HTTP_400_BAD_REQUEST)
+            #         userrole_qs = userrole_qs.filter(project__id=project)
+            #         user_org_proj_role_list = userrole_qs.values_list('group__id', flat=True)
+            #         if int(env('PROJECT_MANAGER')) in user_org_proj_role_list:
+            #             '''all users involved in the project excpet web administrator and organization admin'''
+            #             queryset = queryset.filter(project_id=project)
+            #         elif int(env('DATA_COLLECTOR')) in user_org_proj_role_list:
+            #             '''exclude all the project manager user roles'''
+            #             queryset = queryset.exclude(group__id=int(env('PROJECT_MANAGER')))
+            #             '''user with roles data collector only'''
+            #             queryset = queryset.filter(project__id=project)
+            #         else:
+            #             # queryset = queryset.none()
+            #             return Response(data={'message': 'Your role does not allow you to view other user details!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     else:
+            #         return Response(data={'message': 'Params project is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            # else:
+            #     return Response(data={'message': 'Params organization is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     '''filter, search and order queryset'''
+            # queryset = self.filter_queryset(queryset)
+            # serializer = UserListSerializer(queryset, many=True, context={"request": request})
+            ''''''
+            '''checking if the requesting user has a role assigned'''
+            role_qs=UserRole.active.filter(user__id=request.user.id, active=True)
+            pre_user_qs = PreliminaryUser.active.all()
+            if not role_qs.exists():
+                return Response(data={'message': 'No any active role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             '''removing the requesting user roles from userrole queryset'''
             queryset = UserRole.active.exclude(user__id=request.user.id)
-            '''checking if the requesting user has a role assigned'''
-            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
-            user_role_list = userrole_qs.values_list('group__id', flat=True)
-            '''filtering queryset for web app administrator'''
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
-            elif 'organization' in request_keys and request_dict['organization'] != "":
-                organization = request_dict['organization']
-                '''exclude all the pgis web administrator user roles'''
-                queryset = queryset.exclude(group__id=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
-                if not userrole_qs.filter(organization__id=organization).exists():
-                    return Response(data={'message': 'No any role of the user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-                userrole_qs = userrole_qs.filter(organization__id=organization)
-                user_org_role_list = userrole_qs.values_list('group__id', flat=True)
-                if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
-                    queryset = queryset.filter(organization__id=organization)
-                elif 'project' in request_keys and request_dict['project'] != "":
-                    project = request_dict['project']
-                    '''exclude all the organization admin user roles'''
-                    queryset = queryset.exclude(group__id=int(env('ORGANIZATION_ADMIN')))
-                    if not userrole_qs.filter(project__id=project).exists():
-                        return Response(data={'message': 'No any role of the user found for the project in the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-                    userrole_qs = userrole_qs.filter(project__id=project)
-                    user_org_proj_role_list = userrole_qs.values_list('group__id', flat=True)
-                    if int(env('PROJECT_MANAGER')) in user_org_proj_role_list:
-                        '''all users involved in the project excpet web administrator and organization admin'''
-                        queryset = queryset.filter(project_id=project)
-                    elif int(env('DATA_COLLECTOR')) in user_org_proj_role_list:
-                        '''exclude all the project manager user roles'''
-                        queryset = queryset.exclude(group__id=int(env('PROJECT_MANAGER')))
-                        '''user with roles data collector only'''
-                        queryset = queryset.filter(project__id=project)
-                    else:
-                        # queryset = queryset.none()
-                        return Response(data={'message': 'Your role does not allow you to view other user details!'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response(data={'message': 'Params project is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            group_ids = role_qs.values_list('group', flat=True)
+            project=request.query_params.get('project', None)
+            organization = request.query_params.get('organization', None)
+            if project and Project.active.filter(id=project).exists():
+                '''only project level roles'''
+                queryset=queryset.filter(project=project)
+                pre_user_qs=pre_user_qs.filter(project=project)
+            elif organization and Organization.active.filter(id=organization).exists():
+                '''organization and project level roles'''
+                queryset=queryset.filter(organization=organization)
+                pre_user_qs=pre_user_qs.filter(organization=organization)
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                queryset=queryset.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
+                pre_user_qs=pre_user_qs.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
             else:
-                return Response(data={'message': 'Params organization is missing!'}, status=status.HTTP_400_BAD_REQUEST)
-                '''filter, search and order queryset'''
-            queryset = self.filter_queryset(queryset)
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+            '''filter, search and order queryset'''
+            # queryset = self.filter_queryset(queryset)
+            '''serialize'''
             serializer = UserListSerializer(queryset, many=True, context={"request": request})
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            pre_user_serializer = PreliminaryUserListSerializer(pre_user_qs, many=True)
+
+            data=serializer.data + pre_user_serializer.data
+            return Response(data=data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
