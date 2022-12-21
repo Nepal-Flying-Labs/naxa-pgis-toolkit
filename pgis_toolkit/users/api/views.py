@@ -281,14 +281,14 @@ class UserInvitationAPIView(APIView):
             group_ids = UserRole.active.filter(active=True, user=request.user).values_list('group', flat=True)
             organization = request.query_params.get('organization', None)
             project = request.query_params.get('project', None)
-            if request.user.is_superuser:
-                user_qs=user_qs
-            elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
-                user_qs=user_qs
-            elif organization:
-                user_qs=user_qs.filter(organization=organization)
-            elif project:
+            if project:
+                '''only project level roles'''
                 user_qs=user_qs.filter(project=project)
+            elif organization:
+                '''only organization and project level roles'''
+                user_qs=user_qs.filter(organization=organization)
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                user_qs=user_qs.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
             else:
                 return Response (data={'message': 'organization or project params is missing!'}, status=400)
 
@@ -301,10 +301,12 @@ class UserInvitationAPIView(APIView):
 
             '''filtering'''
             filter_dict={}
-            if 'status' in request.query_params:
-                filter_dict['status'] = request.query_params.get('status', None)
-            if 'group' in request.query_params:
-                filter_dict['group'] = request.query_params.get('group', None)
+            status=request.query_params.get('status', None)
+            group=request.query_params.get('group', None)
+            if status:
+                filter_dict['status'] = status
+            if group:
+                filter_dict['group'] = group
             if filter_dict:
                 user_qs=user_qs.filter(**filter_dict)
 
