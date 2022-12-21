@@ -302,6 +302,9 @@ class Image(DateTimeStamp):
 
     class Meta:
         app_label='projects'
+        permissions = (
+            ('download_image', 'Can download the image'),
+        )
 
 class RequestDemo(DateTimeStamp):
     full_name = models.CharField(max_length=254)
