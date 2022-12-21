@@ -52,6 +52,8 @@ from pgis_toolkit.projects.models import (
 from pgis_toolkit.projects.permissions import (
     DocumentDownloadPermission,
     DocumentPermission,
+    ImageDownloadPermission,
+    ImagePermission,
     OrganizationCategoryPermission,
     OrganizationPermission,
     ProjectPermission,
@@ -804,7 +806,7 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class ImageViewset(viewsets.ModelViewSet):
     queryset=Image.objects.all()
     http_method_names = ['get', 'post', 'patch', 'delete']
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ImagePermission]
     serializer_class = ImageSerializer
 
     def get_queryset(self, *args, **kwargs):
@@ -955,6 +957,42 @@ def document_download(request):
     except Exception as e:
         return Response(data={'message: '+str(e)}, status=400)
 
+'''download document of a project'''
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, ImageDownloadPermission])
+def image_download(request):
+    '''http://localhost:8000/api/projects/document_download/?document=1'''
+    try:
+        image = request.query_params.get('image', None)
+        project = request.query_params.get('project', None)
+        if not image:
+            return Response(data={'message': 'params image is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        if not project or not Project.active.filter(id=project).exists():
+            return Response(data={'message': 'project params is missing or Project matching queryset does not exist!'}, status=400)
+        image_ids = []
+        if image == 'all':
+            pass
+        else:
+            image_ids = json.loads(image)
+        image_files = Image.objects.filter(project=project, id__in=image_ids).values_list('file', flat=True) if image_ids else Image.objects.filter(project=project).values_list('file', flat=True)
+        files_list = [f'{settings.MEDIA_ROOT}/' + file for file in image_files]
+        # create a ZipFile
+        zip_name = 'images.zip'
+        zip_path = f'{settings.MEDIA_ROOT}/project/images/{zip_name}'
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            for file in files_list:
+                zip_file.write(file, os.path.basename(file))
+        # downloading zip file
+        zip_file = open(zip_path, 'rb')
+        response = HttpResponse(
+            zip_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{zip_name}'
+        '''delete the zip file from the server after download'''
+        if os.path.isfile(zip_path): os.remove(zip_path)
+        return response
+    except Exception as e:
+        return Response(data={'message: '+str(e)}, status=400)
 class RequestDemoViewset(viewsets.ModelViewSet):
     queryset = RequestDemo.objects.all()
     serializer_class = RequestDemoSerializer

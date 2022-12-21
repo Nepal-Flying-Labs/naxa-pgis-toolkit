@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import BasePermission
 
-from pgis_toolkit.projects.models import Document, Project
+from pgis_toolkit.projects.models import Document, Image, Project
 from pgis_toolkit.users.models import UserRole
 
 # from users.models import User
@@ -182,4 +182,65 @@ class DocumentDownloadPermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in DocumentPermission Check. Error Details: ", str(e))
+            return False
+
+class ImagePermission(BasePermission):
+    """
+    Permission whether a user can perform CRUD operations of Image
+    """
+
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id = request.user.id
+            if request.user.is_superuser:
+                return True
+            if action=="list":
+                project_id = request.query_params.get('project')
+                organization_id = Project.active.get(id=project_id).organization.id
+            elif action=="create":
+                project_id = request.data.get('project')
+                organization_id = Project.active.get(id=project_id).organization.id
+            elif action in ["retrieve", "partial_update"]:
+                image_id = request.resolver_match.kwargs.get('pk')
+                project_id = Image.objects.get(id=image_id).project.id
+                organization_id = Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id, organization_id, project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if action=="create" and "add_image" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_image" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_image" in permission_list:
+                    return True
+                elif action=="list" and "view_image" in permission_list:
+                    return True
+                elif action=='destory' and 'delete_image' in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ImagePermission Check. Error Details: ", str(e))
+            return False
+
+class ImageDownloadPermission(BasePermission):
+    """
+    Permission whether a user can download a image or not.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id = request.user.id
+            if request.user.is_superuser:
+                return True
+            project_id = request.query_params.get('project')
+            organization_id = Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id, organization_id, project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "download_image" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ImageDownloadPermission Check. Error Details: ", str(e))
             return False
