@@ -33,6 +33,9 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     check_layer,
     dry_fix_layer,
     fix_layer,
+    buffer_distance,
+    buffer_column,
+    data_buffer,
 )
 
 router = DefaultRouter()
@@ -73,5 +76,8 @@ urlpatterns = [
     path('dry_fix_layer', dry_fix_layer, name="dry_fix_layer"),
     path('fix_layer', fix_layer, name='fix_layer'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
-    path('category/', category, name='category')
+    path('category/', category, name='category'),
+    path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
+    path('buffer_by_column/', buffer_column, name="buffer_by_column"),
+    path('data_inside_buffer/', data_buffer, name="data_inside_buffer")
 ]
