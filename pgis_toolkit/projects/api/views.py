@@ -27,7 +27,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 
-from pgis_toolkit.maps.models import ProjectMapConfig, Theme
+from pgis_toolkit.maps.models import (
+    FeatureCollection,
+    Layer,
+    ProjectMapConfig,
+    Theme,
+    Vectorlayer,
+)
 from pgis_toolkit.projects.api.serializers import *
 from pgis_toolkit.projects.models import (
     Country,
@@ -327,15 +333,45 @@ class ProjectViewset(viewsets.ModelViewSet):
                         wkt_name = request_dict['location_wkt']
                         wkt_list = json.loads(request_dict['location_wkt'])
                         merged_geom = GEOSGeometry(wkt_list[0])
-                        for wkt in wkt_list:
-                            geom = GEOSGeometry(wkt)
-                            ProjectLocationFeatureCollection.active.create(project=project,
-                                                                            geometry=geom)
-                            merged_geom = merged_geom.union(geom)
-                        project.bbox = merged_geom.extent
-                        # '''change project status to ongoing'''
-                        # project.status='ongoing'
-                        project.save()
+                        geom_type=merged_geom.geom_type
+                        ''''''
+                        theme_qs = Theme.active.filter(project=project, name='Baseline')
+                        if theme_qs.exists():
+                            '''create a layer of project location in baseline theme'''
+                            layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+                            if not layer_created: upload_status='uploading'
+                            vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance})
+                            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+                            for wkt in wkt_list:
+                                geom = GEOSGeometry(wkt)
+                                ProjectLocationFeatureCollection.active.create(project=project,
+                                                                                geometry=geom)
+                                FeatureCollection.active.create(layer=layer_instance, geometry=geom)
+                                merged_geom = merged_geom.union(geom)
+                            bbox = merged_geom.extent
+                            project.bbox = bbox
+                            # '''change project status to ongoing'''
+                            # project.status='ongoing'
+                            project.geometry_type=geom_type
+                            project.save()
+                            vector_layer_instance.bbox=bbox
+                            vector_layer_instance.geom_type=geom_type
+                            vector_layer_instance.save()
+                            layer_instance.upload_status='successful'
+                            layer_instance.save()
+                        else:
+                            for wkt in wkt_list:
+                                geom = GEOSGeometry(wkt)
+                                ProjectLocationFeatureCollection.active.create(project=project,
+                                                                                geometry=geom)
+                                merged_geom = merged_geom.union(geom)
+                            bbox = merged_geom.extent
+                            project.bbox = bbox
+                            # '''change project status to ongoing'''
+                            # project.status='ongoing'
+                            project.geometry_type=geom_type
+                            project.save()
+                        ''''''
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -443,7 +479,7 @@ def get_project_detail(request, *args, **kwargs):
     if project:
         if Project.active.filter(id=project).exists():
             project_instance = Project.active.get(id=project)
-            data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox}
+            data = {'id': project, 'name': project_instance.name, 'bbox': project_instance.bbox, 'organization_name': project_instance.organization.name}
             map_config_qs = ProjectMapConfig.active.filter(project=project, user=user) if user else ProjectMapConfig.active.filter(project=project)
             if map_config_qs.exists():
                 data['map_config'] = map_config_qs[0].map_config
@@ -648,13 +684,13 @@ def project_location_geojson(request, *args, **kwargs):
         if Project.active.filter(id=project).exists():
             location_qs = ProjectLocationFeatureCollection.active.filter(project=project).exclude(geometry=None)
             if location_qs.exists():
-                for location in location_qs:
-                    # if location.geometry:
-                    geom_type = location.geometry.geom_type
-                    if geom_type != 'Point' or geom_type != 'MultiPoint':
-                        geometry = location.geometry.centroid
-                        location.geometry = geometry
-                        # do not save
+                # for location in location_qs:
+                #     # if location.geometry:
+                #     geom_type = location.geometry.geom_type
+                #     if geom_type != 'Point' or geom_type != 'MultiPoint':
+                #         geometry = location.geometry.centroid
+                #         location.geometry = geometry
+                #         # do not save
                 data = serialize('geojson', location_qs, geometry_field='geometry', fields=('id', 'project', 'attributes'))
                 geojson_data = json.loads(data)
                 return Response(data=geojson_data, status=200)

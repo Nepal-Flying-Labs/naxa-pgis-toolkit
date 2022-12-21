@@ -129,6 +129,11 @@ class Vectorlayer(DateTimeStamp):
     #                            blank=True, null=True
     #                            )# bounding box in format minx,miny,maxx,maxy
     bbox = models.JSONField(default=list, blank=True, null=True) #layer styling
+    mandatory_fields=ArrayField(models.CharField(max_length=100, blank=True),
+                               default=list,
+                               size=100,
+                               blank=True, null=True
+                               ) # attributes list to display required fields in feature create
     popup_fields=ArrayField(models.CharField(max_length=100, blank=True),
                                default=list,
                                size=100,
@@ -223,9 +228,9 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
                     coords=self.geometry.coords
                     feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
                 else:
-                    feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
-                    feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
-
+                    # feature=FeatureCollection.active.filter(id=self.id).aggregate(Extent('geometry'))
+                    # feature_bbox = list(feature['geometry__extent']) if feature['geometry__extent'] else None
+                    feature_bbox=self.geometry.extent
                 vector_layer_instance=Vectorlayer.objects.get(layer=self.layer)
                 layer_bbox= vector_layer_instance.bbox
 

@@ -8,6 +8,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
+    LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     LayerViewSet,
@@ -15,6 +16,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
     ProjectStyleViewset,
+    QueryFeatureCollectionViewset,
     ShortestPathAPIView,
     ShortestRoutesTileQuerySet,
     StandardIconViewset,
@@ -22,7 +24,11 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     ThemeViewset,
     analysis_layers,
     category,
+    check_layer,
+    delete_sequence,
+    dry_fix_layer,
     feature_popup,
+    fix_layer,
     get_analysis_task_response,
     get_data_merge_update_task_response,
     get_layer_upload_task_response,
@@ -49,6 +55,8 @@ router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
+router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
+
 app_name = "projects"
 
 urlpatterns = [
@@ -63,7 +71,7 @@ urlpatterns = [
     path('layer_download/', layer_download, name='layer_download'),
     path('advance_filter_vectortile/<int:z>/<int:x>/<int:y>/', AdvanceFilterVectorTileQuerySet.as_view(), name="AdvanceFilterVectorTileQuerySet"),
     path('import_template/', import_template, name='import_template'),
-    path('feature/<int:pk>/', FeatureGeoJSONAPIView.as_view(), name='feature'),
+    path('feature_geojson/<int:pk>/', FeatureGeoJSONAPIView.as_view(), name='feature'),
     path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
     path('get_data_merge_update_task_response/', get_data_merge_update_task_response),
     path('shortest_distance_analysis/', ShortestPathAPIView.as_view(), name='shortest_distance_analysis'),
@@ -73,11 +81,13 @@ urlpatterns = [
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('check_layer/', check_layer, name='check_layer'),
-    path('dry_fix_layer', dry_fix_layer, name="dry_fix_layer"),
-    path('fix_layer', fix_layer, name='fix_layer'),
+    path('dry_fix_layer/', dry_fix_layer, name="dry_fix_layer"),
+    path('fix_layer/', fix_layer, name='fix_layer'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
+    path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
     path('category/', category, name='category'),
+    path('delete_sequence/', delete_sequence, name='delete_sequence'),
     path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
     path('buffer_by_column/', buffer_column, name="buffer_by_column"),
-    path('data_inside_buffer/', data_buffer, name="data_inside_buffer")
+    path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
 ]

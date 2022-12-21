@@ -8,7 +8,7 @@ from itertools import groupby
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import F, Q
 from django.db.models.query import QuerySet
 from django.http import JsonResponse
 from django.template.loader import render_to_string
@@ -266,6 +266,63 @@ class PreliminaryUserVerificationAPIView(APIView):
                 return Response(data=data_dict, status=status.HTTP_200_OK)
         except Exception as e:
             return Response('Error: ' + str(e))
+
+'''User Invitation Table'''
+class UserInvitationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    # filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    # filterset_fields = ['status', 'project', 'organization', 'group']
+    # search_fields = ['id', 'email']
+    # ordering_fields = ['id', 'status', 'email', 'organization', 'project', 'group', 'uploaded_date']
+
+    def get(self, request, *args, **kwargs):
+        try:
+            user_qs = PreliminaryUser.active.all()
+            group_ids = UserRole.active.filter(active=True, user=request.user).values_list('group', flat=True)
+            organization = request.query_params.get('organization', None)
+            project = request.query_params.get('project', None)
+            if request.user.is_superuser:
+                user_qs=user_qs
+            elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                user_qs=user_qs
+            elif organization:
+                user_qs=user_qs.filter(organization=organization)
+            elif project:
+                user_qs=user_qs.filter(project=project)
+            else:
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+
+            'ordering'
+            ordering = request.query_params.get('ordering', None)
+            if ordering:
+                user_qs = user_qs.order_by(ordering)
+            else:
+                user_qs = user_qs.order_by('-id')
+
+            '''filtering'''
+            filter_dict={}
+            if 'status' in request.query_params:
+                filter_dict['status'] = request.query_params.get('status', None)
+            if 'group' in request.query_params:
+                filter_dict['group'] = request.query_params.get('group', None)
+            if filter_dict:
+                user_qs=user_qs.filter(**filter_dict)
+
+            '''search'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                filter_kwargs = {}
+                search_fields = ['id', 'email']
+                for field in search_fields:
+                    filter_kwargs[field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                user_qs = user_qs.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else user_qs
+            user_qs=user_qs.values('id', 'email','organization__name', 'project__name', 'group__name', 'status', 'uploaded_date')
+            return Response(data=user_qs, status=200)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 '''Viewset to CRUD operations of user model'''
 class UserViewSet(viewsets.ModelViewSet):

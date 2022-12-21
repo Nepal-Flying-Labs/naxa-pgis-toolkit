@@ -13,7 +13,7 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.serializers import serialize
-from django.db.models import Q
+from django.db.models import Count, F, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -29,6 +29,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
+from sequences.models import Sequence
 from sqlalchemy import create_engine
 import pandas as pd
 
@@ -72,6 +73,7 @@ from pgis_toolkit.maps.permissions import (
     ProjectsLayerTemplateAttributePermission,
     ProjectStylePermission,
     ProjectThemeLayerPermission,
+    QueryFeatureCollectionPermission,
     SubLayerPermission,
     ThemePermission,
 )
@@ -85,6 +87,13 @@ from pgis_toolkit.maps.tasks import (
     handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
+from pgis_toolkit.maps.utils.data_cleaning import (
+    check_duplicate,
+    check_multipart,
+    check_null_geometry,
+    check_self_intersection,
+    check_snapping,
+)
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
@@ -111,6 +120,7 @@ from .serializers import (
     ProjectsLayerTemplateAttributeSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    QueryFeatureCollectionListSerializer,
     QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
     SubLayerListSerializer,
@@ -182,8 +192,8 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     http_method_names = ['get']
     permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ('layer', )
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_fields = ('layer', )
 
     serializer_classes = {
         'list': LayerAttributeListSerializer,
@@ -193,12 +203,24 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        self.queryset = self.filter_queryset(self.queryset)
-        serializer = self.get_serializer(self.queryset, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        try:
+            layer = request.query_params.get('layer', None)
+            check_mandatory = request.query_params.get('check_mandatory', False)
+            if not layer:
+                return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type')
+            if check_mandatory == True or check_mandatory == 'True':
+                mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
+                if mandatory_fields:
+                    for data in queryset:
+                        data['mandatory'] = True if data['name'] in mandatory_fields else False
+                else:
+                    for data in queryset:
+                        data['mandatory'] = True
+            # serializer = self.get_serializer(self.queryset, many=True)
+            return Response(data=queryset, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 '''
 #not in use
 @api_view(['GET'])
@@ -390,7 +412,7 @@ class LayerViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['group', 'theme', 'status']
     search_fields = ['id', 'name']
-    ordering_fields = ['id', 'name']
+    ordering_fields = ['id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status', 'geom_type', 'features', 'theme']
     # pagination_class = CustomPageNumberPagination
 
     '''
@@ -415,24 +437,28 @@ class LayerViewSet(viewsets.ModelViewSet):
             if not Project.active.filter(id=project).exists():
                 return Response(data={'message': 'Project not found!'}, status=400)
             theme_ids = Theme.active.select_related('project').filter(project=project).values_list('id', flat=True)
-            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').order_by('-id')
+            # layer_qs = Layer.objects.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status')
+            layer_qs = Layer.active.select_related('theme').filter(theme__in=theme_ids).values('id', 'name', 'source', 'status', 'display_on_map', 'layer_type', 'upload_status').annotate(geom_type=F('vector_layer__geom_type')).annotate(theme=F('theme__name')).annotate(features=Count("layer_feature"))
+            if not ordering:
+                layer_qs = layer_qs.order_by('-id')
             layer_qs = self.filter_queryset(layer_qs)
-            for layer in layer_qs:
-                layer_dict=layer
-                if layer['layer_type']=='Vector':
-                    vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
-                    if vector_layer.exists():
-                        layer_dict['geom_type'] = vector_layer[0]['geom_type']
-                    feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
-                    layer_dict['features'] = feature_count
-                result.append(layer_dict)
-            if ordering and ordering=='features':
-                result = sorted(result, key=lambda x:x[ordering])
-            elif ordering and ordering == '-features':
-                result = sorted(result, key=lambda x:x['features'], reverse=True)
+            # for layer in layer_qs:
+            #     layer_dict=layer
+            #     if layer['layer_type']=='Vector':
+            #         vector_layer = Vectorlayer.objects.filter(layer=layer['id']).values('geom_type')
+            #         if vector_layer.exists():
+            #             layer_dict['geom_type'] = vector_layer[0]['geom_type']
+            #         feature_count = FeatureCollection.active.filter(layer=layer['id']).count()
+            #         layer_dict['features'] = feature_count
+            #     result.append(layer_dict)
+            # if ordering and ordering=='features':
+            #     result = sorted(result, key=lambda x:x[ordering])
+            # elif ordering and ordering == '-features':
+            #     result = sorted(result, key=lambda x:x['features'], reverse=True)
+            ''''''
             # paginated_queryset = paginator.paginate_queryset(result, request)
             # return paginator.get_paginated_response(data=paginated_queryset)
-            return Response(data=result, status=200)
+            return Response(data=layer_qs, status=200)
         except Exception as e:
             return Response(data={'error': str(e)}, status=400)
 
@@ -1095,6 +1121,113 @@ class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
+class QueryFeatureCollectionViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for QueryFeatureCollection innstance
+    '''
+    queryset = QueryFeatureCollection.active.all()
+    http_method_names = ['get', 'retrieve']
+    default_serializer_class = QueryFeatureCollectionSerializer
+    serializer_classes = {
+        'list': QueryFeatureCollectionListSerializer,
+        'retrieve': QueryFeatureCollectionSerializer
+    }
+    # permission_classes=[QueryFeatureCollectionPermission]
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        paginator = CustomPageNumberPagination()
+        layer_id = request.query_params.get('layer', None)
+        if not layer_id:
+            return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        queryset = self.queryset.filter(layer__id=layer_id)
+        '''search_key'''
+        search_key = request.query_params.get('search', None)
+        if search_key:
+            search_fields = list(queryset.first().attributes.keys())
+            filter_kwargs = {}
+            for field in search_fields:
+                filter_kwargs['attributes__'+field+'__icontains'] = search_key
+            list_of_Q = [Q(**{key: val})
+                            for key, val in filter_kwargs.items()]
+            queryset = queryset.filter(
+                reduce(operator.or_, list_of_Q)) if search_fields else queryset
+        ''''order_by'''
+        order_by = request.query_params.get('ordering', None)
+        if order_by:
+            if 'id' in order_by:
+                queryset = queryset.order_by(order_by)
+            elif '-' in order_by:
+                queryset = queryset.order_by('-attributes__'+order_by)
+            else:
+                queryset = queryset.order_by('attributes__'+order_by)
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated_queryset, many=True, context={})
+        return paginator.get_paginated_response(data=serializer.data)
+
+'''Save Query Layer into main Layer Table'''
+class LayerFromQueryAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            layer = request.data.get('layer', None)
+            if not layer:
+                return Response(data={'message': "layer params is missing!"}, status=400)
+            query_layer_qs = QueryLayer.active.filter(id=layer)
+            if query_layer_qs.exists():
+                layer_instance,vector_layer_instance = None, None
+                query_layer = query_layer_qs[0]
+                query_features = QueryFeatureCollection.active.filter(layer=query_layer)
+                if query_features:
+                    try:
+                        layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=query_layer.name, layer_type='Vector',display_on_map=True)
+                    except Exception as e:
+                        return Response(data={'message': 'Layer object could not be created!', 'detail':str(e)}, status=400)
+                    vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
+                    vector_layer_instance.bbox=query_layer.bbox
+                    vector_layer_instance.geom_type=query_layer.geom_type
+                    vector_layer_instance.save()
+
+                    from django.db import connection
+                    try:
+                        with connection.cursor() as cursor:
+                            # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
+                            raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
+                            cursor = connection.cursor()
+                            cursor.execute(raw_query)
+                    except Exception as e:
+                        if layer_instance: layer_instance.delete()
+                        if vector_layer_instance: vector_layer_instance.delete()
+                        return Response(data={'message': 'Raw Query execution failed!', 'detail':str(e)}, status=400)
+
+                    '''create Layer attributes as well'''
+                    attribute_objs = []
+                    field_list = query_features[0].attributes.keys()
+                    for field in field_list:
+                        attribute_objs.append(LayerAttribute(layer=layer_instance, name=field))
+                    LayerAttribute.objects.bulk_create(attribute_objs)
+
+                    return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
+
+                else:
+                    return Response(data={'message': "Query features not found for the layer"}, status=404)
+            else:
+                return Response(data={'message': "QueryLayer matching queryset does not exist!"}, status=404)
+
+        except Exception as e:
+            if layer_instance: layer_instance.delete()
+            if vector_layer_instance: vector_layer_instance.delete()
+            return Response(data={'message': str(e)}, status=400)
+
+@api_view(['POST'])
+def delete_sequence(request, *args, **kwargs):
+    try:
+        Sequence.objects.all().delete()
+        return Response(data={'message': 'All sequence objects are deleted successfully.'}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
 
 @api_view(['GET'])
 @permission_classes([LayerDownloadPermission])
@@ -1499,7 +1632,7 @@ class FeatureGeoJSONAPIView(APIView):
         try:
             feature_qs = FeatureCollection.active.filter(id=pk)
             if feature_qs.exists():
-                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer'))
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer', 'sub_layer'))
                 geojson_data = json.loads(data)
                 return Response(data=geojson_data, status=status.HTTP_200_OK)
             else:

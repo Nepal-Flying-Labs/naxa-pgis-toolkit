@@ -13,6 +13,8 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
+    QueryFeatureCollection,
+    QueryLayer,
     SubLayer,
     Theme,
 )
@@ -511,4 +513,46 @@ class ProjectMapConfigPermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in ProjectMapConfigPermission Check. Error Details: ", str(e))
+            return False
+
+class QueryFeatureCollectionPermission(BasePermission):
+    """
+    Permission check for QueryFeatureCollection model
+    """
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            if action =="list":
+                layer_id=request.query_params.get("layer")
+                project_id=QueryLayer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action=="create":
+                layer_id=request.data.get("layer",None)
+                project_id=QueryLayer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update']:
+                feature_id=request.resolver_match.kwargs.get('pk')
+                project_id= QueryFeatureCollection.objects.get(id=feature_id).layer.theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if action=="list" and "view_featurecollection" in permission_list:
+                    return True
+                elif action=="create" and "add_featurecollection" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_featurecollection" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_featurecollection" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in FeatureCollectionPermission Check. Error Details: ", str(e))
             return False

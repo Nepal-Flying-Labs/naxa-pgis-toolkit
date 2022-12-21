@@ -7,6 +7,7 @@ import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
 
+from pgis_toolkit.maps.models import FeatureCollection, Layer, Theme, Vectorlayer
 from pgis_toolkit.projects.models import Project, ProjectLocationFeatureCollection
 
 
@@ -36,13 +37,36 @@ def handleProjectGeoJSON(project_id):
         project_obj.geometry_type = geometry_type
         project_obj.bbox = total_bounds.tolist()
         project_obj.save()
-        for index, row in gdf.iterrows():
-            dropped_geometry = row.drop(["geometry"])
-            dropped_geometry_dict = dropped_geometry.to_dict()
-            ProjectLocationFeatureCollection.objects.create(project=project_obj,
-                                                            attributes=dropped_geometry_dict,
-                                                            geometry=GEOSGeometry(
-                                                                str(row["geometry"])))
+        theme_qs = Theme.active.filter(project=project_obj, name='Baseline')
+        if theme_qs.exists():
+            '''create a layer of project location in baseline theme'''
+            layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+            if not layer_created: layer_instance.upload_status='uploading'
+            vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance, 'geom_type':geometry_type, 'bbox':total_bounds.tolist()})
+            if not vector_created:
+                vector_layer_instance.bbox = []
+                vector_layer_instance.geom_type=geometry_type
+                vector_layer_instance.save()
+            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+
+            for index, row in gdf.iterrows():
+                dropped_geometry = row.drop(["geometry"])
+                dropped_geometry_dict = dropped_geometry.to_dict()
+                geometry=GEOSGeometry(str(row["geometry"]))
+                ProjectLocationFeatureCollection.objects.create(project=project_obj,
+                                                                attributes=dropped_geometry_dict,
+                                                                geometry=geometry)
+                FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
+                layer_instance.upload_status='successful'
+                layer_instance.save()
+        else:
+            for index, row in gdf.iterrows():
+                dropped_geometry = row.drop(["geometry"])
+                dropped_geometry_dict = dropped_geometry.to_dict()
+                ProjectLocationFeatureCollection.objects.create(project=project_obj,
+                                                                attributes=dropped_geometry_dict,
+                                                                geometry=GEOSGeometry(
+                                                                    str(row["geometry"])))
         clear_dir(file_path)
         return "successful"
     except Exception as e:
@@ -73,14 +97,38 @@ def handleProjectShapeFile(project_id):
         epsg = int(crs_name.replace("epsg:", ""))
         if epsg is None:
             epsg = 4326
-        for index, row in gdf.iterrows():
-            dropped_geometry = row.drop(["geometry"])
-            dropped_geometry_dict = dropped_geometry.to_dict()
-            ProjectLocationFeatureCollection.objects.create(project=project_obj,
-                                                            attributes=dropped_geometry_dict,
-                                                            geometry=GEOSGeometry(
-                                                                str(row["geometry"])))
+        theme_qs = Theme.active.filter(project=project_obj, name='Baseline')
+        if theme_qs.exists():
+            '''create a layer of project location in baseline theme'''
+            layer_instance, layer_created = Layer.active.get_or_create(theme=theme_qs[0], name= 'Boundary', layer_type='Vector', defaults={'theme':theme_qs[0], 'name':'Boundary', 'layer_type':'Vector', 'source':'survey', 'display_on_map':'True'})
+            if not layer_created: layer_instance.upload_status='uploading'
+            vector_layer_instance,vector_created = Vectorlayer.objects.get_or_create(layer=layer_instance, defaults={'layer':layer_instance, 'geom_type':geometry_type, 'bbox':total_bounds.tolist()})
+            if not vector_created:
+                vector_layer_instance.bbox = []
+                vector_layer_instance.geom_type=geometry_type
+                vector_layer_instance.save()
+            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+
+            for index, row in gdf.iterrows():
+                dropped_geometry = row.drop(["geometry"])
+                dropped_geometry_dict = dropped_geometry.to_dict()
+                geometry=GEOSGeometry(str(row["geometry"]))
+                ProjectLocationFeatureCollection.objects.create(project=project_obj,
+                                                                attributes=dropped_geometry_dict,
+                                                                geometry=geometry)
+                FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
+            layer_instance.upload_status='successful'
+            layer_instance.save()
+        else:
+            for index, row in gdf.iterrows():
+                dropped_geometry = row.drop(["geometry"])
+                dropped_geometry_dict = dropped_geometry.to_dict()
+                ProjectLocationFeatureCollection.objects.create(project=project_obj,
+                                                                attributes=dropped_geometry_dict,
+                                                                geometry=GEOSGeometry(
+                                                                    str(row["geometry"])))
         clear_dir(file_path)
         return "successful"
     except Exception as e:
+        print('error occured in handleProjectShapeFile in project: '+str(e))
         return str(e)
