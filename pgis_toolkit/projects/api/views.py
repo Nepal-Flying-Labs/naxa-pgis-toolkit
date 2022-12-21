@@ -908,24 +908,52 @@ class DocumentViewset(viewsets.ModelViewSet):
 def document_download(request):
     '''http://localhost:8000/api/projects/document_download/?document=1'''
     try:
+        # document = request.query_params.get('document', None)
+        # if not document:
+        #     return Response(data={'message': 'params document is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        # if not Document.objects.filter(id=document).exists():
+        #     return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
+        # document_instance = Document.objects.get(id=document)
+        # if not document_instance.file:
+        #     return Response(data={'message': 'The document you are trying to download has no file.'}, status=status.HTTP_404_NOT_FOUND)
+        # document_extension = str(document_instance.file).split('.')[1]
+        # document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
+        # document_file = open(document_url, 'rb')
+        # response = HttpResponse(
+        #     document_file, content_type='application/force-download')
+        # response[
+        #     'Content-Disposition'] = 'attachment; filename="%s"' % f'{document_instance.name}.{document_extension}'
+        # return response
         document = request.query_params.get('document', None)
+        project = request.query_params.get('project', None)
         if not document:
             return Response(data={'message': 'params document is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        if not Document.objects.filter(id=document).exists():
-            return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
-        document_instance = Document.objects.get(id=document)
-        if not document_instance.file:
-            return Response(data={'message': 'The document you are trying to download has no file.'}, status=status.HTTP_404_NOT_FOUND)
-        document_extension = str(document_instance.file).split('.')[1]
-        document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
-        document_file = open(document_url, 'rb')
+        if not project or not Project.active.filter(id=project).exists():
+            return Response(data={'message': 'project params is missing or Project matching queryset does not exist!'}, status=400)
+        document_ids = []
+        if document == 'all':
+            pass
+        else:
+            document_ids = json.loads(document)
+        document_files = Document.active.filter(project=project, id__in=document_ids).values_list('file', flat=True) if document_ids else Document.active.filter(project=project).values_list('file', flat=True)
+        files_list = [f'{settings.MEDIA_ROOT}/' + file for file in document_files]
+        # create a ZipFile
+        zip_name = 'documents.zip'
+        zip_path = f'{settings.MEDIA_ROOT}/documents/files/{zip_name}'
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            for file in files_list:
+                zip_file.write(file, os.path.basename(file))
+        # downloading zip file
+        zip_file = open(zip_path, 'rb')
         response = HttpResponse(
-            document_file, content_type='application/force-download')
+            zip_file, content_type='application/force-download')
         response[
-            'Content-Disposition'] = 'attachment; filename="%s"' % f'{document_instance.name}.{document_extension}'
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{zip_name}'
+        '''delete the zip file from the server after download'''
+        if os.path.isfile(zip_path): os.remove(zip_path)
         return response
     except Exception as e:
-        return Response(data='Error: '+str(e))
+        return Response(data={'message: '+str(e)}, status=400)
 
 class RequestDemoViewset(viewsets.ModelViewSet):
     queryset = RequestDemo.objects.all()

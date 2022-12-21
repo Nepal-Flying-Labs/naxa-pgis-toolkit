@@ -186,7 +186,7 @@ class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
 class DocumentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        exclude=('uploaded_date','last_updated', 'project')
+        exclude=('last_updated', 'project')
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:

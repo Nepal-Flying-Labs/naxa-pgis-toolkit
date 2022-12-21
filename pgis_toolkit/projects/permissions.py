@@ -172,8 +172,7 @@ class DocumentDownloadPermission(BasePermission):
             user_id = request.user.id
             if request.user.is_superuser:
                 return True
-            document_id = request.query_params.get('document')
-            project_id = Document.objects.get(id=document_id).project.id
+            project_id = request.query_params.get('project')
             organization_id = Project.active.get(id=project_id).organization.id
             group_id=get_user_group(user_id, organization_id, project_id)
             if group_id:
