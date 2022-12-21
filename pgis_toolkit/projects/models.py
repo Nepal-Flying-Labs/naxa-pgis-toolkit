@@ -277,6 +277,7 @@ class LayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
 
 class Document(IsDeleted, DateTimeStamp):
     name=models.CharField(max_length=254)
+    description = models.CharField(max_length=254, blank=True, null=True)
     project=models.ForeignKey(Project, on_delete=models.CASCADE)
     cover_image=models.ImageField(upload_to='documents/cover_images/', blank=True, null=True)
     cover_image_thumbnail=models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
