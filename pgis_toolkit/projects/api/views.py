@@ -380,7 +380,7 @@ class ProjectViewset(viewsets.ModelViewSet):
             else:
                 for er in serializer._errors:
                     errors.append(
-                        {'errorName': er, 'details': serializer._errors[er]})
+                        {'errorName': er, 'details': serializer._errors[er][0]})
                 return Response(status=status.HTTP_400_BAD_REQUEST,
                                 data={'message': 'Error Occured', 'error': errors})
             # return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)

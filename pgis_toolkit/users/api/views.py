@@ -205,8 +205,7 @@ class PreliminaryUserAPIView(APIView):
                 organization_instance.delete()
             if project_instance:
                 project_instance.delete()
-            errors.append({'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
@@ -265,7 +264,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                 data_dict['user_created'] = False
                 return Response(data=data_dict, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response('Error: ' + str(e))
+            return Response(data={'message': str(e)}, status=400)
 
 '''User Invitation Table'''
 class UserInvitationAPIView(APIView):
@@ -420,18 +419,25 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "User Not Registered", "Error": errors})
 
     def partial_update(self, request, pk=None):
-        user = User.active.get(pk=pk)
-        if isinstance(request.data.get('image'), str):
-            request.data._mutable = True
-            request.data.pop('image', None)
-            user.image = None
-            user.image_thumbnail = None
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            serializer = UserSerializer(user, context={'request': request})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+        try:
+            errors = []
+            user = User.active.get(pk=pk)
+            if isinstance(request.data.get('image'), str):
+                request.data._mutable = True
+                request.data.pop('image', None)
+                user.image = None
+                user.image_thumbnail = None
+            serializer = UserSerializer(user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                serializer = UserSerializer(user, context={'request': request})
+                return Response(serializer.data, status=200)
+            # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            for er in serializer._errors:
+                errors.append({"errorName": er, "details": serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Update not successful', 'Error': errors})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 
     def list(self, request, *args, **kwargs):
@@ -529,20 +535,26 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def retrieve(self, request, pk, *args, **kwargs):
-        user_instance = User.active.get(pk=pk)
-        serializer = UserDetailSerializer(user_instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            user_instance = User.active.get(pk=pk)
+            serializer = UserDetailSerializer(user_instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Requesting user detail'''
 ''''''
 class RequestUserDetailAPIView(APIView):
     permission_classes=[IsAuthenticated]
     def get(self, request, *args, **kwargs):
-        user_instance = request.user
-        if not user_instance:
-            return Response(data={'message': 'Not logged in!'}, status=400)
-        serializer = UserDetailSerializer(user_instance)
-        return Response(data=serializer.data, status=200)
+        try:
+            user_instance = request.user
+            if not user_instance:
+                return Response(data={'message': 'Not logged in!'}, status=400)
+            serializer = UserDetailSerializer(user_instance)
+            return Response(data=serializer.data, status=200)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
@@ -558,9 +570,9 @@ class EmailConfirmationAPIView(APIView):
             user_instance.save()
             return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
-'''Email Invited User Status Table'''
+'''Email Invited User Status Table  >> NOT IN USE'''
 class PreliminaryUserListView(generics.ListAPIView):
     queryset = PreliminaryUser.active.all()
     serializer_class = PreliminaryUserListSerializer
@@ -646,36 +658,39 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
 '''users group list'''
 @api_view(['GET'])
 def user_group_list(request):
-    if not request.user.is_authenticated:
-        return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-    userrole_qs = UserRole.active.filter(user__id=request.user.id)
-    group_ids = userrole_qs.values_list('group__id', flat=True)
-    group_qs = Group.objects.all()
-    if request.user.is_superuser:
-        group_qs = group_qs
-    elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
-        group_qs = group_qs
-    elif 'organization' in request.query_params and request.query_params['organization'] != "":
-        userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
-        if not userrole_qs.exists():
-            return Response(data={'message': 'No any user role found in the organization!'}, status=400)
+    try:
+        if not request.user.is_authenticated:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+        userrole_qs = UserRole.active.filter(user__id=request.user.id)
         group_ids = userrole_qs.values_list('group__id', flat=True)
-        if int(env('ORGANIZATION_ADMIN')) in group_ids:
-            group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
-    elif 'project' in request.query_params and request.query_params['project'] != "":
-        project_id=request.query_params['project']
-        userrole_qs = userrole_qs.filter(project__id=project_id)
-        if not userrole_qs.exists():
-            return Response(data={'message': 'No any user role found in the project!'}, status=400)
-        group_id = userrole_qs[0].group.id
-        if group_id == int(env('PROJECT_MANAGER')):
-            group_qs = group_qs.filter(pk__in=[int(env('PROJECT_MANAGER')), int(env('DATA_COLLECTOR'))])
-        elif group_id == int(env('DATA_COLLECTOR')):
-            group_qs = group_qs.filter(pk=int(env('DATA_COLLECTOR')))
-    else:
-        group_qs = None
-    serializer = UserGroupListSerializer(group_qs, many=True)
-    return Response(data=serializer.data, status=status.HTTP_200_OK)
+        group_qs = Group.objects.all()
+        if request.user.is_superuser:
+            group_qs = group_qs
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            group_qs = group_qs
+        elif 'organization' in request.query_params and request.query_params['organization'] != "":
+            userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
+            if not userrole_qs.exists():
+                return Response(data={'message': 'No any user role found in the organization!'}, status=400)
+            group_ids = userrole_qs.values_list('group__id', flat=True)
+            if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+        elif 'project' in request.query_params and request.query_params['project'] != "":
+            project_id=request.query_params['project']
+            userrole_qs = userrole_qs.filter(project__id=project_id)
+            if not userrole_qs.exists():
+                return Response(data={'message': 'No any user role found in the project!'}, status=400)
+            group_id = userrole_qs[0].group.id
+            if group_id == int(env('PROJECT_MANAGER')):
+                group_qs = group_qs.filter(pk__in=[int(env('PROJECT_MANAGER')), int(env('DATA_COLLECTOR'))])
+            elif group_id == int(env('DATA_COLLECTOR')):
+                group_qs = group_qs.filter(pk=int(env('DATA_COLLECTOR')))
+        else:
+            group_qs = None
+        serializer = UserGroupListSerializer(group_qs, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Send email to the user when forgot password button is clicked.'''
 class ForgotPasswordEmailView(APIView):
@@ -736,23 +751,25 @@ class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        old_password = request.data["old_password"]
-        new_password1 = request.data["new_password1"]
-        new_password2 = request.data["new_password2"]
-        '''validating old password'''
-        user = User.active.get(id=request.user.id)
-        check_old_password = user.check_password(old_password)
-        if check_old_password:
-            if new_password1 == new_password2:
-                user.set_password(new_password1)
-                # user.is_password_changed = True
-                user.save()
-                return Response({'message': 'Password Change Succesful!'})
+        try:
+            old_password = request.data["old_password"]
+            new_password1 = request.data["new_password1"]
+            new_password2 = request.data["new_password2"]
+            '''validating old password'''
+            user = User.active.get(id=request.user.id)
+            check_old_password = user.check_password(old_password)
+            if check_old_password:
+                if new_password1 == new_password2:
+                    user.set_password(new_password1)
+                    # user.is_password_changed = True
+                    user.save()
+                    return Response({'message': 'Password Change Succesful!'})
+                else:
+                    return Response({"message": "New passwords don't match!"})
             else:
-                return Response({"message": "New passwords don't match!"})
-        else:
-            return Response({"message": "Your old password is wrong!"})
-
+                return Response({"message": "Your old password is wrong!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''activate/deactivate/delete user role'''
 class UserRoleUpdateView(APIView):
@@ -786,38 +803,41 @@ def set_csrf_token(request):
 '''Landing page'''
 @api_view(['GET'])
 def landing_page(request, *args, **kwargs):
-    userrole_qs = UserRole.active.filter(user__id=request.user.id, active=True)
-    organization_ids = userrole_qs.exclude(organization=None).values_list('organization__id', flat=True).distinct()
-    project_ids = userrole_qs.exclude(project=None).values_list('project__id', flat=True).distinct()
-    group_ids = userrole_qs.values_list('group__id', flat=True).distinct()
-    page, organization, project = '', None, None
-    if request.user.is_superuser:
-        page = '/organizations' #'organization_list'
-    elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
-        page = '/organizations' #'organization_list'
-    elif not organization_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the organization!'}, status=400)
-    elif organization_ids.count() > 1:
-        page = '/organizations' #'organization_list'
-    elif organization_ids.exists() and not project_ids.exists():
-        organization = organization_ids.first()
-        # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
-        page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
-    elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
-    elif project_ids.count() > 1:
-        organization = organization_ids.first()
-        page = f'/organizations/{organization}/projects' #'project_list'
-    else:
-        '''inside_project'''
-        organization = organization_ids.first()
-        project = project_ids.first()
-        page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
-        if int(env('PROJECT_MANAGER')) in group_ids:
-            project_status = Project.active.get(id=project).status
-            if project_status == 'draft':
-                page = f'/organizations/{organization}/project-setup/{project}' # 'project_edit'
-            else:
-                '''change this if required'''
-                page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
-    if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
-    result = {'page': page, 'organization': organization, 'project': project}
-    return Response(data=result, status=200)
+    try:
+        userrole_qs = UserRole.active.filter(user__id=request.user.id, active=True)
+        organization_ids = userrole_qs.exclude(organization=None).values_list('organization__id', flat=True).distinct()
+        project_ids = userrole_qs.exclude(project=None).values_list('project__id', flat=True).distinct()
+        group_ids = userrole_qs.values_list('group__id', flat=True).distinct()
+        page, organization, project = '', None, None
+        if request.user.is_superuser:
+            page = '/organizations' #'organization_list'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            page = '/organizations' #'organization_list'
+        elif not organization_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the organization!'}, status=400)
+        elif organization_ids.count() > 1:
+            page = '/organizations' #'organization_list'
+        elif organization_ids.exists() and not project_ids.exists():
+            organization = organization_ids.first()
+            # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
+            page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
+        elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
+        elif project_ids.count() > 1:
+            organization = organization_ids.first()
+            page = f'/organizations/{organization}/projects' #'project_list'
+        else:
+            '''inside_project'''
+            organization = organization_ids.first()
+            project = project_ids.first()
+            page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+            if int(env('PROJECT_MANAGER')) in group_ids:
+                project_status = Project.active.get(id=project).status
+                if project_status == 'draft':
+                    page = f'/organizations/{organization}/project-setup/{project}' # 'project_edit'
+                else:
+                    '''change this if required'''
+                    page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+        if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
+        result = {'page': page, 'organization': organization, 'project': project}
+        return Response(data=result, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})

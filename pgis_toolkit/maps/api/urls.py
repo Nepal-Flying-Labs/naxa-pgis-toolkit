@@ -59,8 +59,12 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 
 app_name = "projects"
 
+def trigger_error(request):
+    division_by_zero = 1 / 0
+
 urlpatterns = [
     path('', include(router.urls)),
+    path('sentry-debug/', trigger_error),
     # path('project_layers/<int:id>/', project_layers, name='project_layers'),
     path('project_theme_layers/', project_theme_layers, name='project_theme_layers'),
     # path('layer/', LayerAPIView.as_view(), name='layer'),

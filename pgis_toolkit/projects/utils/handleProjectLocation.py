@@ -27,10 +27,15 @@ def handleProjectGeoJSON(project_id):
         my_file = project_obj.file
         file_path = settings.MEDIA_ROOT + '/' + str(my_file).split('/')[0]
         gdf = gpd.read_file(my_file)
-        crs_name = str(gdf.crs.srs)
-        epsg = int(crs_name.replace("epsg:", ""))
-        if epsg is None:
-            epsg = 4326
+        epsg = gdf.crs.to_epsg()
+        utm_zone = gdf.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                clear_dir(file_path)
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted"
+            else:
+                clear_dir(file_path)
+                return "Unknown Coordinate System"
         geometry_type = gdf['geometry'].iloc[0].geom_type
         total_bounds = gdf.total_bounds
         # bound_dict = {"total_bounds": total_bounds.tolist()}
@@ -93,10 +98,15 @@ def handleProjectShapeFile(project_id):
         project_obj.geometry_type = geometry_type
         project_obj.bbox = total_bounds.tolist()
         project_obj.save()
-        crs_name = str(gdf.crs.srs)
-        epsg = int(crs_name.replace("epsg:", ""))
-        if epsg is None:
-            epsg = 4326
+        epsg = gdf.crs.to_epsg()
+        utm_zone = gdf.crs.utm_zone,
+        if epsg != 4326:
+            if utm_zone:
+                clear_dir(file_path)
+                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted"
+            else:
+                clear_dir(file_path)
+                return "Unknown Coordinate System"
         theme_qs = Theme.active.filter(project=project_obj, name='Baseline')
         if theme_qs.exists():
             '''create a layer of project location in baseline theme'''
