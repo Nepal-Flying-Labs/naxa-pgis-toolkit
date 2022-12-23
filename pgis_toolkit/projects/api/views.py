@@ -666,7 +666,7 @@ class LayerTemplateUploadAPIView(APIView):
                             {'errorName': er, 'details': attribute_serializer._errors[er][0]})
                     template_instance.delete()
                     clear_dir(FILE_UPLOAD_DIR)
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': errors})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Layer Template Upload Failed', 'Error': errors})
             clear_dir(FILE_UPLOAD_DIR)
             return Response(status=200, data={'message': "Data successfully uploaded"})
         except Exception as e:
