@@ -360,7 +360,7 @@ import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
 sentry_sdk.init(
-    dsn="https://382ffe6052144366bd4271226e3b3f7e@o4504370595561472.ingest.sentry.io/4504370598051840",
+    dsn=env("SENTRY_DSN", default="https://382ffe6052144366bd4271226e3b3f7e@o4504370595561472.ingest.sentry.io/4504370598051840"),
     integrations=[
         DjangoIntegration(),
     ],
