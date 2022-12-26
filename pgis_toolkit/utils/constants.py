@@ -87,3 +87,11 @@ LAYER_UPLOAD_STATUS = (
     ('successful', _('Successful')),
     ('failed', _('Failure')),
 )
+
+DOCUMENT_FILE_TYPE = (
+    ('doc', _('DOCX')),
+    ('pdf', _('PDF')),
+    ('excel', _('Excel')),
+    ('csv', _('CSV')),
+    ('url', 'URL')
+)
