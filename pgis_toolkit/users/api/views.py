@@ -659,36 +659,56 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
 @api_view(['GET'])
 def user_group_list(request):
     try:
-        if not request.user.is_authenticated:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-        userrole_qs = UserRole.active.filter(user__id=request.user.id)
-        group_ids = userrole_qs.values_list('group__id', flat=True)
-        group_qs = Group.objects.all()
-        if request.user.is_superuser:
-            group_qs = group_qs
-        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
-            group_qs = group_qs
-        elif 'organization' in request.query_params and request.query_params['organization'] != "":
-            userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
-            if not userrole_qs.exists():
-                return Response(data={'message': 'No any user role found in the organization!'}, status=400)
-            group_ids = userrole_qs.values_list('group__id', flat=True)
-            if int(env('ORGANIZATION_ADMIN')) in group_ids:
+        # if not request.user.is_authenticated:
+        #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+        # userrole_qs = UserRole.active.filter(user__id=request.user.id)
+        # group_ids = userrole_qs.values_list('group__id', flat=True)
+        # group_qs = Group.objects.all()
+        # if request.user.is_superuser:
+        #     group_qs = group_qs
+        # elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+        #     group_qs = group_qs
+        # elif 'organization' in request.query_params and request.query_params['organization'] != "":
+        #     userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
+        #     if not userrole_qs.exists():
+        #         return Response(data={'message': 'No any user role found in the organization!'}, status=400)
+        #     group_ids = userrole_qs.values_list('group__id', flat=True)
+        #     if int(env('ORGANIZATION_ADMIN')) in group_ids:
+        #         group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+        # elif 'project' in request.query_params and request.query_params['project'] != "":
+        #     project_id=request.query_params['project']
+        #     userrole_qs = userrole_qs.filter(project__id=project_id)
+        #     if not userrole_qs.exists():
+        #         return Response(data={'message': 'No any user role found in the project!'}, status=400)
+        #     group_id = userrole_qs[0].group.id
+        #     if group_id == int(env('PROJECT_MANAGER')):
+        #         group_qs = group_qs.filter(pk__in=[int(env('PROJECT_MANAGER')), int(env('DATA_COLLECTOR'))])
+        #     elif group_id == int(env('DATA_COLLECTOR')):
+        #         group_qs = group_qs.filter(pk=int(env('DATA_COLLECTOR')))
+        # else:
+        #     group_qs = None
+        # serializer = UserGroupListSerializer(group_qs, many=True)
+            '''checking if the requesting user has a role assigned'''
+            role_qs=UserRole.active.filter(user__id=request.user.id, active=True)
+            if not role_qs.exists():
+                return Response(data={'message': 'No any active role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            group_ids = role_qs.values_list('group', flat=True)
+            group_qs = Group.objects.all()
+
+            project=request.query_params.get('project', None)
+            organization = request.query_params.get('organization', None)
+            if project and Project.active.filter(id=project).exists():
+                '''only project level roles'''
+                group_qs = group_qs.exclude(pk__in=[int(env('PGIS_WEB_APP_ADMINISTRATOR')), int(env('ORGANIZATION_ADMIN'))])
+            elif organization and Organization.active.filter(id=organization).exists():
+                '''organization and project level roles'''
                 group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
-        elif 'project' in request.query_params and request.query_params['project'] != "":
-            project_id=request.query_params['project']
-            userrole_qs = userrole_qs.filter(project__id=project_id)
-            if not userrole_qs.exists():
-                return Response(data={'message': 'No any user role found in the project!'}, status=400)
-            group_id = userrole_qs[0].group.id
-            if group_id == int(env('PROJECT_MANAGER')):
-                group_qs = group_qs.filter(pk__in=[int(env('PROJECT_MANAGER')), int(env('DATA_COLLECTOR'))])
-            elif group_id == int(env('DATA_COLLECTOR')):
-                group_qs = group_qs.filter(pk=int(env('DATA_COLLECTOR')))
-        else:
-            group_qs = None
-        serializer = UserGroupListSerializer(group_qs, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                group_qs = group_qs
+            else:
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+            data = group_qs.values('id', 'name').order_by('-id')
+            return Response(data=data, status=status.HTTP_200_OK)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
