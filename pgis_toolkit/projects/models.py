@@ -229,13 +229,13 @@ class Template(models.Model):
         # app_label = 'projects'
         abstract=True
 
-    def clean(self):
-        """
-        Make sure template name are unique
-        """
-        if LayerTemplate.active.exclude(id=self.id).filter(name=self.name).exists():
-            raise ValidationError(
-                f'Layer template with name {self.name} already exists')
+    # def clean(self):
+    #     """
+    #     Make sure template name are unique
+    #     """
+    #     if LayerTemplate.active.exclude(id=self.id).filter(name=self.name).exists():
+    #         raise ValidationError(
+    #             f'Layer template with name {self.name} already exists')
 
 
 class TemplateAttribute(models.Model):

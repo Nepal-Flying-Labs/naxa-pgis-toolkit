@@ -1641,6 +1641,68 @@ def import_template(request):
             ProjectsLayerTemplate.objects.filter(id__in=project_template_instance_ids).delete()
         return Response(data={'message':str(e)}, status=400)
 
+'''bulk download layer templates'''
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def bulk_template_download(request):
+    #creating directory to save shapefile
+    dir=MEDIA_ROOT + '/template_download/templates/'
+    os.makedirs(dir, exist_ok=True)
+    file_url=None
+    try:
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "params project is missing"})
+        layer_template_qs=ProjectsLayerTemplate.active.filter(project=project, selected=True)
+        if not layer_template_qs:
+            return Response(data={'message': 'No any selected layer templated found!'}, status=400)
+        for layer_template in layer_template_qs:
+            attributes=ProjectsLayerTemplateAttribute.objects.filter(layer_template=layer_template, selected=True)
+            properties={}
+            for attribute in attributes:
+                if attribute.data_type=="str":
+                    properties[attribute.name]='str'
+                elif attribute.data_type=="int":
+                    properties[attribute.name]=f'int:{attribute.length}'
+                elif attribute.data_type=="float":
+                    properties[attribute.name]=f'float:{attribute.length}.{attribute.precision}'
+                elif attribute.data_type=="date":
+                    properties[attribute.name]='date'
+            schema={
+                'geometry':layer_template.geometry_type,
+                'properties':properties
+            }
+            shapefile_path = MEDIA_ROOT + \
+                                f'/template_download/templates/{layer_template.name}.shp'
+            shapefile = fiona.open(shapefile_path, mode='w', driver='ESRI Shapefile',
+            schema = schema, crs = "EPSG:4326")
+            shapefile.close()
+
+        # create a ZipFile
+        templates_zip_name = 'templates.zip'
+        zipfile_path = MEDIA_ROOT + f'/template_download/templates'
+        # files = MEDIA_ROOT + '/template_download/shapefiles/'
+        files = zipfile_path
+        shutil.make_archive(zipfile_path, 'zip', files)
+
+        # defining zip file path
+        file_url = MEDIA_ROOT + \
+            f'/template_download/{templates_zip_name}'
+
+        # downloading zip file
+        zip_file = open(file_url, 'rb')
+        response = HttpResponse(
+            zip_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{templates_zip_name}'
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
 '''GeoJSON API for features.'''
 '''{{baseURL}}api/maps/feature/2/'''
 class FeatureGeoJSONAPIView(APIView):
