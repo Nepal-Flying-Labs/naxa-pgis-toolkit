@@ -957,7 +957,8 @@ def document_download(request):
         if document == 'all':
             pass
         else:
-            document_ids = json.loads(document)
+            document_ids = [int(id) for id in document.split(',')]
+            # document_ids = json.loads(document)
         document_files = Document.active.filter(project=project, id__in=document_ids).values_list('file', flat=True) if document_ids else Document.active.filter(project=project).values_list('file', flat=True)
         files_list = [f'{settings.MEDIA_ROOT}/' + file for file in document_files]
         # create a ZipFile
@@ -994,7 +995,8 @@ def image_download(request):
         if image == 'all':
             pass
         else:
-            image_ids = json.loads(image)
+            image_ids = [int(id) for id in image.split(',')]
+            # image_ids = json.loads(image)
         image_files = Image.objects.filter(project=project, id__in=image_ids).values_list('image', flat=True) if image_ids else Image.objects.filter(project=project).values_list('image', flat=True)
         files_list = [f'{settings.MEDIA_ROOT}/' + file for file in image_files]
         # create a ZipFile
