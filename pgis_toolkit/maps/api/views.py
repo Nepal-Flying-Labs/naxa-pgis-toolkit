@@ -1582,6 +1582,25 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
 
+'''Bulk Update ProjectsTemplateAttribute Selection for Download'''
+@api_view(['POST'])
+def update_template_attributes(request):
+    '''
+    http://0.0.0.0:8000/api/maps/update_template_attributes/
+    '''
+    try:
+        instances=[]
+        for key, value in request.data.items():
+            instance = ProjectsLayerTemplateAttribute.objects.get(id=key)
+            instances += [instance]
+            instance.selected = value
+
+        '''update selection in bulk'''
+        ProjectsLayerTemplateAttribute.objects.bulk_update(instances, ['selected'])
+        return Response({'message': "Selection update succssful"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['POST'])
 @permission_classes([ImportTemplatePermission])
 def import_template(request):
