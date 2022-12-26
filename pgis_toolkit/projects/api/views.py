@@ -392,6 +392,7 @@ class ProjectViewset(viewsets.ModelViewSet):
         try:
             paginator = CustomPageNumberPagination()
             organization_id = request.query_params.get('organization', None)
+            paginate = request.query_params.get('paginate', True)
             # queryset = self.queryset
 
             # '''filter by organization id'''
@@ -465,9 +466,14 @@ class ProjectViewset(viewsets.ModelViewSet):
                         project_ids.append(qs['project'])
                 queryset = queryset.filter(id__in=project_ids)
             '''paginate queryset'''
-            paginated_queryset = paginator.paginate_queryset(queryset, request)
-            serializer = self.get_serializer(paginated_queryset, many=True)
-            return paginator.get_paginated_response(data=serializer.data)
+            if paginate == False or paginate == 'False':
+                # serializer = self.get_serializer(queryset, many=True)
+                data = queryset.values('id', 'name')
+                return Response(data=data, status=400)
+            else:
+                paginated_queryset = paginator.paginate_queryset(queryset, request)
+                serializer = self.get_serializer(paginated_queryset, many=True)
+                return paginator.get_paginated_response(data=serializer.data)
         except Exception as error:
             return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
