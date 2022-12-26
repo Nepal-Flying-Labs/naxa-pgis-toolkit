@@ -469,7 +469,7 @@ class ProjectViewset(viewsets.ModelViewSet):
             if paginate == False or paginate == 'False':
                 # serializer = self.get_serializer(queryset, many=True)
                 data = queryset.values('id', 'name')
-                return Response(data=data, status=400)
+                return Response(data=data, status=200)
             else:
                 paginated_queryset = paginator.paginate_queryset(queryset, request)
                 serializer = self.get_serializer(paginated_queryset, many=True)
