@@ -45,7 +45,7 @@ class StateAdmin (admin.ModelAdmin):
     search_fields = ('id', 'name', 'code')
 
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'project')
+    list_display = ('id', 'name', 'type', 'project')
     search_fields = ('id', 'name')
     list_filter = ('project', 'published_year')
 

@@ -8,6 +8,7 @@ from django.utils.translation import ugettext_lazy as _
 from pgis_toolkit.utils.constants import (
     CURRENT_YEAR,
     DATA_TYPE_CHOICES,
+    DOCUMENT_FILE_TYPE,
     FILE_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
@@ -285,6 +286,7 @@ class Document(IsDeleted, DateTimeStamp):
     published_month = models.CharField(max_length=3, choices=PUBLISHED_MONTH_CHOICES, blank=True, null=True)
     published_day = models.IntegerField(validators=[MaxValueValidator(31), MinValueValidator(1)], blank=True, null=True)
     file = models.FileField(upload_to='documents/files/', blank=True, null=True)
+    type = models.CharField(max_length=20, choices=DOCUMENT_FILE_TYPE, blank=True, null=True)
     url = models.URLField(blank=True, null=True)
 
     class Meta:
