@@ -1582,6 +1582,25 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
 
+'''Bulk Update ProjectsTemplateAttribute Selection for Download'''
+@api_view(['POST'])
+def update_template_attributes(request):
+    '''
+    http://0.0.0.0:8000/api/maps/update_template_attributes/
+    '''
+    try:
+        instances=[]
+        for key, value in request.data.items():
+            instance = ProjectsLayerTemplateAttribute.objects.get(id=key)
+            instances += [instance]
+            instance.selected = value
+
+        '''update selection in bulk'''
+        ProjectsLayerTemplateAttribute.objects.bulk_update(instances, ['selected'])
+        return Response({'message': "Selection update succssful"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['POST'])
 @permission_classes([ImportTemplatePermission])
 def import_template(request):
@@ -1596,22 +1615,30 @@ def import_template(request):
         templates = request.data.get('templates', None)
         if not templates:
             return Response(data={'message': 'templates params is missing!'}, status=status.HTTP_400_BAD_REQUEST)
-        templates_list = json.loads(templates)
-        if not LayerTemplate.objects.filter(id__in=templates_list).exists():
+        if templates == 'all':
+            templates_qs = LayerTemplate.active.all().values('id', 'name', 'geometry_type')
+        else:
+            templates_list = [int(id) for id in templates.split(',')]
+            templates_qs = LayerTemplate.active.filter(id__in=templates_list).values('id', 'name', 'geometry_type')
+            # templates_list = json.loads(templates)
+
+        if not templates_qs.exists():
             return Response(data={'message': 'Template object does not exist for the templates params list.'}, status=status.HTTP_400_BAD_REQUEST)
-        for template in templates_list:
+        project_template_instance_ids = []
+        for template in templates_qs:
             '''retrieving layer template vaulues to clone later'''
-            template_values = LayerTemplate.objects.filter(id=template).values('name', 'geometry_type').first()
-            if ProjectsLayerTemplate.objects.filter(Q(name=template_values['name']) & Q(project=project)).exists():
+            if ProjectsLayerTemplate.objects.filter(Q(name=template['name']) & Q(project=project)).exists():
                 return Response(data={'message': 'Cannot create duplicate template name for a project'}, status=status.HTTP_400_BAD_REQUEST)
                 '''creating project layer template object'''
-            project_template_instance = ProjectsLayerTemplate.objects.create(name=template_values['name'], geometry_type=template_values['geometry_type'], project=project_instance)
-            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            project_template_instance = ProjectsLayerTemplate.objects.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
+            project_template_instance_ids.append(project_template_instance.id)
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
                 ProjectsLayerTemplateAttribute.objects.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
-        return Response(data={'message': f'{templates} Template imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
+        return Response(data={'message': f'Templates imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
     except Exception as e:
-        ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
+        if project_template_instance_ids:
+            ProjectsLayerTemplate.objects.filter(id__in=project_template_instance_ids).delete()
         return Response(data={'message':str(e)}, status=400)
 
 '''GeoJSON API for features.'''

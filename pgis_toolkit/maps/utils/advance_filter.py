@@ -53,22 +53,23 @@ def advance_filter_data(layer_id, field, operator, value):
     elif operator == 6:
         query={"layer" : layer_id, attribute : { "$gte" : value}}
     elif operator == 7:
-        if "%" in value:
-            if value.startswith("%") and value.endswith("%"):
-                value = value.strip("%")
-                value = f'/{value}/'
-                query = {"layer" : layer_id, attribute : value}
-            elif value.startswith("%"):
-                value = value.strip("%")
-                value = f'/{value}$/'
-                query={"layer" : layer_id, attribute : value}
-            elif value.endswith("%"):
-                value = value.strip("%")
-                value = f'/^{value}/'
-                query={"layer" : layer_id, attribute : value}
-            elif not value.startswith("%") and not value.endswith("%"):
-                value = value.split("%")
-                value1='/^'+value[0]+'/'
-                value2='/'+value[1]+'$/'
-                query={"$and" : [{"layer" : layer_id, attribute : value1},{"layer" : layer_id, attribute : value2}]}
+        query = {"layer": layer_id, attribute: {'$regex' : value}}
+        # if "%" in value:
+        #     if value.startswith("%") and value.endswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/{value}/'
+        #         query = {"layer" : layer_id, attribute : value}
+        #     elif value.startswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/{value}$/'
+        #         query={"layer" : layer_id, attribute : value}
+        #     elif value.endswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/^{value}/'
+        #         query={"layer" : layer_id, attribute : value}
+        #     elif not value.startswith("%") and not value.endswith("%"):
+        #         value = value.split("%")
+        #         value1='/^'+value[0]+'/'
+        #         value2='/'+value[1]+'$/'
+        #         query={"$and" : [{"layer" : layer_id, attribute : value1},{"layer" : layer_id, attribute : value2}]}
     return query
