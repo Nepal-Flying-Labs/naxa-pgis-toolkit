@@ -1033,16 +1033,28 @@ class RequestDemoViewset(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_country_choices(request, *args, **kwargs):
-    data = Country.objects.all().values('id', 'name')
+    id = request.query_params.get('id', None)
+    if id:
+        if Country.objects.filter(id=id).exists():
+            data = Country.objects.filter(id=id).values('id', 'name')[0]
+        else:
+            return Response(data={'message': 'Country not found!'}, status=400)
+    else:
+        data = Country.objects.all().values('id', 'name')
     return Response(data=data, status=200)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_state_choices(request, *args, **kwargs):
     country = request.query_params.get('country', None)
-    if country:
-        country_list = json.loads(country)
-        data = State.objects.filter(country__id__in=country_list).values('id', 'name')
+    id = request.query_params.get('id', None)
+    if id:
+        if State.objects.filter(id=id).exists():
+            data = State.objects.filter(id=id).values('id', 'name')[0]
+        else:
+            return Response(data={'message': 'State not found!'}, status=400)
+    elif country:
+        data = State.objects.filter(country=country).values('id', 'name')
     else:
         data = State.objects.all().values('id', 'name')
     return Response(data=data, status=200)
