@@ -1028,8 +1028,8 @@ class AdvanceQueryAPIView(APIView):
                 display_on_map = request.data.get('display_on_map', True)
                 if not name or name == "":
                     return Response(data={'message': "QueryLayer name field is required"}, status=400)
-                if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
-                    return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
+                # if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
+                #     return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
                 query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
                 expressions = json.loads(expr_params)
                 join = ''
@@ -1057,6 +1057,7 @@ class AdvanceQueryAPIView(APIView):
                 feature_coll = MONGO_DB['featurecollections']
                 result = feature_coll.find(query, {"id":1, "_id":0})
                 json_data = json.loads(dumps(result))
+                count = len(json_data)
                 for data in json_data:
                     feature = FeatureCollection.objects.get(id=data['id'])
                     serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
@@ -1069,7 +1070,7 @@ class AdvanceQueryAPIView(APIView):
                                 {'errorName': er, 'details': serializer._errors[er][0]})
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
                 bbox = QueryLayer.objects.get(id=query_layer.id).bbox
-                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
+                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'features_count': count, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
         except Exception as e:
             if query_layer:
                 query_layer.delete()
@@ -1166,16 +1167,21 @@ class LayerFromQueryAPIView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             layer = request.data.get('layer', None)
+            name = request.data.get('name', None)
             if not layer:
                 return Response(data={'message': "layer params is missing!"}, status=400)
+            if not name:
+                return Response(data={'message': 'name params is missing!'}, status=400)
             query_layer_qs = QueryLayer.active.filter(id=layer)
             if query_layer_qs.exists():
                 layer_instance,vector_layer_instance = None, None
                 query_layer = query_layer_qs[0]
+                if Layer.active.filter(theme=query_layer.theme, name=name).exists():
+                    return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
                 query_features = QueryFeatureCollection.active.filter(layer=query_layer)
                 if query_features:
                     try:
-                        layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=query_layer.name, layer_type='Vector',display_on_map=True)
+                        layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
                     except Exception as e:
                         return Response(data={'message': str(e)}, status=400)
                     vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
