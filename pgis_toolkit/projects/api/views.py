@@ -814,7 +814,7 @@ class ImageViewset(viewsets.ModelViewSet):
 
     def get_queryset(self, *args, **kwargs):
         try:
-            queryset=Image.objects.all()
+            queryset=Image.objects.all().order_by('-id')
             project = self.request.query_params.get('project', None)
             if project:
                 queryset=queryset.filter(project=project)
@@ -915,7 +915,7 @@ class DocumentViewset(viewsets.ModelViewSet):
             project = request.query_params.get('project', None)
             if not project:
                 return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = self.queryset.filter(project__id=project)
+            queryset = self.queryset.filter(project__id=project).order_by('-id')
             search_key = request.query_params.get('search_key', None)
             if search_key:
                 queryset = queryset.filter(name__icontains=search_key)
