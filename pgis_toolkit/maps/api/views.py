@@ -1061,7 +1061,6 @@ class AdvanceQueryAPIView(APIView):
                 feature_ids = ()
                 for data in json_data:
                     feature_ids = feature_ids + (data['id'],)
-                print(feature_ids, "is feature_ids")
                 # for data in json_data:
                 #     feature = FeatureCollection.objects.get(id=data['id'])
                 #     serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
@@ -1073,22 +1072,29 @@ class AdvanceQueryAPIView(APIView):
                 #             errors.append(
                 #                 {'errorName': er, 'details': serializer._errors[er][0]})
                 #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
-                bbox = QueryLayer.objects.get(id=query_layer.id).bbox
-                from django.db import connection
+                # bbox = QueryLayer.objects.get(id=query_layer.id).bbox
                 try:
+                    import re
+
+                    from django.contrib.gis.geos import GEOSGeometry
+                    from django.db import connection
                     with connection.cursor() as cursor:
-                        # raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
-                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}"
+                        raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
                         cursor = connection.cursor()
-                        # cursor.execute(raw_query)
-                        # cursor = connection.cursor()
-                        bbox_query = f"(SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        cursor.execute(raw_query)
+                        bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
+                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #slower
                         cursor.execute(bbox_query)
-                        print(cursor, 'is cursor')
+                        #result[0] takes the form: 'BOX(85.4090132495848 27.66365506380353,85.51751110375923 27.717172880622645)'
                         result = cursor.fetchone()
-                        print(result, "is result")
+                        result =result[0][4:-1]
+                        result = re.split(" |,", result)
+                        bbox = [float(data) for data in result]
+                        # bbox = GEOSGeometry(result[0]).extent
                 except Exception as e:
                     return Response(data={'message': str(e)}, status=400)
+                query_layer.bbox = bbox
+                query_layer.save()
                 return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'features_count': count, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
         except Exception as e:
             if query_layer:
