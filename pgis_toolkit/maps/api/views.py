@@ -1058,18 +1058,29 @@ class AdvanceQueryAPIView(APIView):
                 result = feature_coll.find(query, {"id":1, "_id":0})
                 json_data = json.loads(dumps(result))
                 count = len(json_data)
-                for data in json_data:
-                    feature = FeatureCollection.objects.get(id=data['id'])
-                    serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
-                    if serializer.is_valid():
-                        created_obj=serializer.save()
-                        feature_ids.append(created_obj.id)
-                    else:
-                        for er in serializer._errors:
-                            errors.append(
-                                {'errorName': er, 'details': serializer._errors[er][0]})
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+                feature_ids=list(json_data.values())
+                print(feature_ids, "is feature_ids")
+                # for data in json_data:
+                #     feature = FeatureCollection.objects.get(id=data['id'])
+                #     serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
+                #     if serializer.is_valid():
+                #         created_obj=serializer.save()
+                #         feature_ids.append(created_obj.id)
+                #     else:
+                #         for er in serializer._errors:
+                #             errors.append(
+                #                 {'errorName': er, 'details': serializer._errors[er][0]})
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
                 bbox = QueryLayer.objects.get(id=query_layer.id).bbox
+                from django.db import connection
+                try:
+                    with connection.cursor() as cursor:
+                        # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
+                        raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        cursor = connection.cursor()
+                        cursor.execute(raw_query)
+                except Exception as e:
+                    return Response(data={'message': str(e)}, status=400)
                 return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'features_count': count, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
         except Exception as e:
             if query_layer:
