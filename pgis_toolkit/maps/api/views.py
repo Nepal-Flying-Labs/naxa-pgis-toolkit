@@ -1058,7 +1058,9 @@ class AdvanceQueryAPIView(APIView):
                 result = feature_coll.find(query, {"id":1, "_id":0})
                 json_data = json.loads(dumps(result))
                 count = len(json_data)
-                feature_ids=list(json_data.values())
+                feature_ids = ()
+                for data in json_data:
+                    feature_ids = feature_ids + (data['id'],)
                 print(feature_ids, "is feature_ids")
                 # for data in json_data:
                 #     feature = FeatureCollection.objects.get(id=data['id'])
@@ -1075,10 +1077,16 @@ class AdvanceQueryAPIView(APIView):
                 from django.db import connection
                 try:
                     with connection.cursor() as cursor:
-                        # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
-                        raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        # raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}"
                         cursor = connection.cursor()
-                        cursor.execute(raw_query)
+                        # cursor.execute(raw_query)
+                        # cursor = connection.cursor()
+                        bbox_query = f"(SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        cursor.execute(bbox_query)
+                        print(cursor, 'is cursor')
+                        result = cursor.fetchone()
+                        print(result, "is result")
                 except Exception as e:
                     return Response(data={'message': str(e)}, status=400)
                 return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'features_count': count, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
