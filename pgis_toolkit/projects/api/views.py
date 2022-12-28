@@ -1036,7 +1036,7 @@ def get_country_choices(request, *args, **kwargs):
     id = request.query_params.get('id', None)
     if id:
         if Country.objects.filter(id=id).exists():
-            data = Country.objects.filter(id=id).values('id', 'name')[0]
+            data = Country.objects.filter(id=id).values('id', 'name')
         else:
             return Response(data={'message': 'Country not found!'}, status=400)
     else:
@@ -1050,7 +1050,7 @@ def get_state_choices(request, *args, **kwargs):
     id = request.query_params.get('id', None)
     if id:
         if State.objects.filter(id=id).exists():
-            data = State.objects.filter(id=id).values('id', 'name')[0]
+            data = State.objects.filter(id=id).values('id', 'name')
         else:
             return Response(data={'message': 'State not found!'}, status=400)
     elif country:
