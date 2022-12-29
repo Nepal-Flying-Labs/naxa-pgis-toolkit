@@ -40,6 +40,7 @@ from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from .serializers import (
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    RequestingUserSerializer,
     UserDetailSerializer,
     UserGroupListSerializer,
     UserGroupPermissionsSerializer,
@@ -551,7 +552,7 @@ class RequestUserDetailAPIView(APIView):
             user_instance = request.user
             if not user_instance:
                 return Response(data={'message': 'Not logged in!'}, status=400)
-            serializer = UserDetailSerializer(user_instance)
+            serializer = RequestingUserSerializer(user_instance)
             return Response(data=serializer.data, status=200)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})

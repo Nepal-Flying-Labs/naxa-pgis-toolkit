@@ -47,6 +47,33 @@ class UserDetailSerializer(serializers.ModelSerializer):
         representation['role'] = role
         return representation
 
+class RequestingUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ('password', 'user_permissions', 'groups', 'email_verification_token', 'is_staff', 'is_superuser')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        role_qs = UserRole.active.filter(user=instance, active=True).exclude(group=None).distinct()
+        role_ids= role_qs.values_list('group', flat=True)
+        role_names = role_qs.values_list('group__name', flat=True)
+
+        if instance.is_superuser:
+            role = 'Super Admin'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in role_ids:
+            role= 'PGIS Web App Administrator'
+        elif int(env('ORGANIZATION_ADMIN')) in role_ids:
+            role = 'Organization Admin'
+        elif int(env('PROJECT_MANAGER')) in role_ids:
+            role = 'Project Manager'
+        elif int(env('DATA_COLLECTOR')) in role_ids:
+            role = 'Data Collector'
+        else:
+            role = ''
+        representation['role'] = role
+        representation['roles'] = role_names
+        return representation
+
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()
     class Meta:
