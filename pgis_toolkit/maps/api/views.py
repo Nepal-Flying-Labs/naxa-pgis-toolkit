@@ -1030,7 +1030,6 @@ class AdvanceQueryAPIView(APIView):
                     return Response(data={'message': "QueryLayer name field is required"}, status=400)
                 # if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
                 #     return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
-                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
                 expressions = json.loads(expr_params)
                 join = ''
                 query={}
@@ -1058,9 +1057,19 @@ class AdvanceQueryAPIView(APIView):
                 result = feature_coll.find(query, {"id":1, "_id":0})
                 json_data = json.loads(dumps(result))
                 count = len(json_data)
-                feature_ids = ()
-                for data in json_data:
-                    feature_ids = feature_ids + (data['id'],)
+                if count == 0:
+                    return Response (data={'features_count': 0}, status=200)
+                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
+                if count == 1:
+                    feature_ids = json_data[0]['id']
+                    raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id = {feature_ids})"
+                    bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id = {feature_ids}" #faster
+                else:
+                    feature_ids = ()
+                    for data in json_data:
+                        feature_ids = feature_ids + (data['id'],)
+                    raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                    bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
                 # for data in json_data:
                 #     feature = FeatureCollection.objects.get(id=data['id'])
                 #     serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
@@ -1079,11 +1088,11 @@ class AdvanceQueryAPIView(APIView):
                     from django.contrib.gis.geos import GEOSGeometry
                     from django.db import connection
                     with connection.cursor() as cursor:
-                        raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        # raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        # bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
+                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #slower
                         cursor = connection.cursor()
                         cursor.execute(raw_query)
-                        bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
-                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #slower
                         cursor.execute(bbox_query)
                         #result[0] takes the form: 'BOX(85.4090132495848 27.66365506380353,85.51751110375923 27.717172880622645)'
                         result = cursor.fetchone()
