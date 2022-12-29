@@ -194,6 +194,25 @@ class PreliminaryUserAPIView(APIView):
                 project_instance.delete()
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+    '''expire/delete user invitation'''
+    def patch(self, request, pk, *args, **kwargs):
+        try:
+            errors=[]
+            if not PreliminaryUser.objects.filter(pk=pk).exists():
+                return Response(data={'message': 'Preliminary instance not found!'}, status=status.HTTP_400_BAD_REQUEST)
+            instance = PreliminaryUser.objects.get(pk=pk)
+            serializer = PreliminaryUserSerializer(instance, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {"errorName": er, "details": serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
     '''http://localhost:8000/api/users/preliminary_user_verify?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
