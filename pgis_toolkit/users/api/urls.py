@@ -32,6 +32,7 @@ urlpatterns = [
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
     path('myprofile/', RequestUserDetailAPIView.as_view(), name='requesting_user_profile'),
     path('preliminary_user_create/', PreliminaryUserAPIView.as_view(), name='preliminary_user_create'),
+    path('preliminary_user/<int:pk>/', PreliminaryUserAPIView.as_view(), name='preliminary_user'),
     path('preliminary_user_verify/', PreliminaryUserVerificationAPIView.as_view(), name='preliminary_user_verify'),
     path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify'),
     path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),

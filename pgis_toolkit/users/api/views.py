@@ -105,13 +105,6 @@ class PreliminaryUserAPIView(APIView):
                 '''creating organization object'''
                 organization_instance = Organization.active.create(name=organization_name[0])
                 request.data['organization'] = organization_instance.id
-                # '''checking if group exists already'''
-                # if Group.objects.filter(name='Organization Admin').exists():
-                #     request.data['group'] = Group.objects.get(name='Organization Admin').id
-                # else:
-                #     '''creating new group object'''
-                #     group_instance = Group.objects.create(name='Organization Admin')
-                #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
             elif project_name:
                 email_proj_name=project_name[0]
@@ -126,23 +119,16 @@ class PreliminaryUserAPIView(APIView):
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
                 request.data['project'] = project_instance.id
-                # '''checking if group exists already'''
-                # if Group.objects.filter(name='Project Manager').exists():
-                #     request.data['group'] = Group.objects.get(name='Project Manager').id
-                # else:
-                #     '''creating new group object'''
-                #     group_instance = Group.objects.create(name='Project Manager')
-                #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('PROJECT_MANAGER'))
             else:
                 '''checking for already existing organization and projects'''
                 if not group or not Group.objects.filter(id=group).exists():
                     return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                 if int(group) == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-                    request.data.pop('organization', None)
-                    request.data.pop('project', None)
+                    request.data['organization'] = None
+                    request.data['project'] = None
                 elif int(group) == int(env('ORGANIZATION_ADMIN')):
-                    request.data.pop('project', None)
+                    request.data['project'] = None
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
                     email_org_name = Organization.active.get(id=int(organization)).name
@@ -155,10 +141,10 @@ class PreliminaryUserAPIView(APIView):
             '''create multiple or single preliminary user instances'''
 
             # created_object_list = []
-            if PreliminaryUser.active.filter(status='Pending', email__in=email_list).exists():
-                # return Response(data={'message': 'Preliminary User instance for the email already exists!'}, status=400)
-                raise Exception('Preliminary User instance for the email already exists!')
             for email in email_list:
+                if PreliminaryUser.active.filter(status='Pending', email=email, organization=request.data['organization'], project=request.data['project'], group=request.data['group']).exists():
+                    role = Group.objects.get(id=request.data['group']).name
+                    raise Exception(f'Invitation as {role} for the email: {email} already exists.')
                 request.data['email'] = email
                 request.data['email_verification_token'] = uuid.uuid4()
                 serializer = PreliminaryUserSerializer(data=request.data)
@@ -208,6 +194,25 @@ class PreliminaryUserAPIView(APIView):
                 project_instance.delete()
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+    '''expire/delete user invitation'''
+    def patch(self, request, pk, *args, **kwargs):
+        try:
+            errors=[]
+            if not PreliminaryUser.objects.filter(pk=pk).exists():
+                return Response(data={'message': 'Preliminary instance not found!'}, status=status.HTTP_400_BAD_REQUEST)
+            instance = PreliminaryUser.objects.get(pk=pk)
+            serializer = PreliminaryUserSerializer(instance, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {"errorName": er, "details": serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
     '''http://localhost:8000/api/users/preliminary_user_verify?token=cd72216e-a08d-456f-a72c-8f91ca9ca61c'''
@@ -237,7 +242,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
                 elif data_dict['organization']:
                     user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
@@ -267,6 +272,7 @@ class PreliminaryUserVerificationAPIView(APIView):
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
+'''NOT IN USE'''
 '''User Invitation Table'''
 class UserInvitationAPIView(APIView):
     permission_classes = [IsAuthenticated]
