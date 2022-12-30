@@ -106,6 +106,7 @@ class PreliminaryUserAPIView(APIView):
                 organization_instance = Organization.active.create(name=organization_name[0])
                 request.data['organization'] = organization_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
+                request.data['project'] = None
             elif project_name:
                 email_proj_name=project_name[0]
                 # project_name = request.data.pop('project_name', None)
@@ -252,7 +253,7 @@ class PreliminaryUserVerificationAPIView(APIView):
                         group_name=Group.objects.get(id=group_id).name
                         '''delete PreliminaryUserInstance once the job is done'''
                         preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
