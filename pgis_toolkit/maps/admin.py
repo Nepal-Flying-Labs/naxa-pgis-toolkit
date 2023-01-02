@@ -17,10 +17,15 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('id', 'name')
 
+def change_layer_upload_status_to_successful(modeladmin, request, queryset):
+    queryset.update(upload_status='successful')
+change_layer_upload_status_to_successful.short_description = 'Change Upload Status to Successful'
+
 class LayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'order','name','group', 'layer_type', 'is_osm_layer')
     search_fields = ('id', 'name')
     list_filter = ('layer_type', 'default_load', 'is_osm_layer')
+    actions = [change_layer_upload_status_to_successful]
 
 class LayerFileAdmin(admin.ModelAdmin):
     list_display=('id','file','layer')
