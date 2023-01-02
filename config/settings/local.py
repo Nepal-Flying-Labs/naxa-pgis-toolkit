@@ -74,11 +74,18 @@ CELERY_TIMEZONE = 'CET'
 CELERY_TASK_ROUTES = {
     # 'core.tasks.add': {'queue': 'pccims'},
     'pgis_toolkit.users.tasks.check_token_expiration': {'queue': 'default'},
+    'pgis_toolkit.maps.tasks.delete_query_layers': {'queue': 'default'},
+
 }
 
 CELERY_BEAT_SCHEDULE = {
     'check_token_expiration': {
         'task': 'pgis_toolkit.users.tasks.check_token_expiration',
+        'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
+        'options': {'queue': 'default'}
+    },
+    'delete_query_layers': {
+        'task': 'pgis_toolkit.maps.tasks.delete_query_layers',
         'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
         'options': {'queue': 'default'}
     },
