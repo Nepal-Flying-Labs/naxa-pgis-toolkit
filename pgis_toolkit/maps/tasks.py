@@ -52,6 +52,7 @@ def UploadVectorLayer(layer_id,request_data):
     errors=[]
     dir = MEDIA_ROOT+"/geofiles/"
     try:
+        layer = Layer.active.get(id=layer_id)
         layer_file_instance=None
         tries=1
         while tries<3:
@@ -60,6 +61,8 @@ def UploadVectorLayer(layer_id,request_data):
                 break
             time.sleep(3)
         if not layer_file_instance:
+            layer.upload_status='failed'
+            layer.save()
             return 'Error Occured from UploadVectorLayer: couldnot save/extract upoaded file', None
 
         '''Knowing file extension'''
@@ -81,16 +84,18 @@ def UploadVectorLayer(layer_id,request_data):
             response = handleGPX(layer_id)
         else:
             clear_dir(dir)
+            layer.upload_status='failed'
+            layer.save()
             return 'Error Occured: Invalid file extension', None
 
         clear_dir(dir)
         if response=="successful":
-            layer = Layer.active.get(id=layer_id)
+            # layer = Layer.active.get(id=layer_id)
             layer.upload_status='successful'
             layer.save()
             return "successful", layer_id
         else:
-            layer = Layer.active.get(id=layer_id)
+            # layer = Layer.active.get(id=layer_id)
             layer.upload_status='failed'
             layer.save()
             # Layer.objects.filter(id=layer_id).delete()
@@ -226,6 +231,8 @@ def UploadRasterLayer(layer_id, request_dict):
         if raster_layer_serializer.is_valid():
             raster_layer_serializer.save()
         else:
+            layer_instance.upload_status='failed'
+            layer_instance.save()
             for er in raster_layer_serializer._errors:
                 errors.append(
                     {'errorName': er, 'details': raster_layer_serializer._errors[er][0]})
@@ -262,13 +269,15 @@ def UploadRasterLayer(layer_id, request_dict):
             '''clearing the uploaded file directory'''
         dir = MEDIA_ROOT + '/geofiles'
         clear_dir(dir)
+        layer_instance.upload_status='successful'
+        layer_instance.save()
         return "successful", layer_id
     except Exception as e:
         # layer_instance.delete()
         # layer_file_instance.delete()
         return str(e), None
 
-@shared_task(max_retries=1, soft_time_limit=8000)
+# @shared_task(max_retries=1, soft_time_limit=8000)
 def UpdateRasterLayer(layer_id, request_dict):
     from django.core.files import File
 
@@ -296,10 +305,12 @@ def UpdateRasterLayer(layer_id, request_dict):
                 path=sld_path, workspace=raster_layer_instance.geoserver_workspace)
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
-            return "successful", layer_id
-        return "successful", layer_id
+            # return "successful", layer_id
+            return "successful"
+        return "successful"
     except Exception as e:
-        return str(e), None
+        # return str(e),
+        return str(e)
 
 def UploadWMSLayer(layer_id, request_dict):
     if 'url' in request_dict.keys() and request_dict['url'] != "":

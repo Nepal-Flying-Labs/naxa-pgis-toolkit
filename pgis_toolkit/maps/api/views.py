@@ -567,10 +567,22 @@ class LayerViewSet(viewsets.ModelViewSet):
                         Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
                     request_dict.pop('file')
+                    '''wait untils the layer instance is created'''
+                    iterate=True
+                    while iterate:
+                        if Layer.objects.filter(id=created_object.id).exists():
+                            # layer_instane=Layer.objects.get(id=created_object.id)
+                            iterate=False
+                        else:
+                            print("sleeep time")
+                            time.sleep(3)
+
+                    print("reached here123")
                     response = UploadRasterLayer.delay(created_object.id, request_dict)
+                    CeleryTask.objects.create(layer_id=created_object.id, task_id=response.task_id)
                     # return Response(response)
                     return Response(status=200,
-                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id, 'layer_id': created_object.id})
 
                 elif layer_type == "WMS":
                     '''handle WMS layer upload'''
@@ -628,12 +640,19 @@ class LayerViewSet(viewsets.ModelViewSet):
 
                     '''handle Vector layer update'''
                 elif layer_type == "Raster":
-                    is_working=get_celery_worker_status()
-                    if not is_working=="working":
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
-                    response = UpdateRasterLayer.delay(pk, request_dict)
-                    return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
-                    '''handle Vector layer upload'''
+                        # is_working=get_celery_worker_status()
+                        # if not is_working=="working":
+                        #     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        # response = UpdateRasterLayer.delay(pk, request_dict)
+                        # return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
+                        response = UpdateRasterLayer(pk, request_dict)
+                        if response=="successful":
+                            data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']}
+                            return Response(data=data,status=200)
+                        else:
+                            return Response(data={'message': response},status=status.HTTP_400_BAD_REQUEST)
+
+                        '''handle Vector layer upload'''
                 elif layer_type == "WMS":
                     if 'url' in request_keys and request_dict['url'] != "":
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
@@ -641,7 +660,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance.save()
                         if layer_instance.group:
                             group_id = layer_instance.group.id
-                    return Response(data={'message':"success","id":serializer.data['id'], "group":group_id},status=200)
+                    return Response(data={'message':"successful","id":serializer.data['id'], "group":group_id},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
