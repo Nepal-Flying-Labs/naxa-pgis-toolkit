@@ -482,3 +482,16 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))
         return (str(e), 400)
+
+@shared_task(bind=True, max_retries=3, soft_time_limit=800)
+def delete_query_layers(self):
+    try:
+        print('****deleting query layers and query_feature_collection of more than 24 hours from uploaded date****')
+        from datetime import datetime, timedelta, timezone
+
+        from pgis_toolkit.maps.models import QueryFeatureCollection, QueryLayer
+        current_datetime = datetime.now().replace(tzinfo=timezone.utc)
+        threshold = current_datetime - timedelta(days=1)
+        QueryLayer.active.filter(uploaded_date__lt=threshold).delete()
+    except Exception as e:
+        return("Query Layer Delete Task fail, error: " + str(e))

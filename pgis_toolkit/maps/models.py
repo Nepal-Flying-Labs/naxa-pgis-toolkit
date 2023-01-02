@@ -486,35 +486,35 @@ class QueryFeatureCollection(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
-    def save(self, *args, **kwargs):
-        '''Update bbox of QueryFeatureCollection'''
-        try:
-            if self.geometry:
-                if self.geometry.geom_type=="Point":
-                    coords=self.geometry.coords
-                    feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
-                else:
-                    feature_bbox = self.geometry.extent
+    # def save(self, *args, **kwargs):
+    #     '''Update bbox of QueryFeatureCollection'''
+    #     try:
+    #         if self.geometry:
+    #             if self.geometry.geom_type=="Point":
+    #                 coords=self.geometry.coords
+    #                 feature_bbox =[coords[0],coords[1],coords[0],coords[1]]
+    #             else:
+    #                 feature_bbox = self.geometry.extent
 
-                layer_instance=QueryLayer.active.get(id=self.layer.id)
-                layer_bbox= layer_instance.bbox
+    #             layer_instance=QueryLayer.active.get(id=self.layer.id)
+    #             layer_bbox= layer_instance.bbox
 
-                if layer_bbox and feature_bbox:
-                    if feature_bbox[0]<layer_bbox[0]:
-                        layer_bbox[0]=feature_bbox[0]
+    #             if layer_bbox and feature_bbox:
+    #                 if feature_bbox[0]<layer_bbox[0]:
+    #                     layer_bbox[0]=feature_bbox[0]
 
-                    if feature_bbox[1]<layer_bbox[1]:
-                        layer_bbox[1]=feature_bbox[1]
+    #                 if feature_bbox[1]<layer_bbox[1]:
+    #                     layer_bbox[1]=feature_bbox[1]
 
-                    if feature_bbox[2]>layer_bbox[2]:
-                        layer_bbox[2]=feature_bbox[2]
+    #                 if feature_bbox[2]>layer_bbox[2]:
+    #                     layer_bbox[2]=feature_bbox[2]
 
-                    if feature_bbox[3]>layer_bbox[3]:
-                        layer_bbox[3]=feature_bbox[3]
+    #                 if feature_bbox[3]>layer_bbox[3]:
+    #                     layer_bbox[3]=feature_bbox[3]
 
-                elif feature_bbox:
-                    layer_instance.bbox=list(feature_bbox)
-                layer_instance.save()
-        except Exception as e:
-            print(f'error in def save of QueryFeatureCollection: {str(e)}')
-        super(QueryFeatureCollection, self).save(*args, **kwargs)
+    #             elif feature_bbox:
+    #                 layer_instance.bbox=list(feature_bbox)
+    #             layer_instance.save()
+    #     except Exception as e:
+    #         print(f'error in def save of QueryFeatureCollection: {str(e)}')
+    #     super(QueryFeatureCollection, self).save(*args, **kwargs)

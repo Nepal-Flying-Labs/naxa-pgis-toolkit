@@ -117,7 +117,7 @@ class CeleryTaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'task_id')
 
 class QueryLayerAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'theme', 'group', 'geom_type', 'display_on_map', 'source')
+    list_display = ('id', 'name', 'theme', 'group', 'geom_type', 'display_on_map', 'source', 'uploaded_date')
 
 class QueryFeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer')
