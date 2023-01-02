@@ -1202,20 +1202,24 @@ class LayerFromQueryAPIView(APIView):
         try:
             layer = request.data.get('layer', None)
             name = request.data.get('name', None)
+            theme = request.data.get('theme', None)
             if not layer:
                 return Response(data={'message': "layer params is missing!"}, status=400)
             if not name:
                 return Response(data={'message': 'name params is missing!'}, status=400)
+            if not theme:
+                return Response(data={'message': 'theme params is missing!'}, status=400)
             query_layer_qs = QueryLayer.active.filter(id=layer)
             if query_layer_qs.exists():
                 layer_instance,vector_layer_instance = None, None
                 query_layer = query_layer_qs[0]
-                if Layer.active.filter(theme=query_layer.theme, name=name).exists():
+                theme = Theme.objects.get(id=theme)
+                if Layer.active.filter(theme=theme, name=name).exists():
                     return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
                 query_features = QueryFeatureCollection.active.filter(layer=query_layer)
                 if query_features:
                     try:
-                        layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
+                        layer_instance = Layer.active.create(theme=theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
                     except Exception as e:
                         return Response(data={'message': str(e)}, status=400)
                     vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
@@ -1241,7 +1245,8 @@ class LayerFromQueryAPIView(APIView):
                     for field in field_list:
                         attribute_objs.append(LayerAttribute(layer=layer_instance, name=field))
                     LayerAttribute.objects.bulk_create(attribute_objs)
-
+                    layer_instance.upload_status = 'successful'
+                    layer_instance.save()
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
 
                 else:
