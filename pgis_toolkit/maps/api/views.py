@@ -1662,7 +1662,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         request_keys = request_dict.keys()
         project_layer_template_attribute = ProjectsLayerTemplateAttribute.objects.get(pk=pk)
         if 'layer_template' in request_keys and request_dict['layer_template'] != "":
-            layer_template = request_dict['templayer_templatelate']
+            layer_template = request_dict['layer_template']
         else:
             layer_template = project_layer_template_attribute.layer_template.id
         if 'name' in request_keys and request_dict['name'] != "":
