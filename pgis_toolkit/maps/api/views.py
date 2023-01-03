@@ -355,6 +355,22 @@ def project_theme_layers(request):
                         layer_item['bbox'] = []
                         layer_item['geom'] = ''
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
+                elif layer['layer_type']=='Raster':
+                    raster_layer = RasterLayer.objects.filter(layer=layer['id'])
+                    if raster_layer.exists():
+                        layer_item['geoserver_workspace'] = raster_layer[0].geoserver_workspace
+                        layer_item['geoserver_layer_name'] = raster_layer[0].geoserver_layer_name
+                    else:
+                        layer_item['geoserver_workspace'] = ''
+                        layer_item['geoserver_layer_name'] = ''
+
+                elif layer['layer_type']=='WMS':
+                    wms_layer = WMSLayer.objects.filter(layer=layer['id']).values('url')
+                    if wms_layer.exists():
+                        layer_item['url'] = wms_layer[0]['url']
+                    else:
+                        layer_item['url'] = ''
+
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
@@ -393,6 +409,21 @@ def project_theme_layers(request):
                     layer_item['geom_type'] = ''
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
+            elif layer['layer_type']=='Raster':
+                raster_layer = RasterLayer.objects.filter(layer=layer['id'])
+                if raster_layer.exists():
+                    layer_item['geoserver_workspace'] = raster_layer[0].geoserver_workspace
+                    layer_item['geoserver_layer_name'] = raster_layer[0].geoserver_layer_name
+                else:
+                    layer_item['geoserver_workspace'] = ''
+                    layer_item['geoserver_layer_name'] = ''
+
+            elif layer['layer_type']=='WMS':
+                wms_layer = WMSLayer.objects.filter(layer=layer['id']).values('url')
+                if wms_layer.exists():
+                    layer_item['url'] = wms_layer[0]['url']
+                else:
+                    layer_item['url'] = ''
             options.append(layer_item)
         return Response(options,status=200)
     except Exception as e:
