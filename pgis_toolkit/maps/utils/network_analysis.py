@@ -66,3 +66,6 @@ def generate_routes(origin_long, origin_lat, destination_long, destination_lat, 
             Analysis.objects.get(id=analysis_id).delete()
         print("error occured in generate_routes: " + str(e))
         return (str(e), 400)
+
+def service_area_analysis():
+    pass

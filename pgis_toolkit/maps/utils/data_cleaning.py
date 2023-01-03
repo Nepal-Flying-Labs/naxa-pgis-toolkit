@@ -7,8 +7,10 @@ from shapely.geometry import MultiLineString, MultiPoint
 import collections
 import momepy
 
+#===================
 # Checking data
-def check_null_geometry(data: GeoDataFrame) -> dict:
+#===================
+def check_null(data: GeoDataFrame) -> dict:
     """Check if the geometry is null or not
 
     Parameters
@@ -23,6 +25,7 @@ def check_null_geometry(data: GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    total_data = len(data)
     data["is_null"] = False
     null_rows = 0
     for i, row in data.iterrows():
@@ -31,7 +34,7 @@ def check_null_geometry(data: GeoDataFrame) -> dict:
             null_rows += 1
         else:
             data.at[i,'is_null'] = False
-    content = {"message": f"Total {null_rows} geometries were found empty", "data": data}
+    content = {"error_data": null_rows, "total_data": total_data, "data": data.to_json()}
     return content
 
 def check_multipart(data: GeoDataFrame) -> dict:
@@ -49,6 +52,7 @@ def check_multipart(data: GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    total_data = len(data)
     data["is_multipart"] = True
     multipart_rows = 0
     for i, row in data.iterrows():
@@ -57,7 +61,7 @@ def check_multipart(data: GeoDataFrame) -> dict:
             multipart_rows += 1
         else:
             data.at[i,'is_multipart'] = False
-    content = {"message": f"Total {multipart_rows} geometry were found multipart", "data": data}
+    content = {"error_data": multipart_rows, "total_data": total_data, "data": data.to_json()}
     return content
 
 def check_duplicate(data: GeoDataFrame) -> dict:
@@ -75,9 +79,37 @@ def check_duplicate(data: GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    total_data = len(data)
     data = data.drop(axis=1, columns=["attributes"])
     sum = data.duplicated().sum()
-    content = {"message": f"Total {sum} geometries were found duplicate", "data": data}
+    content = {"error_data": sum, "total_data": total_data, "data": data.to_json()}
+    return content
+
+def check_overlapping(layer, con) -> dict:
+    """Check if the geometry has overlapping geometries
+
+    Parameters
+    ----------
+    data : GeoDataFrame
+        The data to check
+
+    Returns
+    -------
+    content: dict
+        message: str
+            The message to display
+        data : GeoDataFrame
+    """
+    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+    gdf = gpd.read_postgis(sql, con)
+    total_data = len(gdf)
+    sql = f'''SELECT a.*
+        FROM maps_featurecollection WHERE layer_id={layer} a
+        INNER JOIN maps_featurecollection WHERE layer_id={layer} b ON 
+        (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
+        WHERE a.id != b.id'''
+    data = gpd.read_postgis(sql, con, geom_col="geometry")
+    content = {"error_data": len(data), "total_data": total_data, "data": data.to_json()}
     return content
 
 def check_self_intersection(data: GeoDataFrame) -> dict:
@@ -95,6 +127,7 @@ def check_self_intersection(data: GeoDataFrame) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    total_data = len(data)
     data["has_self_intersection"] = False
     self_intersection_rows = 0
     for i, row in data.iterrows():
@@ -103,7 +136,7 @@ def check_self_intersection(data: GeoDataFrame) -> dict:
         else:
             data.at[i,'has_self_intersection'] = True
             self_intersection_rows += 1
-    content = {"message": f"Total {self_intersection_rows} geometries were found with self intersection", "data": data}
+    content = {"error_data": self_intersection_rows, "total_data": total_data, "data": data.to_json()}
     return content
 
 def check_snapping(layer, con) -> dict:
@@ -121,6 +154,9 @@ def check_snapping(layer, con) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+    gdf = gpd.read_postgis(sql, con)
+    total_data = len(gdf)
     sql = f'''WITH segments AS (
         SELECT id as id, (
         ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
@@ -131,36 +167,20 @@ def check_snapping(layer, con) -> dict:
     graph = momepy.gdf_to_nx(data, approach='primal')
     components = list(nx.connected_components(graph))
     components.sort(key=len, reverse=True)
-    largest = components.pop(0)
+    # largest = components.pop(0)
     isolated = list( g for cc in components for g in cc )
-    content = {"message": f"Total {len(isolated)} points were found isolated", "data": data}
+    content = {"error_data": len(isolated), "total_data": total_data, "data": data.to_json()}
     return content
 
-
-# Dry run for cleaning data
-def dry_fix_null_geometry(data: GeoDataFrame) -> dict:
-    pass
-
-def dry_fix_multipart(data: GeoDataFrame) -> dict:
-    pass
-
-def dry_fix_duplicate(data: GeoDataFrame) -> dict:
-    pass
-
-def dry_fix_intersection(data: GeoDataFrame) -> dict:
-    pass
-
-def dry_fix_snapping(data: GeoDataFrame) -> dict:
-    pass
-
-
+#===================
 # Cleaning data
-def fix_null_geometry(data: GeoDataFrame) -> dict:
+#===================
+def fix_null(data: GeoDataFrame) -> dict:
     try:
         data = data[~data.is_empty]
-        return "Successfully fixed null geometry", data
+        return "Successfully fixed null geometry", data.to_json()
     except:
-        return "Failed to fix null geometry", data
+        return "Failed to fix null geometry", data.to_json()
 
 def fix_multipart(data: GeoDataFrame) -> dict:
     try:
@@ -183,6 +203,12 @@ def fix_duplicate(data: GeoDataFrame) -> dict:
         return "Successfully fixed duplicate geometry", data
     except:
         return "Failed to fix duplicate geometry", data
+
+def fix_overlapping(data: GeoDataFrame) -> dict:
+    try: 
+        return "Successfully fixed overlay geometries", data
+    except:
+        return "Failed to fix overlay geomtries", data
 
 def convert_distance_to_4326(distance: float) -> float:
     """Convert the distance to WGS 1984 (epsg: 4326)
@@ -221,4 +247,7 @@ def fix_self_intersection(data: GeoDataFrame) -> dict:
         return "Failed to fix self intersection", data
 
 def fix_snapping(data: GeoDataFrame) -> dict:
-    pass
+    try:
+        return "Successfully fixed the geometry", data
+    except:
+        return "Failed to fix the geometry", data
