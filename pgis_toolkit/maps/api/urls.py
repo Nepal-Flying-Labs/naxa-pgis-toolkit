@@ -27,12 +27,9 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     buffer_distance,
     bulk_template_download,
     category,
-    check_layer,
     data_buffer,
     delete_sequence,
-    dry_fix_layer,
     feature_popup,
-    fix_layer,
     get_analysis_task_response,
     get_data_merge_update_task_response,
     get_layer_upload_task_response,
@@ -41,6 +38,26 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     project_theme_layers,
     reorder,
     update_template_attributes,
+    check_layer,
+    check_null_geometry,
+    check_multipart_geometry,
+    check_duplicate_geometry,
+    check_overlapping_geometry,
+    check_self_intersecting_geometry,
+    check_isolated_geometry,
+    fix_layer,
+    fix_null_geometry,
+    fix_multipart_geometry,
+    fix_duplicate_geometry,
+    fix_overlay_geometry,
+    fix_self_intersecting_geometry,
+    fix_isolated_geometry,
+    buffer_distance,
+    buffer_column,
+    data_buffer,
+    optimum_path_analysis,
+    service_area_analysis,
+    closest_path_analysis,
 )
 
 router = DefaultRouter()
@@ -57,6 +74,34 @@ router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer att
 router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
 
 app_name = "projects"
+
+data_clean_urls = [
+    # Check Layers api
+    path('check_layer/', check_layer, name='check_layer'),
+    path('check_null_geometry/', check_null_geometry, name='check_null_geometry'),
+    path('check_multipart_geometry/', check_multipart_geometry, name='check_multipart_geometry'),
+    path('check_duplicate_geometry/', check_duplicate_geometry, name='check_duplicate_geometry'),
+    path('check_overlapping_geometry/', check_overlapping_geometry, name='check_overlapping_geometry'),
+    path('check_self_intersecting_geometry/', check_self_intersecting_geometry, name='check_self_intersecting_geometry'),
+    path('check_isolated_geometry/', check_isolated_geometry, name='check_isolated_geometry'),
+    # Fix Layers api
+    path('fix_layer/', fix_layer, name='fix_layer'),
+    path('fix_null_geometry/', fix_null_geometry, name='fix_null_geometry'),
+    path('fix_multipart_geometry/', fix_multipart_geometry, name='fix_multipart_geometry'),
+    path('fix_duplicate_geometry/', fix_duplicate_geometry, name='fix_duplicate_geometry'),
+    path('fix_overlay_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
+    path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
+    path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
+]
+
+data_analysis_urls = [
+    path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
+    path('buffer_by_column/', buffer_column, name="buffer_by_column"),
+    path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
+    path('optimum_path_analysis/', optimum_path_analysis, name="optimum_path_analysis"),
+    path('service_area_analysis/', service_area_analysis, name="service_area_analysis"),
+    path('closest_path_analysis/', closest_path_analysis, name="closest_path_analysis")
+]
 
 def trigger_error(request):
     division_by_zero = 1 / 0
@@ -85,14 +130,8 @@ urlpatterns = [
     path('feature_popup/', feature_popup, name='feature_popup'),
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
-    path('check_layer/', check_layer, name='check_layer'),
-    path('dry_fix_layer/', dry_fix_layer, name="dry_fix_layer"),
-    path('fix_layer/', fix_layer, name='fix_layer'),
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
     path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
     path('category/', category, name='category'),
     path('delete_sequence/', delete_sequence, name='delete_sequence'),
-    path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
-    path('buffer_by_column/', buffer_column, name="buffer_by_column"),
-    path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
-]
+] + data_clean_urls + data_analysis_urls

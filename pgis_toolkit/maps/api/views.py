@@ -93,11 +93,18 @@ from pgis_toolkit.maps.utils.buffer_analysis import (
     find_data_within_buffer,
 )
 from pgis_toolkit.maps.utils.data_cleaning import (
-    check_duplicate,
+    check_null,
     check_multipart,
-    check_null_geometry,
+    check_duplicate,
+    check_overlapping,
     check_self_intersection,
     check_snapping,
+    fix_null,
+    fix_multipart,
+    fix_duplicate,
+    fix_overlapping,
+    fix_self_intersection,
+    fix_snapping
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
@@ -135,6 +142,12 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
+)
+
+from pgis_toolkit.maps.utils.buffer_analysis import (
+    buffer_by_distance,
+    buffer_by_column_value,
+    find_data_within_buffer,
 )
 
 User = get_user_model()
@@ -2194,6 +2207,9 @@ def category(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
 
+# DB Connection
+db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+con = create_engine(db_connection_url)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2204,11 +2220,9 @@ def check_layer(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-            con = create_engine(db_connection_url)
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            null_check = check_null_geometry(gdf)
+            null_check = check_null(gdf)
             multipart_check = check_multipart(gdf)
             duplicate_check = check_duplicate(gdf)
             intersection_check = check_self_intersection(gdf)
@@ -2221,14 +2235,107 @@ def check_layer(request, *args, **kwargs):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def dry_fix_layer(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    if not layer:
-        return Response(data={'message': 'layer params is missing!'}, status=400)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        pass
-    return Response(data={"message": "Dry Run"}, status=200)
+def check_null_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = check_null(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_multipart_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = check_multipart(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_duplicate_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = check_duplicate(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_overlapping_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            content = check_overlapping(layer, con)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_self_intersecting_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = check_self_intersection(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_isolated_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            content = check_snapping(layer, con)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2240,6 +2347,114 @@ def fix_layer(request, *args, **kwargs):
     if layer_qs.exists():
         pass
     return Response(data={"message": "Fixed Layer"}, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_null_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_null(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_multipart_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_multipart(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_duplicate_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_duplicate(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_overlay_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_overlapping(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_self_intersecting_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_self_intersection(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def fix_isolated_geometry(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            content = fix_snapping(gdf)
+            return Response(content)
+        else:
+            return Response(data={'messages': ["Data does not exists"]}, status=200)
+    except Exception as e:
+        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2314,4 +2529,31 @@ def data_buffer(request, *args, **kwargs):
             layers_qs.append(gdf)
         data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
         return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
+    return Response(data={'message': "Data does not exists"}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def optimum_path_analysis(request, *args, **kwargs):
+    layer = request.query_params.get('layer', None)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        return Response(data={'message': "Successfull"}, status=200)
+    return Response(data={'message': "Data does not exists"}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def service_area_analysis(request, *args, **kwargs):
+    layer = request.query_params.get('layer', None)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        return Response(data={'message': "Successfull"}, status=200)
+    return Response(data={'message': "Data does not exists"}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def closest_path_analysis(request, *args, **kwargs):
+    layer = request.query_params.get('layer', None)
+    layer_qs = Vectorlayer.objects.filter(layer=layer)
+    if layer_qs.exists():
+        return Response(data={'message': "Successfull"}, status=200)
     return Response(data={'message': "Data does not exists"}, status=400)
