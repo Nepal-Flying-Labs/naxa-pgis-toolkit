@@ -595,6 +595,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                             errors.append(
                                 {'errorName': er, 'details': wms_serializer._errors[er][0]})
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+                    created_object.upload_status='successful'
+                    created_object.save()
                     return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
                 else:
                     Layer.objects.get(id=created_object.id).delete()
