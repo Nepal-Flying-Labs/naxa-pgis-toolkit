@@ -201,7 +201,7 @@ class ImagePermission(BasePermission):
             elif action=="create":
                 project_id = request.data.get('project')
                 organization_id = Project.active.get(id=project_id).organization.id
-            elif action in ["retrieve", "partial_update"]:
+            elif action in ["retrieve", "partial_update", "destory"]:
                 image_id = request.resolver_match.kwargs.get('pk')
                 project_id = Image.objects.get(id=image_id).project.id
                 organization_id = Project.active.get(id=project_id).organization.id
