@@ -396,10 +396,6 @@ def project_theme_layers(request):
                     # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
 
-                icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
-                layer_item['icon']=icon
-                layer_item['std_icon']=std_icon
-                layer_item['style']=style
                 vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
@@ -687,13 +683,13 @@ class LayerViewSet(viewsets.ModelViewSet):
 
                         '''handle Vector layer upload'''
                 elif layer_type == "WMS":
+                    wms_instance = WMSLayer.objects.get(layer__id=pk)
                     if 'url' in request_keys and request_dict['url'] != "":
-                        wms_instance = WMSLayer.objects.get(layer__id=pk)
                         wms_instance.url = request_dict['url']
                         wms_instance.save()
-                        if layer_instance.group:
-                            group_id = layer_instance.group.id
-                    return Response(data={'message':"successful","id":serializer.data['id'], "group":group_id},status=200)
+                        # if layer_instance.group:
+                        #     group_id = layer_instance.group.id
+                    return Response(data={'message':"successful", "id":serializer.data['id'], "group":serializer.data['group'], "theme": serializer.data['theme'], "url": wms_instance.url},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
