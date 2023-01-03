@@ -47,6 +47,33 @@ class UserDetailSerializer(serializers.ModelSerializer):
         representation['role'] = role
         return representation
 
+class RequestingUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ('password', 'user_permissions', 'groups', 'email_verification_token', 'is_staff', 'is_superuser')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        role_qs = UserRole.active.filter(user=instance, active=True).exclude(group=None).distinct()
+        role_ids= role_qs.values_list('group', flat=True)
+        role_names = role_qs.values_list('group__name', flat=True)
+
+        if instance.is_superuser:
+            role = 'Super Admin'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in role_ids:
+            role= 'PGIS Web App Administrator'
+        elif int(env('ORGANIZATION_ADMIN')) in role_ids:
+            role = 'Organization Admin'
+        elif int(env('PROJECT_MANAGER')) in role_ids:
+            role = 'Project Manager'
+        elif int(env('DATA_COLLECTOR')) in role_ids:
+            role = 'Data Collector'
+        else:
+            role = ''
+        representation['role'] = role
+        representation['roles'] = role_names
+        return representation
+
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()
     class Meta:
@@ -67,6 +94,7 @@ class UserListSerializer(serializers.ModelSerializer):
         representation['project'] = instance.project.name if instance.project else None
         representation['group'] = instance.group.name if instance.group else None
         representation['active'] = instance.active
+        representation['status'] = None
         return representation
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
@@ -75,21 +103,36 @@ class PreliminaryUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PreliminaryUserListSerializer(serializers.ModelSerializer):
-    organization = serializers.SerializerMethodField()
-    project = serializers.SerializerMethodField()
-    group = serializers.SerializerMethodField()
+    # organization = serializers.SerializerMethodField()
+    # project = serializers.SerializerMethodField()
+    # group = serializers.SerializerMethodField()
     class Meta:
         model = PreliminaryUser
-        fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        # fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        fields = ('id',)
 
-    def get_organization(self, instance):
-        return instance.organization.name if instance.organization else None
 
-    def get_project(self, instance):
-        return instance.project.name if instance.project else None
+    # def get_organization(self, instance):
+    #     return instance.organization.name if instance.organization else None
 
-    def get_group(self, instance):
-        return instance.group.name if instance.group else None
+    # def get_project(self, instance):
+    #     return instance.project.name if instance.project else None
+
+    # def get_group(self, instance):
+    #     return instance.group.name if instance.group else None
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['user_id'] = None
+        representation['full_name'] = None
+        representation['image_thumbnail'] = None
+        representation['contact'] = None
+        representation['email'] = instance.email
+        representation['organization'] = instance.organization.name if instance.organization else None
+        representation['project'] = instance.project.name if instance.project else None
+        representation['group'] = instance.group.name if instance.group else None
+        representation['active'] = None
+        representation['status'] = instance.status
+        return representation
 
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:

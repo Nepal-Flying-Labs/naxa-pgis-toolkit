@@ -8,6 +8,7 @@ from functools import reduce
 import fiona
 import geopandas
 import pandas
+import pandas as pd
 from bson.json_util import dumps, loads
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
@@ -31,7 +32,6 @@ from rest_framework_simplejwt.tokens import AccessToken
 from sequences import get_next_value
 from sequences.models import Sequence
 from sqlalchemy import create_engine
-import pandas as pd
 
 from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
@@ -87,6 +87,11 @@ from pgis_toolkit.maps.tasks import (
     handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
+from pgis_toolkit.maps.utils.buffer_analysis import (
+    buffer_by_column_value,
+    buffer_by_distance,
+    find_data_within_buffer,
+)
 from pgis_toolkit.maps.utils.data_cleaning import (
     check_null,
     check_multipart,
@@ -176,12 +181,15 @@ class ProjectStyleViewset(viewsets.ModelViewSet):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
     def list(self, request, *args, **kwargs):
-        project = request.query_params.get('project', None)
-        if not project:
-            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        self.queryset = self.filter_queryset(self.queryset)
-        serializer = self.get_serializer(self.queryset, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        try:
+            project = request.query_params.get('project', None)
+            if not project:
+                return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            self.queryset = self.filter_queryset(self.queryset)
+            serializer = self.get_serializer(self.queryset, many=True)
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 class LayerAttributeViewset(viewsets.ModelViewSet):
     '''
@@ -360,6 +368,22 @@ def project_theme_layers(request):
                         layer_item['bbox'] = []
                         layer_item['geom'] = ''
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
+                elif layer['layer_type']=='Raster':
+                    raster_layer = RasterLayer.objects.filter(layer=layer['id'])
+                    if raster_layer.exists():
+                        layer_item['geoserver_workspace'] = raster_layer[0].geoserver_workspace
+                        layer_item['geoserver_layer_name'] = raster_layer[0].geoserver_layer_name
+                    else:
+                        layer_item['geoserver_workspace'] = ''
+                        layer_item['geoserver_layer_name'] = ''
+
+                elif layer['layer_type']=='WMS':
+                    wms_layer = WMSLayer.objects.filter(layer=layer['id']).values('url')
+                    if wms_layer.exists():
+                        layer_item['url'] = wms_layer[0]['url']
+                    else:
+                        layer_item['url'] = ''
+
                 group_layer_list.append(layer_item)
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
@@ -398,10 +422,25 @@ def project_theme_layers(request):
                     layer_item['geom_type'] = ''
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
+            elif layer['layer_type']=='Raster':
+                raster_layer = RasterLayer.objects.filter(layer=layer['id'])
+                if raster_layer.exists():
+                    layer_item['geoserver_workspace'] = raster_layer[0].geoserver_workspace
+                    layer_item['geoserver_layer_name'] = raster_layer[0].geoserver_layer_name
+                else:
+                    layer_item['geoserver_workspace'] = ''
+                    layer_item['geoserver_layer_name'] = ''
+
+            elif layer['layer_type']=='WMS':
+                wms_layer = WMSLayer.objects.filter(layer=layer['id']).values('url')
+                if wms_layer.exists():
+                    layer_item['url'] = wms_layer[0]['url']
+                else:
+                    layer_item['url'] = ''
             options.append(layer_item)
         return Response(options,status=200)
     except Exception as e:
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 class LayerViewSet(viewsets.ModelViewSet):
     queryset = Layer.active.all()
@@ -459,7 +498,7 @@ class LayerViewSet(viewsets.ModelViewSet):
             # return paginator.get_paginated_response(data=paginated_queryset)
             return Response(data=layer_qs, status=200)
         except Exception as e:
-            return Response(data={'error': str(e)}, status=400)
+            return Response(data={'message': str(e)}, status=400)
 
     def retrieve(self, request, pk=None):
 
@@ -470,9 +509,9 @@ class LayerViewSet(viewsets.ModelViewSet):
         # print(Group.objects.get(id=2).permissions.all().first().codename,"requestsssssssssssssssssssssss")
         try:
             if not pk:
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "pk is missing"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "pk is missing"})
             if not Layer.active.filter(pk=pk).exists():
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "Layer does not exists"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "Layer does not exists"})
 
             # layer_instance = self.get_object(pk)
             layer_instance = Layer.active.get(pk=pk)
@@ -505,7 +544,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                     results[key]=wms_layer_instance.__dict__[key]
             return Response(results,status=200)
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occurred', 'error': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def create(self, request, *args, **kwargs):
         errors=[]
@@ -534,14 +573,14 @@ class LayerViewSet(viewsets.ModelViewSet):
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
                         Layer.objects.get(id=created_object.id).delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
                     '''handle Vector layer upload'''
                     if 'file' in request.FILES and request.FILES.get('file') != "":
                         layer_file_instance = LayerFile.objects.create(
                             file=request.FILES['file'],layer=created_object)
                     else:
                         Layer.objects.filter(id=created_object.id).delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "File is missing"})
                     request_dict.pop('file')
                     '''wait untils the layer instance is created'''
                     iterate=True
@@ -572,10 +611,22 @@ class LayerViewSet(viewsets.ModelViewSet):
                         Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'error occured', 'error': "File is missing"})
                     request_dict.pop('file')
+                    '''wait untils the layer instance is created'''
+                    iterate=True
+                    while iterate:
+                        if Layer.objects.filter(id=created_object.id).exists():
+                            # layer_instane=Layer.objects.get(id=created_object.id)
+                            iterate=False
+                        else:
+                            print("sleeep time")
+                            time.sleep(3)
+
+                    print("reached here123")
                     response = UploadRasterLayer.delay(created_object.id, request_dict)
+                    CeleryTask.objects.create(layer_id=created_object.id, task_id=response.task_id)
                     # return Response(response)
                     return Response(status=200,
-                                    data={'message': 'Uploading Data', 'task_id': response.task_id})
+                                    data={'message': 'Uploading Data', 'task_id': response.task_id, 'layer_id': created_object.id})
 
                 elif layer_type == "WMS":
                     '''handle WMS layer upload'''
@@ -587,7 +638,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                         for er in wms_serializer._errors:
                             errors.append(
                                 {'errorName': er, 'details': wms_serializer._errors[er][0]})
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+                    created_object.upload_status='successful'
+                    created_object.save()
                     return Response(data={'message': 'Layer Created', 'data': serializer.data}, status=status.HTTP_201_CREATED)
                 else:
                     Layer.objects.get(id=created_object.id).delete()
@@ -597,10 +650,9 @@ class LayerViewSet(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def partial_update(self, request, pk=None):
         errors=[]
@@ -634,12 +686,19 @@ class LayerViewSet(viewsets.ModelViewSet):
 
                     '''handle Vector layer update'''
                 elif layer_type == "Raster":
-                    is_working=get_celery_worker_status()
-                    if not is_working=="working":
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
-                    response = UpdateRasterLayer.delay(pk, request_dict)
-                    return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
-                    '''handle Vector layer upload'''
+                        # is_working=get_celery_worker_status()
+                        # if not is_working=="working":
+                        #     return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                        # response = UpdateRasterLayer.delay(pk, request_dict)
+                        # return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
+                        response = UpdateRasterLayer(pk, request_dict)
+                        if response=="successful":
+                            data={'message':response,"id":serializer.data['id'],'theme':serializer.data['theme'], "group": serializer.data['group']}
+                            return Response(data=data,status=200)
+                        else:
+                            return Response(data={'message': response},status=status.HTTP_400_BAD_REQUEST)
+
+                        '''handle Vector layer upload'''
                 elif layer_type == "WMS":
                     if 'url' in request_keys and request_dict['url'] != "":
                         wms_instance = WMSLayer.objects.get(layer__id=pk)
@@ -647,17 +706,16 @@ class LayerViewSet(viewsets.ModelViewSet):
                         wms_instance.save()
                         if layer_instance.group:
                             group_id = layer_instance.group.id
-                    return Response(data={'message':"success","id":serializer.data['id'], "group":group_id},status=200)
+                    return Response(data={'message':"successful","id":serializer.data['id'], "group":group_id},status=200)
                 else:
                     return Response(data={'message': 'Invalid Layer Type. Choices are: Vector, Raster and WMS'},status=status.HTTP_400_BAD_REQUEST)
             else:
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -678,8 +736,8 @@ class LayerViewSet(viewsets.ModelViewSet):
                 WMSLayer.objects.filter(layer=instance).delete()
 
         except Http404:
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'Message': 'Not Found'})
-        return Response(status=status.HTTP_200_OK, data={'Message': 'Layer Data deleted'})
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+        return Response(status=status.HTTP_200_OK, data={'message': 'Layer Data deleted'})
 
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
@@ -760,10 +818,9 @@ class SubLayerViewset(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 
 # @api_view(['GET'])
@@ -875,33 +932,35 @@ class ThemeViewset(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
-        errors = []
-        request_dict = request.data
-        request_keys = request_dict.keys()
-        theme_instance = Theme.active.get(pk=pk)
-        if 'project' in request_keys and request_dict['project'] != "":
-            project = request_dict['project']
-        else:
-            project = theme_instance.project.id
-        if 'name' in request_keys and request_dict['name'] != "":
-            name = request_dict['name']
-            if Theme.active.exclude(id=pk).filter(Q(project__id=project) & Q(name=name)).exists():
-                return Response(data={'message': 'Cannot create duplicate theme name for the project.'},status=status.HTTP_400_BAD_REQUEST)
-        serializer = self.get_serializer(theme_instance, request_dict, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
-        else:
-            for er in serializer._errors:
-                errors.append(
-                    {'errorName': er, 'details': serializer._errors[er][0]})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+        try:
+            errors = []
+            request_dict = request.data
+            request_keys = request_dict.keys()
+            theme_instance = Theme.active.get(pk=pk)
+            if 'project' in request_keys and request_dict['project'] != "":
+                project = request_dict['project']
+            else:
+                project = theme_instance.project.id
+            if 'name' in request_keys and request_dict['name'] != "":
+                name = request_dict['name']
+                if Theme.active.exclude(id=pk).filter(Q(project__id=project) & Q(name=name)).exists():
+                    return Response(data={'message': 'Cannot create duplicate theme name for the project.'},status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(theme_instance, request_dict, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data={'message': 'Success', 'data': serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def list(self, request, *args, **kwargs):
         project = request.query_params.get('project', None)
@@ -947,10 +1006,10 @@ def reorder(request):
         if request.data:
             response=reorder_item(table,request.data)
             if not response=="successful":
-                return Response(data={'message': 'error occured','error':response}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': "successful"}, status=200)
     except Exception as e:
-        return Response(data={'message': 'error occured','error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LayerVectorTileQuerySet(LayerMVTView, DetailView):
@@ -1016,7 +1075,7 @@ class AdvanceQueryAPIView(APIView):
             else:
                 return Response(data={'message': 'layer or field params is missing!'}, status=400)
         except Exception as e:
-            return Response(data=str(e), status=400)
+            return Response(data={'message': str(e)}, status=400)
 
     def post(self, request, *args, **kwargs):
         try:
@@ -1034,9 +1093,8 @@ class AdvanceQueryAPIView(APIView):
                 display_on_map = request.data.get('display_on_map', True)
                 if not name or name == "":
                     return Response(data={'message': "QueryLayer name field is required"}, status=400)
-                if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
-                    return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
-                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
+                # if QueryLayer.active.filter(name=name, theme=layer.theme).exists():
+                #     return Response(data={'message': 'QueryLayer name cannot be duplicate.'}, status=400)
                 expressions = json.loads(expr_params)
                 join = ''
                 query={}
@@ -1063,25 +1121,61 @@ class AdvanceQueryAPIView(APIView):
                 feature_coll = MONGO_DB['featurecollections']
                 result = feature_coll.find(query, {"id":1, "_id":0})
                 json_data = json.loads(dumps(result))
-                for data in json_data:
-                    feature = FeatureCollection.objects.get(id=data['id'])
-                    serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
-                    if serializer.is_valid():
-                        created_obj=serializer.save()
-                        feature_ids.append(created_obj.id)
-                    else:
-                        for er in serializer._errors:
-                            errors.append(
-                                {'errorName': er, 'details': serializer._errors[er][0]})
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
-                bbox = QueryLayer.objects.get(id=query_layer.id).bbox
-                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
+                count = len(json_data)
+                if count == 0:
+                    return Response (data={'features_count': 0}, status=200)
+                query_layer = QueryLayer.objects.create(name=name, display_on_map=display_on_map, theme=layer.theme, group=layer.group, source=layer.source, geom_type=vector_layer.geom_type)
+                if count == 1:
+                    feature_ids = json_data[0]['id']
+                    raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id = {feature_ids})"
+                    bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id = {feature_ids}" #faster
+                else:
+                    feature_ids = ()
+                    for data in json_data:
+                        feature_ids = feature_ids + (data['id'],)
+                    raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                    bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
+                # for data in json_data:
+                #     feature = FeatureCollection.objects.get(id=data['id'])
+                #     serializer = QueryFeatureCollectionSerializer(data={'layer':query_layer.id, 'attributes':feature.attributes, 'geometry':feature.geometry})
+                #     if serializer.is_valid():
+                #         created_obj=serializer.save()
+                #         feature_ids.append(created_obj.id)
+                #     else:
+                #         for er in serializer._errors:
+                #             errors.append(
+                #                 {'errorName': er, 'details': serializer._errors[er][0]})
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+                # bbox = QueryLayer.objects.get(id=query_layer.id).bbox
+                try:
+                    import re
+
+                    from django.contrib.gis.geos import GEOSGeometry
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        # raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
+                        # bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
+                        # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #slower
+                        cursor = connection.cursor()
+                        cursor.execute(raw_query)
+                        cursor.execute(bbox_query)
+                        #result[0] takes the form: 'BOX(85.4090132495848 27.66365506380353,85.51751110375923 27.717172880622645)'
+                        result = cursor.fetchone()
+                        result =result[0][4:-1]
+                        result = re.split(" |,", result)
+                        bbox = [float(data) for data in result]
+                        # bbox = GEOSGeometry(result[0]).extent
+                except Exception as e:
+                    return Response(data={'message': str(e)}, status=400)
+                query_layer.bbox = bbox
+                query_layer.save()
+                return Response(data={'id': query_layer.id, 'name': query_layer.name, 'display_on_map': query_layer.display_on_map, 'bbox': bbox, 'geom_type': query_layer.geom_type, 'features_count': count, 'icon': "", 'std_icon': '', 'style': {}}, status=200)
         except Exception as e:
             if query_layer:
                 query_layer.delete()
             if feature_ids:
                 QueryFeatureCollection.active.filter(id__in=feature_ids).delete()
-            return Response(data=str(e), status=400)
+            return Response(data={'message': str(e)}, status=400)
 
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
@@ -1172,18 +1266,27 @@ class LayerFromQueryAPIView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             layer = request.data.get('layer', None)
+            name = request.data.get('name', None)
+            theme = request.data.get('theme', None)
             if not layer:
                 return Response(data={'message': "layer params is missing!"}, status=400)
+            if not name:
+                return Response(data={'message': 'name params is missing!'}, status=400)
+            if not theme:
+                return Response(data={'message': 'theme params is missing!'}, status=400)
             query_layer_qs = QueryLayer.active.filter(id=layer)
             if query_layer_qs.exists():
                 layer_instance,vector_layer_instance = None, None
                 query_layer = query_layer_qs[0]
+                theme = Theme.objects.get(id=theme)
+                if Layer.active.filter(theme=theme, name=name).exists():
+                    return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
                 query_features = QueryFeatureCollection.active.filter(layer=query_layer)
                 if query_features:
                     try:
-                        layer_instance = Layer.active.create(theme=query_layer.theme, group=query_layer.group, name=query_layer.name, layer_type='Vector',display_on_map=True)
+                        layer_instance = Layer.active.create(theme=theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
                     except Exception as e:
-                        return Response(data={'message': 'Layer object could not be created!', 'detail':str(e)}, status=400)
+                        return Response(data={'message': str(e)}, status=400)
                     vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
                     vector_layer_instance.bbox=query_layer.bbox
                     vector_layer_instance.geom_type=query_layer.geom_type
@@ -1199,7 +1302,7 @@ class LayerFromQueryAPIView(APIView):
                     except Exception as e:
                         if layer_instance: layer_instance.delete()
                         if vector_layer_instance: vector_layer_instance.delete()
-                        return Response(data={'message': 'Raw Query execution failed!', 'detail':str(e)}, status=400)
+                        return Response(data={'message': str(e)}, status=400)
 
                     '''create Layer attributes as well'''
                     attribute_objs = []
@@ -1207,7 +1310,8 @@ class LayerFromQueryAPIView(APIView):
                     for field in field_list:
                         attribute_objs.append(LayerAttribute(layer=layer_instance, name=field))
                     LayerAttribute.objects.bulk_create(attribute_objs)
-
+                    layer_instance.upload_status = 'successful'
+                    layer_instance.save()
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
 
                 else:
@@ -1311,7 +1415,7 @@ def layer_download(request):
         return response
     except Exception as e:
         clear_dir(dir)
-        return Response(status=404, data={'Error': str(e)})
+        return Response(status=404, data={'message': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
@@ -1394,10 +1498,9 @@ class LayerGroupViewset(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         errors = []
@@ -1420,7 +1523,7 @@ class LayerGroupViewset(viewsets.ModelViewSet):
             for er in serializer._errors:
                 errors.append(
                     {'errorName': er, 'details': serializer._errors[er][0]})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
 
     def list(self, request, *args, **kwargs):
         theme = request.query_params.get('theme', None)
@@ -1480,10 +1583,9 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''
@@ -1509,7 +1611,7 @@ class ProjectLayerTemplateViewset(viewsets.ModelViewSet):
             for er in serializer._errors:
                 errors.append(
                     {'errorName': er, 'details': serializer._errors[er][0]})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
 
 class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     '''
@@ -1560,10 +1662,9 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
-            errors.append({'errorName': str(e), 'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': str(e)})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''
@@ -1589,7 +1690,26 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
             for er in serializer._errors:
                 errors.append(
                     {'errorName': er, 'details': serializer._errors[er][0]})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+
+'''Bulk Update ProjectsTemplateAttribute Selection for Download'''
+@api_view(['POST'])
+def update_template_attributes(request):
+    '''
+    http://0.0.0.0:8000/api/maps/update_template_attributes/
+    '''
+    try:
+        instances=[]
+        for key, value in request.data.items():
+            instance = ProjectsLayerTemplateAttribute.objects.get(id=key)
+            instances += [instance]
+            instance.selected = value
+
+        '''update selection in bulk'''
+        ProjectsLayerTemplateAttribute.objects.bulk_update(instances, ['selected'])
+        return Response({'message': "Selection update succssful"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([ImportTemplatePermission])
@@ -1605,23 +1725,93 @@ def import_template(request):
         templates = request.data.get('templates', None)
         if not templates:
             return Response(data={'message': 'templates params is missing!'}, status=status.HTTP_400_BAD_REQUEST)
-        templates_list = json.loads(templates)
-        if not LayerTemplate.objects.filter(id__in=templates_list).exists():
+        if templates == 'all':
+            templates_qs = LayerTemplate.active.all().values('id', 'name', 'geometry_type')
+        else:
+            templates_list = [int(id) for id in templates.split(',')]
+            templates_qs = LayerTemplate.active.filter(id__in=templates_list).values('id', 'name', 'geometry_type')
+            # templates_list = json.loads(templates)
+
+        if not templates_qs.exists():
             return Response(data={'message': 'Template object does not exist for the templates params list.'}, status=status.HTTP_400_BAD_REQUEST)
-        for template in templates_list:
+        project_template_instance_ids = []
+        for template in templates_qs:
             '''retrieving layer template vaulues to clone later'''
-            template_values = LayerTemplate.objects.filter(id=template).values('name', 'geometry_type').first()
-            if ProjectsLayerTemplate.objects.filter(Q(name=template_values['name']) & Q(project=project)).exists():
+            if ProjectsLayerTemplate.objects.filter(Q(name=template['name']) & Q(project=project)).exists():
                 return Response(data={'message': 'Cannot create duplicate template name for a project'}, status=status.HTTP_400_BAD_REQUEST)
                 '''creating project layer template object'''
-            project_template_instance = ProjectsLayerTemplate.objects.create(name=template_values['name'], geometry_type=template_values['geometry_type'], project=project_instance)
-            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            project_template_instance = ProjectsLayerTemplate.objects.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
+            project_template_instance_ids.append(project_template_instance.id)
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
                 ProjectsLayerTemplateAttribute.objects.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
-        return Response(data={'message': f'{templates} Template imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
+        return Response(data={'message': f'Templates imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
     except Exception as e:
-        ProjectsLayerTemplate.objects.get(id=project_template_instance.id).delete()
-        return Response(data='Error: '+str(e))
+        if project_template_instance_ids:
+            ProjectsLayerTemplate.objects.filter(id__in=project_template_instance_ids).delete()
+        return Response(data={'message':str(e)}, status=400)
+
+'''bulk download layer templates'''
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def bulk_template_download(request):
+    #creating directory to save shapefile
+    dir=MEDIA_ROOT + '/template_download/templates/'
+    os.makedirs(dir, exist_ok=True)
+    file_url=None
+    try:
+        project = request.query_params.get('project', None)
+        if not project:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "params project is missing"})
+        layer_template_qs=ProjectsLayerTemplate.active.filter(project=project, selected=True)
+        if not layer_template_qs:
+            return Response(data={'message': 'No any selected layer templated found!'}, status=400)
+        for layer_template in layer_template_qs:
+            attributes=ProjectsLayerTemplateAttribute.objects.filter(layer_template=layer_template, selected=True)
+            properties={}
+            for attribute in attributes:
+                if attribute.data_type=="str":
+                    properties[attribute.name]='str'
+                elif attribute.data_type=="int":
+                    properties[attribute.name]=f'int:{attribute.length}'
+                elif attribute.data_type=="float":
+                    properties[attribute.name]=f'float:{attribute.length}.{attribute.precision}'
+                elif attribute.data_type=="date":
+                    properties[attribute.name]='date'
+            schema={
+                'geometry':layer_template.geometry_type,
+                'properties':properties
+            }
+            shapefile_path = MEDIA_ROOT + \
+                                f'/template_download/templates/{layer_template.name}.shp'
+            shapefile = fiona.open(shapefile_path, mode='w', driver='ESRI Shapefile',
+            schema = schema, crs = "EPSG:4326")
+            shapefile.close()
+
+        # create a ZipFile
+        templates_zip_name = 'templates.zip'
+        zipfile_path = MEDIA_ROOT + f'/template_download/templates'
+        # files = MEDIA_ROOT + '/template_download/shapefiles/'
+        files = zipfile_path
+        shutil.make_archive(zipfile_path, 'zip', files)
+
+        # defining zip file path
+        file_url = MEDIA_ROOT + \
+            f'/template_download/{templates_zip_name}'
+
+        # downloading zip file
+        zip_file = open(file_url, 'rb')
+        response = HttpResponse(
+            zip_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{templates_zip_name}'
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''GeoJSON API for features.'''
 '''{{baseURL}}api/maps/feature/2/'''
@@ -1637,7 +1827,7 @@ class FeatureGeoJSONAPIView(APIView):
             else:
                 return Response(data={'message': 'FeatureCollection matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 '''
 API for data merge/update
@@ -1667,20 +1857,13 @@ class DataMergeUpdateAPIView(APIView):
                 '''check whether celery is working or not'''
                 is_working=get_celery_worker_status()
                 if is_working != "working":
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
                 response = handleDataMergeUpdate.delay(layer, missed_col, extra_col, verified)
                 return Response(status=200, data={'message': 'Updating/Merging Data', 'task_id': response.task_id})
-                # response, code = handleDataMergeUpdate(layer, missed_col, extra_col, verified)
-                # '''clear directory'''
-                # clear_dir(dir)
-                # if response == "success" or code == 200:
-                #     return Response(response, status=status.HTTP_200_OK)
-                # else:
-                #     return Response(response, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response(data={'message': 'Layer matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(data={'message': 'error', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 def get_data_merge_update_task_response(request):
@@ -1701,7 +1884,7 @@ def get_data_merge_update_task_response(request):
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': "Please wait result"}, status=200)
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # import geopandas as gpd
 # import matplotlib.pyplot as plt
@@ -1901,10 +2084,10 @@ def get_analysis_task_response(request):
                 else:
                     return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': "Please wait for result"}, status=200)
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ShortestRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
@@ -1965,7 +2148,7 @@ def feature_popup(request, *args, **kwargs):
             result=attributes
         return Response(data=result, status=200)
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
@@ -1992,7 +2175,7 @@ def analysis_layers(request, *args, **kwargs):
             options[ana_type]=ana_type_list
         return Response(options,status=200)
     except Exception as e:
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
@@ -2013,7 +2196,7 @@ class ProjectMapConfigAPIView(APIView):
             result = {'id': instance.id, 'map_config': instance.map_config, 'user': instance.user}
             return Response(data=result, status=200)
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''category api for layers'''
 @api_view(['GET'])

@@ -52,6 +52,8 @@ from pgis_toolkit.projects.models import (
 from pgis_toolkit.projects.permissions import (
     DocumentDownloadPermission,
     DocumentPermission,
+    ImageDownloadPermission,
+    ImagePermission,
     OrganizationCategoryPermission,
     OrganizationPermission,
     ProjectPermission,
@@ -378,9 +380,9 @@ class ProjectViewset(viewsets.ModelViewSet):
             else:
                 for er in serializer._errors:
                     errors.append(
-                        {'errorName': er, 'details': serializer._errors[er]})
+                        {'errorName': er, 'details': serializer._errors[er][0]})
                 return Response(status=status.HTTP_400_BAD_REQUEST,
-                                data={'message': 'Error Occured', 'error': errors})
+                                data={'message': 'Project Update Failed', 'Error': errors})
             # return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -390,6 +392,7 @@ class ProjectViewset(viewsets.ModelViewSet):
         try:
             paginator = CustomPageNumberPagination()
             organization_id = request.query_params.get('organization', None)
+            paginate = request.query_params.get('paginate', True)
             # queryset = self.queryset
 
             # '''filter by organization id'''
@@ -447,12 +450,10 @@ class ProjectViewset(viewsets.ModelViewSet):
             #                     for key, val in filter_kwargs.items()]
             #     queryset = queryset.filter(
             #         reduce(operator.or_, list_of_Q)) if search_fields else queryset
-            queryset = get_project_queryset(request, request.user)
-            if not isinstance(queryset, QuerySet):
-                if isinstance(queryset, HttpResponse):
-                    return Response(queryset.content, status=queryset.status_code)
-                else:
-                    return Response(data=queryset, status=status.HTTP_400_BAD_REQUEST)
+            response, status = get_project_queryset(request, request.user)
+            if status == 400:
+                return Response(data={'message': response}, status=status)
+            queryset = response
             '''filter by polygon_wkt'''
             polygon_wkt = request.query_params.get('polygon_wkt', None)
             if polygon_wkt and polygon_wkt != "":
@@ -465,11 +466,16 @@ class ProjectViewset(viewsets.ModelViewSet):
                         project_ids.append(qs['project'])
                 queryset = queryset.filter(id__in=project_ids)
             '''paginate queryset'''
-            paginated_queryset = paginator.paginate_queryset(queryset, request)
-            serializer = self.get_serializer(paginated_queryset, many=True)
-            return paginator.get_paginated_response(data=serializer.data)
+            if paginate == False or paginate == 'False':
+                # serializer = self.get_serializer(queryset, many=True)
+                data = queryset.values('id', 'name')
+                return Response(data=data, status=200)
+            else:
+                paginated_queryset = paginator.paginate_queryset(queryset, request)
+                serializer = self.get_serializer(paginated_queryset, many=True)
+                return paginator.get_paginated_response(data=serializer.data)
         except Exception as error:
-            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 '''Retrieve bbox and project name in Map page'''
 @api_view(['GET'])
@@ -487,15 +493,15 @@ def get_project_detail(request, *args, **kwargs):
                 data['map_config'] = {}
             return Response(status=status.HTTP_200_OK, data={'message': 'success', 'data': data})
         else:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "Project Matching queryset not found!"})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "Project Matching queryset not found!"})
     else:
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params project is missing"})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "params project is missing"})
 
 
 class DefaultThemeViewset(viewsets.ModelViewSet):
-    queryset = Organization.active.all()
+    queryset = DefaultTheme.objects.all()
     http_method_names = ['get', 'post', 'patch']
-    default_serializer_class = OrganizationSerializer
+    default_serializer_class = DefaultThemeSerializer
     serializer_classes = {
         'list': DefaultThemeListSerializer,
         'retrieve': DefaultThemeSerializer
@@ -547,7 +553,7 @@ def layer_template_download(request):
     try:
         layer_template_id=request.query_params.get('layer_template_id',None)
         if not layer_template_id:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "params layer_template_id is missing"})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "params layer_template_id is missing"})
         layer_template_instance=LayerTemplate.objects.get(id=layer_template_id)
         attributes=LayerTemplateAttribute.objects.filter(layer_template=layer_template_instance.id)
         properties={}
@@ -590,7 +596,7 @@ def layer_template_download(request):
         return response
     except Exception as e:
         clear_dir(dir) #clearing directory
-        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 class LayerTemplateUploadAPIView(APIView):
     def post(self, request, format=None):
@@ -601,14 +607,14 @@ class LayerTemplateUploadAPIView(APIView):
             os.makedirs(FILE_UPLOAD_DIR, exist_ok=True)
 
             if not 'file' in request.FILES and request.FILES.get('file') == "":
-                return Response("error: file is missing", status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={"message": "file is missing"}, status=status.HTTP_400_BAD_REQUEST)
 
             file = request.data["file"]
             split_tup = os.path.splitext(str(file))
             file_name=split_tup[0]
             file_extension = split_tup[1]
             if not file_extension == ".zip":
-                return Response("error: only .zip file is valid", status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={"message": "only .zip file is valid"}, status=status.HTTP_400_BAD_REQUEST)
 
             #saving uploded file in directory
             fd, zip_file_path = tempfile.mkstemp(prefix=file_name, dir=FILE_UPLOAD_DIR)
@@ -628,7 +634,7 @@ class LayerTemplateUploadAPIView(APIView):
                     shp_file_name=file_name
             if not shp_file_name:
                 clear_dir(FILE_UPLOAD_DIR)
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "File with extension .shp not found"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "File with extension .shp not found"})
 
             #reading shapefile
             c = fiona.open(FILE_UPLOAD_DIR+shp_file_name)
@@ -645,8 +651,7 @@ class LayerTemplateUploadAPIView(APIView):
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
                     clear_dir(FILE_UPLOAD_DIR)
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': errors})
-
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Layer Template Upload Failed', 'Error': errors})
             #reading fields properites and saving it into the LayerTemplateAttribute table
             for data in schema['properties']:
                 properties={'name':str(data)}
@@ -667,12 +672,12 @@ class LayerTemplateUploadAPIView(APIView):
                             {'errorName': er, 'details': attribute_serializer._errors[er][0]})
                     template_instance.delete()
                     clear_dir(FILE_UPLOAD_DIR)
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': errors})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Layer Template Upload Failed', 'Error': errors})
             clear_dir(FILE_UPLOAD_DIR)
             return Response(status=200, data={'message': "Data successfully uploaded"})
         except Exception as e:
             clear_dir(FILE_UPLOAD_DIR) #clearing directory
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''GeoJSON API for Project Location | convers line and polygon to point | used only for clustering'''
 @api_view(['GET'])
@@ -804,12 +809,12 @@ class ProjectLocationVectorTileQuerySet(ProjectLocationMVTView, DetailView):
 class ImageViewset(viewsets.ModelViewSet):
     queryset=Image.objects.all()
     http_method_names = ['get', 'post', 'patch', 'delete']
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ImagePermission]
     serializer_class = ImageSerializer
 
     def get_queryset(self, *args, **kwargs):
         try:
-            queryset=Image.objects.all()
+            queryset=Image.objects.all().order_by('-id')
             project = self.request.query_params.get('project', None)
             if project:
                 queryset=queryset.filter(project=project)
@@ -840,6 +845,7 @@ class DocumentViewset(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/'''
         try:
+            errors=[]
             project = request.data.get('project', None)
             name = request.data.get('name', None)
             project = request.data.get('project', None)
@@ -850,14 +856,21 @@ class DocumentViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
                 created_object = serializer.save()
-            return Response(data= serializer.data, status=status.HTTP_201_CREATED)
+                return Response(data= serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'message': 'Document not created', 'Error': errors})
         except Exception as e:
             Document.objects.get(id=created_object.id).delete()
-            return Response(data='Error: '+str(e))
+            return Response(data={'message': str(e)}, status=400)
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         '''http://localhost:8000/api/projects/document/2/'''
         try:
+            errors=[]
             document_instance = Document.active.get(pk=pk)
             request.data._mutable = True
             request_dict = request.data
@@ -886,46 +899,124 @@ class DocumentViewset(viewsets.ModelViewSet):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST,
+                                data={'message': 'Document Update Failed', 'Error': errors})
         except Exception as e:
-            return Response(data='Error: '+str(e))
+            return Response(data={'message': str(e)}, status=400)
 
     def list(self, request, *args, **kwargs):
         '''http://localhost:8000/api/maps/document/?project=2'''
         '''search is implemented from name field only.'''
-        project = request.query_params.get('project', None)
-        if not project:
-            return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        queryset = self.queryset.filter(project__id=project)
-        search_key = request.query_params.get('search_key', None)
-        if search_key:
-            queryset = queryset.filter(name__icontains=search_key)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(data=serializer.data, status=status.HTTP_200_OK)
+        try:
+            project = request.query_params.get('project', None)
+            if not project:
+                return Response(data={'message': 'params project is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(project__id=project).order_by('-id')
+            search_key = request.query_params.get('search_key', None)
+            if search_key:
+                queryset = queryset.filter(name__icontains=search_key)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
 
 '''download document of a project'''
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, DocumentDownloadPermission])
 def document_download(request):
-    '''http://localhost:8000/api/projects/document_download/?document=1'''
+    '''http://localhost:8000/api/projects/document_download/?project=1&document=all or [1,2,3]'''
     try:
+        # document = request.query_params.get('document', None)
+        # if not document:
+        #     return Response(data={'message': 'params document is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        # if not Document.objects.filter(id=document).exists():
+        #     return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
+        # document_instance = Document.objects.get(id=document)
+        # if not document_instance.file:
+        #     return Response(data={'message': 'The document you are trying to download has no file.'}, status=status.HTTP_404_NOT_FOUND)
+        # document_extension = str(document_instance.file).split('.')[1]
+        # document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
+        # document_file = open(document_url, 'rb')
+        # response = HttpResponse(
+        #     document_file, content_type='application/force-download')
+        # response[
+        #     'Content-Disposition'] = 'attachment; filename="%s"' % f'{document_instance.name}.{document_extension}'
+        # return response
         document = request.query_params.get('document', None)
+        project = request.query_params.get('project', None)
         if not document:
             return Response(data={'message': 'params document is missing'}, status=status.HTTP_400_BAD_REQUEST)
-        if not Document.objects.filter(id=document).exists():
-            return Response(data={'message': 'No document matching queryset found!'}, status=status.HTTP_400_BAD_REQUEST)
-        document_instance = Document.objects.get(id=document)
-        if not document_instance.file:
-            return Response(data={'message': 'The document you are trying to download has no file.'}, status=status.HTTP_404_NOT_FOUND)
-        document_extension = str(document_instance.file).split('.')[1]
-        document_url = settings.MEDIA_ROOT + f"/{document_instance.file}"
-        document_file = open(document_url, 'rb')
+        if not project or not Project.active.filter(id=project).exists():
+            return Response(data={'message': 'project params is missing or Project matching queryset does not exist!'}, status=400)
+        document_ids = []
+        if document == 'all':
+            pass
+        else:
+            document_ids = [int(id) for id in document.split(',')]
+            # document_ids = json.loads(document)
+        document_files = Document.active.filter(project=project, id__in=document_ids).values_list('file', flat=True) if document_ids else Document.active.filter(project=project).values_list('file', flat=True)
+        files_list = [f'{settings.MEDIA_ROOT}/' + file for file in document_files]
+        # create a ZipFile
+        zip_name = 'documents.zip'
+        zip_path = f'{settings.MEDIA_ROOT}/documents/files/{zip_name}'
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            for file in files_list:
+                zip_file.write(file, os.path.basename(file))
+        # downloading zip file
+        zip_file = open(zip_path, 'rb')
         response = HttpResponse(
-            document_file, content_type='application/force-download')
+            zip_file, content_type='application/force-download')
         response[
-            'Content-Disposition'] = 'attachment; filename="%s"' % f'{document_instance.name}.{document_extension}'
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{zip_name}'
+        '''delete the zip file from the server after download'''
+        if os.path.isfile(zip_path): os.remove(zip_path)
         return response
     except Exception as e:
-        return Response(data='Error: '+str(e))
+        return Response(data={'message':str(e)}, status=400)
+
+'''download document of a project'''
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, ImageDownloadPermission])
+def image_download(request):
+    '''http://localhost:8000/api/projects/document_download/?project=1document=all or [1,2,3]'''
+    try:
+        image = request.query_params.get('image', None)
+        project = request.query_params.get('project', None)
+        if not image:
+            return Response(data={'message': 'params image is missing'}, status=status.HTTP_400_BAD_REQUEST)
+        if not project or not Project.active.filter(id=project).exists():
+            return Response(data={'message': 'project params is missing or Project matching queryset does not exist!'}, status=400)
+        image_ids = []
+        if image == 'all':
+            pass
+        else:
+            image_ids = [int(id) for id in image.split(',')]
+            # image_ids = json.loads(image)
+        image_files = Image.objects.filter(project=project, id__in=image_ids).values_list('image', flat=True) if image_ids else Image.objects.filter(project=project).values_list('image', flat=True)
+        files_list = [f'{settings.MEDIA_ROOT}/' + file for file in image_files]
+        # create a ZipFile
+        zip_name = 'images.zip'
+        zip_path = f'{settings.MEDIA_ROOT}/project/images/{zip_name}'
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            for file in files_list:
+                zip_file.write(file, os.path.basename(file))
+        # downloading zip file
+        zip_file = open(zip_path, 'rb')
+        response = HttpResponse(
+            zip_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{zip_name}'
+        '''delete the zip file from the server after download'''
+        if os.path.isfile(zip_path): os.remove(zip_path)
+        return response
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
 
 class RequestDemoViewset(viewsets.ModelViewSet):
     queryset = RequestDemo.objects.all()
@@ -942,16 +1033,28 @@ class RequestDemoViewset(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_country_choices(request, *args, **kwargs):
-    data = Country.objects.all().values('id', 'name')
+    id = request.query_params.get('id', None)
+    if id:
+        if Country.objects.filter(id=id).exists():
+            data = Country.objects.filter(id=id).values('id', 'name')
+        else:
+            return Response(data={'message': 'Country not found!'}, status=400)
+    else:
+        data = Country.objects.all().values('id', 'name')
     return Response(data=data, status=200)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_state_choices(request, *args, **kwargs):
     country = request.query_params.get('country', None)
-    if country:
-        country_list = json.loads(country)
-        data = State.objects.filter(country__id__in=country_list).values('id', 'name')
+    id = request.query_params.get('id', None)
+    if id:
+        if State.objects.filter(id=id).exists():
+            data = State.objects.filter(id=id).values('id', 'name')
+        else:
+            return Response(data={'message': 'State not found!'}, status=400)
+    elif country:
+        data = State.objects.filter(country=country).values('id', 'name')
     else:
         data = State.objects.all().values('id', 'name')
     return Response(data=data, status=200)

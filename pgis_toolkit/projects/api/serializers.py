@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from pgis_toolkit.projects.models import (
     ContactPerson,
@@ -120,10 +121,10 @@ class DefaultThemeSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.partial:
-            if 'name' in data.keys() and DefaultTheme.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+            if 'name' in data.keys() and DefaultTheme.objects.exclude(id=self.instance.id).filter(name=data['name']).exists():
                 raise serializers.ValidationError('Default Theme name must be unique')
             return data
-        elif DefaultTheme.active.filter(name=data['name']).exists():
+        elif DefaultTheme.objects.filter(name=data['name']).exists():
             raise serializers.ValidationError('Default Theme name must be unique')
         return data
 
@@ -186,7 +187,7 @@ class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
 class DocumentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        exclude=('uploaded_date','last_updated', 'project')
+        exclude=('last_updated', 'project')
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -197,6 +198,14 @@ class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
         fields = '__all__'
+
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Image.objects.all(),
+                fields=['title', 'project'],
+                message='Image Title must be unique',
+            )
+        ]
 
 class RequestDemoSerializer(serializers.ModelSerializer):
     class Meta:

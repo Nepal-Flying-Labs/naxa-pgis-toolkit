@@ -82,3 +82,6 @@ mapclassify==2.4.3
 
 #mongo
 pymongo==4.3.3
+
+#sentry
+sentry-sdk==1.12.1

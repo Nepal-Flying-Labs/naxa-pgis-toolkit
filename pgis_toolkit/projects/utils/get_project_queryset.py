@@ -16,14 +16,14 @@ env = environ.Env()
 def get_project_queryset(request, user):
     try:
         if not request.GET.keys():
-            return HttpResponse('No request params is given!', status=status.HTTP_400_BAD_REQUEST)
+            return 'No request params is given!', 400
         request_keys = request.GET.keys()
         '''filter by organization'''
         if 'organization' not in request_keys or request.GET['organization'] == "":
-            return HttpResponse('Params organization is missing', status=status.HTTP_400_BAD_REQUEST)
+            return 'Params organization is missing', 400
         organization_id = request.GET['organization']
         if not Organization.active.filter(id=organization_id).exists():
-            return HttpResponse('Organization matching queryset does not exist!', status=status.HTTP_400_BAD_REQUEST)
+            return 'Organization matching queryset does not exist!', 400
         organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
         '''superuser gets to see all project sites'''
         if user.is_superuser == True:
@@ -46,7 +46,7 @@ def get_project_queryset(request, user):
                     user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
                     organization_project_qs = organization_project_qs.filter(id__in=user_org_proj_list)
         else:
-            return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            return 'No any user role of the requesting user found!', 400
         '''search_key'''
         if 'search' in request_keys and request.GET['search'] != "":
             search_key = request.GET['search']
@@ -66,8 +66,8 @@ def get_project_queryset(request, user):
         elif 'country' in request_keys and request.GET['country'] != "":
             country = request.GET['country']
             organization_project_qs = organization_project_qs.filter(country__id=country)
-        return organization_project_qs
+        return organization_project_qs, 200
     except Exception as e:
         error = 'Error occured in get_project_queryset method. Details: '+ str(e)
         print(error)
-        return str(e)
+        return str(e), 400
