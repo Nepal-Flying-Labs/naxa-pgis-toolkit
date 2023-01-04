@@ -104,12 +104,17 @@ def check_overlapping(layer, con) -> dict:
     gdf = gpd.read_postgis(sql, con)
     total_data = len(gdf)
     sql = f'''SELECT a.*
-        FROM maps_featurecollection WHERE layer_id={layer} a
-        INNER JOIN maps_featurecollection WHERE layer_id={layer} b ON 
+        FROM maps_featurecollection WHERE layer_id={layer} as a
+        INNER JOIN maps_featurecollection WHERE layer_id={layer} as b ON 
         (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
         WHERE a.id != b.id'''
-    data = gpd.read_postgis(sql, con, geom_col="geometry")
-    content = {"error_data": len(data), "total_data": total_data, "data": data.to_json()}
+    try:
+        data = gpd.read_postgis(sql, con, geom_col="geometry")
+        error_data = len(data)
+    except:
+        data = gdf
+        error_data = 0
+    content = {"error_data": error_data, "total_data": total_data, "data": data.to_json()}
     return content
 
 def check_self_intersection(data: GeoDataFrame) -> dict:

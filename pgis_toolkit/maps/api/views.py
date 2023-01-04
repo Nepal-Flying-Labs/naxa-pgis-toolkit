@@ -2229,9 +2229,9 @@ def check_layer(request, *args, **kwargs):
             snapping_check = check_snapping(layer, con)
             return Response(data={'messages': [null_check["message"], multipart_check["message"], duplicate_check["message"], intersection_check["message"], snapping_check["message"]]}, status=200)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2247,9 +2247,9 @@ def check_null_geometry(request, *args, **kwargs):
             content = check_null(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2265,9 +2265,9 @@ def check_multipart_geometry(request, *args, **kwargs):
             content = check_multipart(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2283,9 +2283,9 @@ def check_duplicate_geometry(request, *args, **kwargs):
             content = check_duplicate(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2299,9 +2299,9 @@ def check_overlapping_geometry(request, *args, **kwargs):
             content = check_overlapping(layer, con)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2317,9 +2317,9 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             content = check_self_intersection(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'messages': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2333,9 +2333,9 @@ def check_isolated_geometry(request, *args, **kwargs):
             content = check_snapping(layer, con)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2362,9 +2362,9 @@ def fix_null_geometry(request, *args, **kwargs):
             content = fix_null(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2380,9 +2380,9 @@ def fix_multipart_geometry(request, *args, **kwargs):
             content = fix_multipart(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2398,9 +2398,9 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             content = fix_duplicate(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2416,9 +2416,9 @@ def fix_overlay_geometry(request, *args, **kwargs):
             content = fix_overlapping(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2434,9 +2434,9 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             content = fix_self_intersection(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2452,9 +2452,9 @@ def fix_isolated_geometry(request, *args, **kwargs):
             content = fix_snapping(gdf)
             return Response(content)
         else:
-            return Response(data={'messages': ["Data does not exists"]}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
-        return Response(data={'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
