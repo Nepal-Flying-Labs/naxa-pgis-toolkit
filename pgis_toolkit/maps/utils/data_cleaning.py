@@ -6,11 +6,12 @@ from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint
 import collections
 import momepy
+from pgis_toolkit.maps.models import CleaningErrors
 
 #===================
 # Checking data
 #===================
-def check_null(data: GeoDataFrame) -> dict:
+def check_null(data: GeoDataFrame, layer) -> dict:
     """Check if the geometry is null or not
 
     Parameters
@@ -26,18 +27,15 @@ def check_null(data: GeoDataFrame) -> dict:
         data : GeoDataFrame
     """
     total_data = len(data)
-    data["is_null"] = False
-    null_rows = 0
+    null_rows = [1]
     for i, row in data.iterrows():
         if row.geom.is_empty:
-            data.at[i,'is_null'] = True
-            null_rows += 1
-        else:
-            data.at[i,'is_null'] = False
-    content = {"error_data": null_rows, "total_data": total_data, "data": data.to_json()}
+            null_rows.append(row['id'])
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+    content = {"error_data": len(null_rows), "total_data": total_data}
     return content
 
-def check_multipart(data: GeoDataFrame) -> dict:
+def check_multipart(data: GeoDataFrame, layer) -> dict:
     """Check if the data is multipart or not
     
     Parameters
@@ -53,18 +51,17 @@ def check_multipart(data: GeoDataFrame) -> dict:
         data : GeoDataFrame
     """
     total_data = len(data)
-    data["is_multipart"] = True
-    multipart_rows = 0
+    multipart_rows = []
     for i, row in data.iterrows():
         if row.geom.type.startswith("Multi"):
-            data.at[i,'is_multipart'] = True
-            multipart_rows += 1
+            multipart_rows.append(row['id'])
         else:
             data.at[i,'is_multipart'] = False
-    content = {"error_data": multipart_rows, "total_data": total_data, "data": data.to_json()}
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": [1]})
+    content = {"error_data": len(multipart_rows), "total_data": total_data}
     return content
 
-def check_duplicate(data: GeoDataFrame) -> dict:
+def check_duplicate(data: GeoDataFrame, layer) -> dict:
     """Check if the geometry is duplicate or not
 
     Parameters
@@ -82,7 +79,8 @@ def check_duplicate(data: GeoDataFrame) -> dict:
     total_data = len(data)
     data = data.drop(axis=1, columns=["attributes"])
     sum = data.duplicated().sum()
-    content = {"error_data": sum, "total_data": total_data, "data": data.to_json()}
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate":[2]})
+    content = {"error_data": sum, "total_data": total_data}
     return content
 
 def check_overlapping(layer, con) -> dict:
@@ -114,10 +112,11 @@ def check_overlapping(layer, con) -> dict:
     except:
         data = gdf
         error_data = 0
-    content = {"error_data": error_data, "total_data": total_data, "data": data.to_json()}
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap":[1]})
+    content = {"error_data": error_data, "total_data": total_data}
     return content
 
-def check_self_intersection(data: GeoDataFrame) -> dict:
+def check_self_intersection(data: GeoDataFrame, layer) -> dict:
     """Check if the geometry has self intersection or not
 
     Parameters
@@ -133,15 +132,12 @@ def check_self_intersection(data: GeoDataFrame) -> dict:
         data : GeoDataFrame
     """
     total_data = len(data)
-    data["has_self_intersection"] = False
-    self_intersection_rows = 0
+    self_intersection_rows = [5, 10]
     for i, row in data.iterrows():
-        if row['geom'].is_simple:
-            data.at[i,'has_self_intersection'] = False
-        else:
-            data.at[i,'has_self_intersection'] = True
-            self_intersection_rows += 1
-    content = {"error_data": self_intersection_rows, "total_data": total_data, "data": data.to_json()}
+        if not row['geom'].is_simple:
+            self_intersection_rows.append(row['id'])
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect":self_intersection_rows})
+    content = {"error_data": len(self_intersection_rows), "total_data": total_data}
     return content
 
 def check_snapping(layer, con) -> dict:
@@ -174,7 +170,8 @@ def check_snapping(layer, con) -> dict:
     components.sort(key=len, reverse=True)
     # largest = components.pop(0)
     isolated = list( g for cc in components for g in cc )
-    content = {"error_data": len(isolated), "total_data": total_data, "data": data.to_json()}
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": [1]})
+    content = {"error_data": len(isolated), "total_data": total_data}
     return content
 
 #===================

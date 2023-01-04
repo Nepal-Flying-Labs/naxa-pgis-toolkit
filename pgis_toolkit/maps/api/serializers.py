@@ -194,3 +194,8 @@ class QueryFeatureCollectionListSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation |= instance.attributes
         return representation
+
+class CleaningErrorsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CleaningErrors
+        fields = '__all__'
