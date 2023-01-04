@@ -518,3 +518,21 @@ class QueryFeatureCollection(DateTimeStamp,IsDeleted):
     #     except Exception as e:
     #         print(f'error in def save of QueryFeatureCollection: {str(e)}')
     #     super(QueryFeatureCollection, self).save(*args, **kwargs)
+
+
+class CleaningErrors(DateTimeStamp):
+    """
+    layer_id > Layer
+
+    remaining fields stores ids > FeatureCollectionMirror object ids
+    """
+    layer_id = models.IntegerField(db_index=True, blank=True, null=True)
+    null =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+    multipart =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+    duplicate=ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+    overlap=ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+    self_instersect =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+    snapping =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'

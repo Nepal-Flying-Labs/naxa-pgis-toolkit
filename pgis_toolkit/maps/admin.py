@@ -114,13 +114,17 @@ class NetworkRoutesAdmin(admin.ModelAdmin):
     list_filter = ('route_no', 'analysis_id')
 
 class CeleryTaskAdmin(admin.ModelAdmin):
-    list_display = ('id', 'task_id')
+    list_display = ('id', 'task_id', 'layer_id')
 
 class QueryLayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'theme', 'group', 'geom_type', 'display_on_map', 'source', 'uploaded_date')
 
 class QueryFeatureCollectionAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer')
+
+class CleaningErrorsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer_id', 'null')
+    search_fields = ('id', 'layer_id')
 
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
@@ -146,3 +150,4 @@ admin.site.register(Category, CategoryAdmin)
 admin.site.register(CeleryTask, CeleryTaskAdmin)
 admin.site.register(QueryLayer, QueryLayerAdmin)
 admin.site.register(QueryFeatureCollection, QueryFeatureCollectionAdmin)
+admin.site.register(CleaningErrors, CleaningErrorsAdmin)

@@ -34,7 +34,10 @@ from pgis_toolkit.projects.models import (
     Project,
 )
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
-from pgis_toolkit.users.permissions import IsAuthorizedInviter
+from pgis_toolkit.users.permissions import (
+    IsAuthorizedInviter,
+    UpdatePreliminaryUserPermission,
+)
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
@@ -194,6 +197,8 @@ class PreliminaryUserAPIView(APIView):
                 project_instance.delete()
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+class PreliminaryUserUpdateAPIView(APIView):
+    permission_classes = [UpdatePreliminaryUserPermission]
     '''resend, expire/delete user invitation'''
     def patch(self, request, pk, *args, **kwargs):
         try:

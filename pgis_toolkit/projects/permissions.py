@@ -201,11 +201,12 @@ class ImagePermission(BasePermission):
             elif action=="create":
                 project_id = request.data.get('project')
                 organization_id = Project.active.get(id=project_id).organization.id
-            elif action in ["retrieve", "partial_update"]:
+            elif action in ["retrieve", "partial_update", "destroy"]:
                 image_id = request.resolver_match.kwargs.get('pk')
                 project_id = Image.objects.get(id=image_id).project.id
                 organization_id = Project.active.get(id=project_id).organization.id
             group_id=get_user_group(user_id, organization_id, project_id)
+            print(group_id, "is group_id")
             if group_id:
                 permission_list=get_permission_list(group_id)
                 if action=="create" and "add_image" in permission_list:
@@ -216,7 +217,7 @@ class ImagePermission(BasePermission):
                     return True
                 elif action=="list" and "view_image" in permission_list:
                     return True
-                elif action=='destory' and 'delete_image' in permission_list:
+                elif action=='destroy' and 'delete_image' in permission_list:
                     return True
             return False
         except Exception as e:
