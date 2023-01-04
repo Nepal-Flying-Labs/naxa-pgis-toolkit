@@ -14,8 +14,8 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.serializers import serialize
-from django.db.models import Count, F, Q
-from django.http import Http404, HttpResponse
+from django.db import connection
+from django.db.models import Count, F, Func, IntegerField, Q, Value
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -2330,27 +2330,27 @@ def check_isolated_geometry(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_error_data(request, *args, **kwargs):
-    try:
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'layer params is missing!'}, status=400)
-        layer_qs = Vectorlayer.objects.filter(layer=layer)
-        if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            try:
-                error_data = CleaningErrors.objects.get(layer_id=layer)
-                serializer = CleaningErrorsSerializer(error_data)
-                return Response(data={"total_data": len(gdf), "errors": serializer.data})
-            except  Exception as e:
-                return Response(data={'message': str(e)}, status=400)
-        else:
-            return Response(data={'message': "Data does not exists"}, status=400)
-    except Exception as e:
-        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_error_data(request, *args, **kwargs):
+#     try:
+#         layer = request.query_params.get('layer', None)
+#         if not layer:
+#             return Response(data={'message': 'layer params is missing!'}, status=400)
+#         layer_qs = Vectorlayer.objects.filter(layer=layer)
+#         if layer_qs.exists():
+#             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#             gdf = geopandas.read_postgis(sql, con)
+#             try:
+#                 error_data = CleaningErrors.objects.get(layer_id=layer)
+#                 serializer = CleaningErrorsSerializer(error_data)
+#                 return Response(data={"total_data": len(gdf), "errors": serializer.data})
+#             except  Exception as e:
+#                 return Response(data={'message': str(e)}, status=400)
+#         else:
+#             return Response(data={'message': "Data does not exists"}, status=400)
+#     except Exception as e:
+#         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2581,10 +2581,20 @@ def cleaning_error_features(request, *args, **kwargs):
         layer = request.query_params.get('layer', None)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
-        total_features = FeatureCollectionMirror.active.filter(layer=layer).count()
-        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer).annotate(features=total_features)
+        features = "SELECT COUNT (id) FROM maps_featurecollectionmirror WHERE layer_id=" + layer
+        # null = "SELECT ARRAY_LENGTH (snapping, 1) FROM maps_cleaningerrors WHERE layer_id=" + layer
+        try:
+            with connection.cursor() as cursor:
+                cursor = connection.cursor()
+                cursor.execute(features)
+                features = cursor.fetchone()
+                features_count = features[0]
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer).annotate(features=Value(features_count))
         if cleaning_error_qs.exists():
-            cleaning_error = cleaning_error_qs.values('null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping', 'features')
+            cleaning_error = cleaning_error_qs.values('layer_id', 'null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping', 'features')[0]
         else:
             return Response(data={'message': 'Cleaning error instance not found for the layer'}, status=400)
         return Response(data=cleaning_error, status=200)
