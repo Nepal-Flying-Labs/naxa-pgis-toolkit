@@ -36,6 +36,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     check_self_intersecting_geometry,
     cleaning_error_features,
     closest_path_analysis,
+    copy_features,
     data_buffer,
     delete_sequence,
     feature_popup,
@@ -79,7 +80,9 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 app_name = "projects"
 
 data_clean_urls = [
+
     # Check Layers api
+    path('copy_features/', copy_features, name='copy_features'),
     path('check_layer/', check_layer, name='check_layer'),
     path('check_null_geometry/', check_null_geometry, name='check_null_geometry'),
     path('check_multipart_geometry/', check_multipart_geometry, name='check_multipart_geometry'),

@@ -2600,3 +2600,25 @@ def cleaning_error_features(request, *args, **kwargs):
         return Response(data=cleaning_error, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
+
+'''copy features from featurecollection to featurecollectionmirror before data cleaning'''
+@api_view(['POST'])
+def copy_features(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing'}, status=400)
+        if not FeatureCollection.active.filter(layer=layer).exists():
+            return Response(data={'message': 'No any features found for the layer'}, status=400)
+        delete_sql = 'DELETE FROM public.maps_featurecollectionmirror WHERE layer_id='+layer
+        insert_sql = f'INSERT INTO public.maps_featurecollectionmirror (layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM public.maps_featurecollection WHERE layer_id = {layer})'
+        try:
+            with connection.cursor() as cursor:
+                cursor = connection.cursor()
+                cursor.execute(delete_sql)
+                cursor.execute(insert_sql)
+            return Response(data={'message': 'Features were replicated successfully'}, status=200)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
