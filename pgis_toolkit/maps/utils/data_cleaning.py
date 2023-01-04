@@ -3,7 +3,7 @@ from geopandas import GeoDataFrame
 import pandas as pd
 import networkx as nx
 from shapely import ops
-from shapely.geometry import MultiLineString, MultiPoint
+from shapely.geometry import MultiLineString, MultiPoint, Point
 import collections
 import momepy
 from pgis_toolkit.maps.models import CleaningErrors
@@ -27,7 +27,7 @@ def check_null(data: GeoDataFrame, layer) -> dict:
         data : GeoDataFrame
     """
     total_data = len(data)
-    null_rows = [1]
+    null_rows = []
     for i, row in data.iterrows():
         if row.geom.is_empty:
             null_rows.append(row['id'])
@@ -57,7 +57,7 @@ def check_multipart(data: GeoDataFrame, layer) -> dict:
             multipart_rows.append(row['id'])
         else:
             data.at[i,'is_multipart'] = False
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": [1]})
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": multipart_rows})
     content = {"error_data": len(multipart_rows), "total_data": total_data}
     return content
 
@@ -79,7 +79,8 @@ def check_duplicate(data: GeoDataFrame, layer) -> dict:
     total_data = len(data)
     data = data.drop(axis=1, columns=["attributes"])
     sum = data.duplicated().sum()
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate":[2]})
+    gdf = data.loc[data.duplicated(), :]
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate":[list(gdf['id'])]})
     content = {"error_data": sum, "total_data": total_data}
     return content
 
@@ -101,20 +102,19 @@ def check_overlapping(layer, con) -> dict:
     sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
     gdf = gpd.read_postgis(sql, con)
     total_data = len(gdf)
-    sql = f'''SELECT a.*
-        FROM maps_featurecollection WHERE layer_id={layer} as a
-        INNER JOIN maps_featurecollection WHERE layer_id={layer} as b ON 
-        (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
-        WHERE a.id != b.id'''
+    sql = f'''SELECT a.* From
+            (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a
+            INNER JOIN (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) b ON 
+            (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
+            WHERE a.id != b.id'''
     try:
         data = gpd.read_postgis(sql, con, geom_col="geometry")
         error_data = len(data)
+        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap": list(data['id'])})
+        content = {"error_data": error_data, "total_data": total_data}
+        return content
     except:
-        data = gdf
-        error_data = 0
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap":[1]})
-    content = {"error_data": error_data, "total_data": total_data}
-    return content
+        return {"message": "Query failed"}
 
 def check_self_intersection(data: GeoDataFrame, layer) -> dict:
     """Check if the geometry has self intersection or not
@@ -132,11 +132,11 @@ def check_self_intersection(data: GeoDataFrame, layer) -> dict:
         data : GeoDataFrame
     """
     total_data = len(data)
-    self_intersection_rows = [5, 10]
+    self_intersection_rows = []
     for i, row in data.iterrows():
         if not row['geom'].is_simple:
             self_intersection_rows.append(row['id'])
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect":self_intersection_rows})
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect": self_intersection_rows})
     content = {"error_data": len(self_intersection_rows), "total_data": total_data}
     return content
 
@@ -168,11 +168,22 @@ def check_snapping(layer, con) -> dict:
     graph = momepy.gdf_to_nx(data, approach='primal')
     components = list(nx.connected_components(graph))
     components.sort(key=len, reverse=True)
-    # largest = components.pop(0)
+    largest = components.pop(0)
     isolated = list( g for cc in components for g in cc )
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": [1]})
-    content = {"error_data": len(isolated), "total_data": total_data}
-    return content
+    points = [Point(xy) for xy in isolated]
+    gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
+    try:
+        gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='topology')
+        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a 
+            INNER JOIN snap_points b ON 
+            (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
+        f_data = gpd.read_postgis(s, con, geom_col="geometry")
+        con.execute('''DROP TABLE IF EXISTS snap_points;''')
+        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": list(f_data['id'])})
+        content = {"error_data": len(f_data), "total_data": total_data}
+        return content
+    except Exception as e:
+        return {"message": str(e)}
 
 #===================
 # Cleaning data
@@ -250,6 +261,21 @@ def fix_self_intersection(data: GeoDataFrame) -> dict:
 
 def fix_snapping(data: GeoDataFrame) -> dict:
     try:
+        sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
+                from (
+                    select 
+                        ST_MakeLine(cp.p, point.geom) vec,
+                        ST_MakeLine(cp.p, 
+                            ST_LineInterpolatePoint(
+                                line.geom, 
+                                ST_LineLocatePoint(line.geom, cp.p) * 1.01)
+                        ) seg
+                        from (
+                            select 
+                                ST_ClosestPoint(line.geom, point.geom)
+                        ) p as cp
+                    ) as h'''
+        con = '''ST_Contains(ST_Buffer(line.geom, 100, 'side=left'), point.geom)'''
         return "Successfully fixed the geometry", data
     except:
         return "Failed to fix the geometry", data
