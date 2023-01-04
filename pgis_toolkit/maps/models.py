@@ -526,7 +526,7 @@ class CleaningErrors(DateTimeStamp):
 
     remaining fields stores ids > FeatureCollectionMirror object ids
     """
-    layer_id = models.IntegerField(db_index=True, blank=True, null=True)
+    layer_id = models.IntegerField(db_index=True, unique=True, blank=True, null=True)
     null =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
     multipart =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
     duplicate=ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)

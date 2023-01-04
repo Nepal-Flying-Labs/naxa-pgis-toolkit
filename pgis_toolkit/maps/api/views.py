@@ -14,8 +14,8 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.serializers import serialize
-from django.db.models import Count, F, Q
-from django.http import Http404, HttpResponse
+from django.db import connection
+from django.db.models import Count, F, Func, IntegerField, Q, Value
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -39,7 +39,9 @@ from pgis_toolkit.maps.models import (
     Analysis,
     Category,
     CeleryTask,
+    CleaningErrors,
     FeatureCollection,
+    FeatureCollectionMirror,
     Layer,
     LayerAttribute,
     LayerFile,
@@ -93,20 +95,19 @@ from pgis_toolkit.maps.utils.buffer_analysis import (
     find_data_within_buffer,
 )
 from pgis_toolkit.maps.utils.data_cleaning import (
-    check_null,
-    check_multipart,
     check_duplicate,
+    check_multipart,
+    check_null,
     check_overlapping,
     check_self_intersection,
     check_snapping,
-    fix_null,
-    fix_multipart,
     fix_duplicate,
+    fix_multipart,
+    fix_null,
     fix_overlapping,
     fix_self_intersection,
-    fix_snapping
+    fix_snapping,
 )
-from pgis_toolkit.maps.models import CleaningErrors
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
@@ -118,6 +119,7 @@ from pgis_toolkit.utils.vectortile import (
 )
 
 from .serializers import (
+    CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionSerializer,
     LayerAttributeListSerializer,
@@ -143,13 +145,6 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
-    CleaningErrorsSerializer,
-)
-
-from pgis_toolkit.maps.utils.buffer_analysis import (
-    buffer_by_distance,
-    buffer_by_column_value,
-    find_data_within_buffer,
 )
 
 User = get_user_model()
@@ -2335,27 +2330,27 @@ def check_isolated_geometry(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_error_data(request, *args, **kwargs):
-    try:
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'layer params is missing!'}, status=400)
-        layer_qs = Vectorlayer.objects.filter(layer=layer)
-        if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            try:
-                error_data = CleaningErrors.objects.get(layer_id=layer)
-                serializer = CleaningErrorsSerializer(error_data)
-                return Response(data={"total_data": len(gdf), "errors": serializer.data})
-            except  Exception as e:
-                return Response(data={'message': str(e)}, status=400)
-        else:
-            return Response(data={'message': "Data does not exists"}, status=400)
-    except Exception as e:
-        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_error_data(request, *args, **kwargs):
+#     try:
+#         layer = request.query_params.get('layer', None)
+#         if not layer:
+#             return Response(data={'message': 'layer params is missing!'}, status=400)
+#         layer_qs = Vectorlayer.objects.filter(layer=layer)
+#         if layer_qs.exists():
+#             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#             gdf = geopandas.read_postgis(sql, con)
+#             try:
+#                 error_data = CleaningErrors.objects.get(layer_id=layer)
+#                 serializer = CleaningErrorsSerializer(error_data)
+#                 return Response(data={"total_data": len(gdf), "errors": serializer.data})
+#             except  Exception as e:
+#                 return Response(data={'message': str(e)}, status=400)
+#         else:
+#             return Response(data={'message': "Data does not exists"}, status=400)
+#     except Exception as e:
+#         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2577,3 +2572,53 @@ def closest_path_analysis(request, *args, **kwargs):
     if layer_qs.exists():
         return Response(data={'message': "Successfull"}, status=200)
     return Response(data={'message': "Data does not exists"}, status=400)
+
+'''cleaning error map toogle bar api'''
+@api_view(['GET'])
+def cleaning_error_features(request, *args, **kwargs):
+    try:
+        result={}
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing'}, status=400)
+        features = "SELECT COUNT (id) FROM maps_featurecollectionmirror WHERE layer_id=" + layer
+        # null = "SELECT ARRAY_LENGTH (snapping, 1) FROM maps_cleaningerrors WHERE layer_id=" + layer
+        try:
+            with connection.cursor() as cursor:
+                cursor = connection.cursor()
+                cursor.execute(features)
+                features = cursor.fetchone()
+                features_count = features[0]
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer).annotate(features=Value(features_count))
+        if cleaning_error_qs.exists():
+            cleaning_error = cleaning_error_qs.values('layer_id', 'null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping', 'features')[0]
+        else:
+            return Response(data={'message': 'Cleaning error instance not found for the layer'}, status=400)
+        return Response(data=cleaning_error, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
+'''copy features from featurecollection to featurecollectionmirror before data cleaning'''
+@api_view(['POST'])
+def copy_features(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing'}, status=400)
+        if not FeatureCollection.active.filter(layer=layer).exists():
+            return Response(data={'message': 'No any features found for the layer'}, status=400)
+        delete_sql = 'DELETE FROM public.maps_featurecollectionmirror WHERE layer_id='+layer
+        insert_sql = f'INSERT INTO public.maps_featurecollectionmirror (layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM public.maps_featurecollection WHERE layer_id = {layer})'
+        try:
+            with connection.cursor() as cursor:
+                cursor = connection.cursor()
+                cursor.execute(delete_sql)
+                cursor.execute(insert_sql)
+            return Response(data={'message': 'Features were replicated successfully'}, status=200)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)

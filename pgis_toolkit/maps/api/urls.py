@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
+from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_error_data,
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
@@ -34,8 +34,9 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,
     check_null_geometry,
     check_overlapping_geometry,
     check_self_intersecting_geometry,
-    get_error_data,
+    cleaning_error_features,
     closest_path_analysis,
+    copy_features,
     data_buffer,
     delete_sequence,
     feature_popup,
@@ -79,7 +80,9 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 app_name = "projects"
 
 data_clean_urls = [
+
     # Check Layers api
+    path('copy_features/', copy_features, name='copy_features'),
     path('check_layer/', check_layer, name='check_layer'),
     path('check_null_geometry/', check_null_geometry, name='check_null_geometry'),
     path('check_multipart_geometry/', check_multipart_geometry, name='check_multipart_geometry'),
@@ -87,7 +90,7 @@ data_clean_urls = [
     path('check_overlapping_geometry/', check_overlapping_geometry, name='check_overlapping_geometry'),
     path('check_self_intersecting_geometry/', check_self_intersecting_geometry, name='check_self_intersecting_geometry'),
     path('check_isolated_geometry/', check_isolated_geometry, name='check_isolated_geometry'),
-    path('get_error_data/', get_error_data, name="get_error_data"),
+    # path('get_error_data/', get_error_data, name="get_error_data"),
     # Fix Layers api
     path('fix_layer/', fix_layer, name='fix_layer'),
     path('fix_null_geometry/', fix_null_geometry, name='fix_null_geometry'),
@@ -127,7 +130,7 @@ urlpatterns = [
     path('feature_geojson/<int:pk>/', FeatureGeoJSONAPIView.as_view(), name='feature'),
     path('feature_popup/', feature_popup, name='feature_popup'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
-
+    path('cleaning_error_features/', cleaning_error_features, name='cleaning_error_features'),
     # Data Merge
     path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
     path('get_data_merge_update_task_response/', get_data_merge_update_task_response),
