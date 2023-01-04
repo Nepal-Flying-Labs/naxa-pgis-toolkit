@@ -106,6 +106,7 @@ from pgis_toolkit.maps.utils.data_cleaning import (
     fix_self_intersection,
     fix_snapping
 )
+from pgis_toolkit.maps.models import CleaningErrors
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
@@ -142,6 +143,7 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
+    CleaningErrorsSerializer,
 )
 
 from pgis_toolkit.maps.utils.buffer_analysis import (
@@ -2240,7 +2242,7 @@ def check_null_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = check_null(gdf)
+            content = check_null(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2258,7 +2260,7 @@ def check_multipart_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = check_multipart(gdf)
+            content = check_multipart(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2276,7 +2278,7 @@ def check_duplicate_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = check_duplicate(gdf)
+            content = check_duplicate(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2310,7 +2312,7 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = check_self_intersection(gdf)
+            content = check_self_intersection(gdf, layer)
             return Response(content)
         else:
             return Response(data={'messages': "Data does not exists"}, status=200)
@@ -2330,6 +2332,28 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_error_data(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            gdf = geopandas.read_postgis(sql, con)
+            try:
+                error_data = CleaningErrors.objects.get(layer_id=layer)
+                serializer = CleaningErrorsSerializer(error_data)
+                return Response(data={"total_data": len(gdf), "errors": serializer.data})
+            except  Exception as e:
+                return Response(data={'message': str(e)}, status=400)
+        else:
+            return Response(data={'message': "Data does not exists"}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
