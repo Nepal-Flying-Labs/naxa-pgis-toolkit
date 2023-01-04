@@ -39,7 +39,9 @@ from pgis_toolkit.maps.models import (
     Analysis,
     Category,
     CeleryTask,
+    CleaningErrors,
     FeatureCollection,
+    FeatureCollectionMirror,
     Layer,
     LayerAttribute,
     LayerFile,
@@ -93,18 +95,18 @@ from pgis_toolkit.maps.utils.buffer_analysis import (
     find_data_within_buffer,
 )
 from pgis_toolkit.maps.utils.data_cleaning import (
-    check_null,
-    check_multipart,
     check_duplicate,
+    check_multipart,
+    check_null,
     check_overlapping,
     check_self_intersection,
     check_snapping,
-    fix_null,
-    fix_multipart,
     fix_duplicate,
+    fix_multipart,
+    fix_null,
     fix_overlapping,
     fix_self_intersection,
-    fix_snapping
+    fix_snapping,
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
@@ -142,12 +144,6 @@ from .serializers import (
     ThemeListSerializer,
     ThemeSerializer,
     WMSLayerSerializer,
-)
-
-from pgis_toolkit.maps.utils.buffer_analysis import (
-    buffer_by_distance,
-    buffer_by_column_value,
-    find_data_within_buffer,
 )
 
 User = get_user_model()
@@ -2553,3 +2549,21 @@ def closest_path_analysis(request, *args, **kwargs):
     if layer_qs.exists():
         return Response(data={'message': "Successfull"}, status=200)
     return Response(data={'message': "Data does not exists"}, status=400)
+
+'''cleaning error map toogle bar api'''
+@api_view(['GET'])
+def cleaning_error_features(request, *args, **kwargs):
+    try:
+        result={}
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing'}, status=400)
+        total_features = FeatureCollectionMirror.active.filter(layer=layer).count()
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer).annotate(features=total_features)
+        if cleaning_error_qs.exists():
+            cleaning_error = cleaning_error_qs.values('null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping', 'features')
+        else:
+            return Response(data={'message': 'Cleaning error instance not found for the layer'}, status=400)
+        return Response(data=cleaning_error, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
