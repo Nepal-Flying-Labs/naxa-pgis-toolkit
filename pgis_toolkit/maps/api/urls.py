@@ -96,7 +96,7 @@ data_clean_urls = [
     path('fix_null_geometry/', fix_null_geometry, name='fix_null_geometry'),
     path('fix_multipart_geometry/', fix_multipart_geometry, name='fix_multipart_geometry'),
     path('fix_duplicate_geometry/', fix_duplicate_geometry, name='fix_duplicate_geometry'),
-    path('fix_overlay_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
+    path('fix_overlapping_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
     path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
     path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
 ]

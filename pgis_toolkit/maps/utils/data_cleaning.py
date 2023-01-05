@@ -190,44 +190,56 @@ def check_snapping(layer, con) -> dict:
 #===================
 def fix_null(data: GeoDataFrame, layer) -> dict:
     try:
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            null_error = cleaning_error_qs.values('null')[0]
         data = data[~data.is_empty]
         content = check_null(data, layer)
-        return {"message": "Successfully fixed null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
-    except:
-        content = check_null(data, layer)
-        return {"message": "Failed to fix null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
+        return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
+    except Exception as e:
+        return {'message': str(e)}
+        
 
 def fix_multipart(data: GeoDataFrame, layer) -> dict:
     try:
-        df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-        for i, row in data.iterrows():
-            data = ops.linemerge(row.geometry)
-            data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
-            data = data.explode(index_parts=True)
-            for value in row.keys():
-                if value != 'geometry':
-                    data.at[i,value] = row[value]
-            df = pd.concat([df, data])
-        content = check_multipart(df, layer)
-        return {"message": "Successfully fixed multipart geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
-    except:
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            multipart_error = cleaning_error_qs.values('multipart')[0]
+        # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
+        # for i, row in data.iterrows():
+        #     data = ops.linemerge(row.geometry)
+        #     data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
+        #     data = data.explode(index_parts=True)
+        #     for value in row.keys():
+        #         if value != 'geometry':
+        #             data.at[i,value] = row[value]
+        #     df = pd.concat([df, data])
+        #     print(type(df))
         content = check_multipart(data, layer)
-        return {"message": "Failed to fix null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
+        return {"new_error": content["error_data"], "prev_error": len(multipart_error["multipart"])}
+    except Exception as e:
+        return {'message': str(e)}
 
 def fix_duplicate(data: GeoDataFrame, layer) -> dict:
     try:
-        data = data.drop_duplicates(keep='last')
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            duplicate_error = cleaning_error_qs.values('duplicate')[0]
+        # data = data.drop_duplicates(keep='last')
         content = check_duplicate(data, layer)
-        return {"message": "Successfully fixed duplicate geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
-    except:
-        content = check_duplicate(data, layer)
-        return {"message": "Failed to fix duplicate geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
+        return {"new_error": content["error_data"], "prev_error": len(duplicate_error["duplicate"])}
+    except Exception as e:
+        return {'message': str(e)}
 
-def fix_overlapping(data: GeoDataFrame) -> dict:
+def fix_overlapping(layer, con) -> dict:
     try: 
-        return "Successfully fixed overlay geometries", data
-    except:
-        return "Failed to fix overlay geomtries", data
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            overlap_error = cleaning_error_qs.values('overlap')[0]
+        content = check_overlapping(layer, con)
+        return {"new_error": content["error_data"], "prev_error": len(overlap_error["overlap"])}
+    except Exception as e:
+        return {'message': str(e)}
 
 def convert_distance_to_4326(distance: float) -> float:
     """Convert the distance to WGS 1984 (epsg: 4326)
@@ -242,30 +254,33 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
-def fix_self_intersection(data: GeoDataFrame) -> dict:
+def fix_self_intersection(data: GeoDataFrame, layer) -> dict:
     try:
-        df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-        for i, row in data.iterrows():
-            # if row['has_self_intersection']:
-            mls = ops.unary_union(row.geometry)
-            if isinstance(mls, MultiLineString):
-                coords_list = []
-                for part in mls.geoms:
-                    coords_list.extend(part.coords)
-                points = [item for item, count in collections.Counter(coords_list).items() if count > 1]
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            self_instersect_error = cleaning_error_qs.values('self_instersect')[0]
+        # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
+        # for i, row in data.iterrows():
+        #     mls = ops.unary_union(row.geometry)
+        #     if isinstance(mls, MultiLineString):
+        #         coords_list = []
+        #         for part in mls.geoms:
+        #             coords_list.extend(part.coords)
+        #         points = [item for item, count in collections.Counter(coords_list).items() if count > 1]
 
-                multi_point = MultiPoint(points)
-                result = ops.split(row.geometry, multi_point)
-                for geom in result.geoms:
-                    if geom.length > convert_distance_to_4326(10):
-                        df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
-            else:
-                df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
-        return "Successfully fixed self intersection", df
-    except:
-        return "Failed to fix self intersection", data
+        #         multi_point = MultiPoint(points)
+        #         result = ops.split(row.geometry, multi_point)
+        #         for geom in result.geoms:
+        #             if geom.length > convert_distance_to_4326(10):
+        #                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
+        #     else:
+        #         df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
+        content = check_self_intersection(data, layer)
+        return {"new_error": content["error_data"], "prev_error": len(self_instersect_error["self_instersect"])}
+    except Exception as e:
+        return {'message': str(e)}
 
-def fix_snapping(data: GeoDataFrame) -> dict:
+def fix_snapping(layer, con) -> dict:
     try:
         sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
                 from (
@@ -281,7 +296,11 @@ def fix_snapping(data: GeoDataFrame) -> dict:
                                 ST_ClosestPoint(line.geom, point.geom)
                         ) p as cp
                     ) as h'''
-        con = '''ST_Contains(ST_Buffer(line.geom, 100, 'side=left'), point.geom)'''
-        return "Successfully fixed the geometry", data
-    except:
-        return "Failed to fix the geometry", data
+        s = '''ST_Contains(ST_Buffer(line.geom, 100, 'side=left'), point.geom)'''
+        cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
+        if cleaning_error_qs.exists():
+            snapping_error = cleaning_error_qs.values('snapping')[0]
+        content = check_snapping(layer, con)
+        return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
+    except Exception as e:
+        return {'message': str(e)}
