@@ -102,6 +102,7 @@ from pgis_toolkit.maps.utils.data_cleaning import (
     check_overlapping,
     check_self_intersection,
     check_snapping,
+    del_id_from_clean_instance,
     fix_duplicate,
     fix_multipart,
     fix_null,
@@ -2652,33 +2653,8 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
                 is_deleted = request.data.get('is_deleted', False)
                 if is_deleted == True or is_deleted == 'True':
                     cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
-                    '''update null'''
-                    null_list = cleaning_err_inst.null
-                    if pk in null_list:
-                        null_list.remove(pk)
-                    '''update multipart'''
-                    multipart_list = cleaning_err_inst.multipart
-                    if pk in multipart_list:
-                        multipart_list.remove(pk)
-                    '''update duplicate'''
-                    duplicate_list = cleaning_err_inst.duplicate
-                    if pk in duplicate_list:
-                        duplicate_list.remove(pk)
-                    '''update overlap'''
-                    overlap_list = cleaning_err_inst.overlap
-                    if pk in overlap_list:
-                        overlap_list.remove(pk)
-                    '''update self_instersect'''
-                    self_instersect_list = cleaning_err_inst.self_instersect
-                    if pk in self_instersect_list:
-                        self_instersect_list.remove(pk)
-                    '''update snapping'''
-                    snapping_list = cleaning_err_inst.snapping
-                    if pk in snapping_list:
-                        snapping_list.remove(pk)
-                    '''finally update cleaning instance'''
+                    del_id_from_clean_instance(cleaning_err_inst, pk)
                     cleaning_err_inst.save()
-
                 serializer.save()
                 return Response(data={'message': 'Feature Update Successful!'}, status=200)
             else:
@@ -2694,9 +2670,6 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
 def bulk_del_null_geom(request, *args, **kwargs):
     try:
         feature_ids = request.data.get('feature_ids', None)
-        # layer = request.data.get('layer', None)
-        # if not layer:
-        #     return Response(data={'message': 'params layer is missing'}, status=400)
         if not feature_ids:
             return Response(data={'message': 'params feature_ids is missing'}, status=400)
         feature_ids = [int(id) for id in feature_ids.split(',')]
@@ -2705,33 +2678,12 @@ def bulk_del_null_geom(request, *args, **kwargs):
             layer = feature_qs[0].layer.id
             cleaning_err_inst = CleaningErrors.objects.get(layer_id=layer)
             for pk in feature_ids:
-                '''update null'''
-                null_list = cleaning_err_inst.null
-                if pk in null_list:
-                    null_list.remove(pk)
-                '''update multipart'''
-                multipart_list = cleaning_err_inst.multipart
-                if pk in multipart_list:
-                    multipart_list.remove(pk)
-                '''update duplicate'''
-                duplicate_list = cleaning_err_inst.duplicate
-                if pk in duplicate_list:
-                    duplicate_list.remove(pk)
-                '''update overlap'''
-                overlap_list = cleaning_err_inst.overlap
-                if pk in overlap_list:
-                    overlap_list.remove(pk)
-                '''update self_instersect'''
-                self_instersect_list = cleaning_err_inst.self_instersect
-                if pk in self_instersect_list:
-                    self_instersect_list.remove(pk)
-                '''update snapping'''
-                snapping_list = cleaning_err_inst.snapping
-                if pk in snapping_list:
-                    snapping_list.remove(pk)
+                del_id_from_clean_instance(cleaning_err_inst, pk)
             '''finally update cleaning instance'''
             feature_qs.update(is_deleted=True)
             cleaning_err_inst.save()
+        else:
+            return Response(data={'message': 'Feature matching queryset not found'}, status=400)
         return Response(data={'message': 'Features deleted successful.'}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)

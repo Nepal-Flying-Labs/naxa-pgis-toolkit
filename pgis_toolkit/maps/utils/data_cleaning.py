@@ -1,12 +1,15 @@
+import collections
+
 import geopandas as gpd
-from geopandas import GeoDataFrame
-import pandas as pd
+import momepy
 import networkx as nx
+import pandas as pd
+from geopandas import GeoDataFrame
 from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint
-import collections
-import momepy
+
 from pgis_toolkit.maps.models import CleaningErrors
+
 
 #===================
 # Checking data
@@ -37,12 +40,12 @@ def check_null(data: GeoDataFrame, layer) -> dict:
 
 def check_multipart(data: GeoDataFrame, layer) -> dict:
     """Check if the data is multipart or not
-    
+
     Parameters
     ----------
     data : GeoDataFrame
         The data to check
-        
+
     Returns
     -------
     content: dict
@@ -103,7 +106,7 @@ def check_overlapping(layer, con) -> dict:
     total_data = len(gdf)
     sql = f'''SELECT a.*
         FROM maps_featurecollection WHERE layer_id={layer} as a
-        INNER JOIN maps_featurecollection WHERE layer_id={layer} as b ON 
+        INNER JOIN maps_featurecollection WHERE layer_id={layer} as b ON
         (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
         WHERE a.id != b.id'''
     try:
@@ -207,14 +210,14 @@ def fix_duplicate(data: GeoDataFrame) -> dict:
         return "Failed to fix duplicate geometry", data
 
 def fix_overlapping(data: GeoDataFrame) -> dict:
-    try: 
+    try:
         return "Successfully fixed overlay geometries", data
     except:
         return "Failed to fix overlay geomtries", data
 
 def convert_distance_to_4326(distance: float) -> float:
     """Convert the distance to WGS 1984 (epsg: 4326)
-    
+
     Parameters
     ----------
     distance : float
@@ -253,3 +256,30 @@ def fix_snapping(data: GeoDataFrame) -> dict:
         return "Successfully fixed the geometry", data
     except:
         return "Failed to fix the geometry", data
+
+'''used to remove id from clean instance'''
+def del_id_from_clean_instance(instance, pk):
+    '''update null'''
+    null_list = instance.null
+    if pk in null_list:
+        null_list.remove(pk)
+    '''update multipart'''
+    multipart_list = instance.multipart
+    if pk in multipart_list:
+        multipart_list.remove(pk)
+    '''update duplicate'''
+    duplicate_list = instance.duplicate
+    if pk in duplicate_list:
+        duplicate_list.remove(pk)
+    '''update overlap'''
+    overlap_list = instance.overlap
+    if pk in overlap_list:
+        overlap_list.remove(pk)
+    '''update self_instersect'''
+    self_instersect_list = instance.self_instersect
+    if pk in self_instersect_list:
+        self_instersect_list.remove(pk)
+    '''update snapping'''
+    snapping_list = instance.snapping
+    if pk in snapping_list:
+        snapping_list.remove(pk)
