@@ -122,6 +122,7 @@ from pgis_toolkit.utils.vectortile import (
 from .serializers import (
     CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
+    FeatureCollectionMirrorSerializer,
     FeatureCollectionSerializer,
     LayerAttributeListSerializer,
     LayerAttributeSerializer,
@@ -1736,7 +1737,7 @@ def import_template(request):
                 '''creating project layer template object'''
             project_template_instance = ProjectsLayerTemplate.active.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
             project_template_instance_ids.append(project_template_instance.id)
-            template_attributes_values = LayerTemplateAttribute.active.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
                 ProjectsLayerTemplateAttribute.active.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
         return Response(data={'message': f'Templates imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
