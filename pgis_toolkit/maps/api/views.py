@@ -1027,7 +1027,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             user_id = auth_token.user_id
         if not User.active.filter(id=user_id).exists():
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
-        queryset=FeatureCollection.objects.all()
+        queryset=FeatureCollection.active.all()
         request_keys = request.GET.keys()
         '''filter by layer id'''
         if 'layer' not in request_keys or request.GET['layer'] == "":
