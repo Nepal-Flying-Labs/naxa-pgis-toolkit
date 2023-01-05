@@ -1611,7 +1611,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
     '''
     Viewset for ProjectLayerTemplateAttribute objects.
     '''
-    queryset = ProjectsLayerTemplateAttribute.objects.all()
+    queryset = ProjectsLayerTemplateAttribute.active.all()
     http_method_names = ['get', 'post', 'patch']
     permission_classes = [ProjectsLayerTemplateAttributePermission]
     default_serializer_class = ProjectsLayerTemplateAttributeSerializer
@@ -1646,7 +1646,7 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         try:
             name = request.data.get('name', None)
             layer_template = request.data.get('layer_template', None)
-            if ProjectsLayerTemplateAttribute.objects.filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
+            if ProjectsLayerTemplateAttribute.active.filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplateAttribute name for the Template.'},status=status.HTTP_400_BAD_REQUEST)
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
@@ -1667,14 +1667,14 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
         errors = []
         request_dict = request.data
         request_keys = request_dict.keys()
-        project_layer_template_attribute = ProjectsLayerTemplateAttribute.objects.get(pk=pk)
+        project_layer_template_attribute = ProjectsLayerTemplateAttribute.active.get(pk=pk)
         if 'layer_template' in request_keys and request_dict['layer_template'] != "":
             layer_template = request_dict['layer_template']
         else:
             layer_template = project_layer_template_attribute.layer_template.id
         if 'name' in request_keys and request_dict['name'] != "":
             name = request_dict['name']
-            if ProjectsLayerTemplateAttribute.objects.exclude(id=pk).filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
+            if ProjectsLayerTemplateAttribute.active.exclude(id=pk).filter(Q(layer_template__id=layer_template) & Q(name=name)).exists():
                 return Response(data={'message': 'Cannot create duplicate ProjectsLayerTemplateAttribute name for the Template.'},status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(project_layer_template_attribute, request_dict, partial=True)
         if serializer.is_valid():
@@ -1695,12 +1695,12 @@ def update_template_attributes(request):
     try:
         instances=[]
         for key, value in request.data.items():
-            instance = ProjectsLayerTemplateAttribute.objects.get(id=key)
+            instance = ProjectsLayerTemplateAttribute.active.get(id=key)
             instances += [instance]
             instance.selected = value
 
         '''update selection in bulk'''
-        ProjectsLayerTemplateAttribute.objects.bulk_update(instances, ['selected'])
+        ProjectsLayerTemplateAttribute.active.bulk_update(instances, ['selected'])
         return Response({'message': "Selection update succssful"}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1731,18 +1731,18 @@ def import_template(request):
         project_template_instance_ids = []
         for template in templates_qs:
             '''retrieving layer template vaulues to clone later'''
-            if ProjectsLayerTemplate.objects.filter(Q(name=template['name']) & Q(project=project)).exists():
+            if ProjectsLayerTemplate.active.filter(Q(name=template['name']) & Q(project=project)).exists():
                 return Response(data={'message': 'Cannot create duplicate template name for a project'}, status=status.HTTP_400_BAD_REQUEST)
                 '''creating project layer template object'''
-            project_template_instance = ProjectsLayerTemplate.objects.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
+            project_template_instance = ProjectsLayerTemplate.active.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
             project_template_instance_ids.append(project_template_instance.id)
-            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            template_attributes_values = LayerTemplateAttribute.active.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
-                ProjectsLayerTemplateAttribute.objects.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
+                ProjectsLayerTemplateAttribute.active.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
         return Response(data={'message': f'Templates imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
     except Exception as e:
         if project_template_instance_ids:
-            ProjectsLayerTemplate.objects.filter(id__in=project_template_instance_ids).delete()
+            ProjectsLayerTemplate.active.filter(id__in=project_template_instance_ids).delete()
         return Response(data={'message':str(e)}, status=400)
 
 '''bulk download layer templates'''
@@ -1761,7 +1761,7 @@ def bulk_template_download(request):
         if not layer_template_qs:
             return Response(data={'message': 'No any selected layer templated found!'}, status=400)
         for layer_template in layer_template_qs:
-            attributes=ProjectsLayerTemplateAttribute.objects.filter(layer_template=layer_template, selected=True)
+            attributes=ProjectsLayerTemplateAttribute.active.filter(layer_template=layer_template, selected=True)
             properties={}
             for attribute in attributes:
                 if attribute.data_type=="str":

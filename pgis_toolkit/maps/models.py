@@ -339,7 +339,7 @@ class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
         return f'{self.id} {self.name}'
 
 
-class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
+class ProjectsLayerTemplateAttribute(IsDeleted, DateTimeStamp,TemplateAttribute):
     selected = models.BooleanField(default=True)
     layer_template=models.ForeignKey(ProjectsLayerTemplate,on_delete=models.CASCADE)
     class Meta:
