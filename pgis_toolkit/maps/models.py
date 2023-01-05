@@ -340,7 +340,7 @@ class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
 
 
 class ProjectsLayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
-    selected = models.BooleanField(default=False)
+    selected = models.BooleanField(default=True)
     layer_template=models.ForeignKey(ProjectsLayerTemplate,on_delete=models.CASCADE)
     class Meta:
         app_label = 'maps'
