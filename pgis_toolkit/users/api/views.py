@@ -258,7 +258,7 @@ class PreliminaryUserVerificationAPIView(APIView):
             if not token:
                 return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
             if not PreliminaryUser.objects.filter(Q(email_verification_token=token) & Q(status='Pending')).exists():
-                return Response(data={'message': 'PreliminaryUser matching queryset does not exists or your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'message': 'Your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
             preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) & Q(status='Pending'))
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)

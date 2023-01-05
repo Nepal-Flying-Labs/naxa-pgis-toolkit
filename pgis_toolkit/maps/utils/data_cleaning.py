@@ -1,12 +1,15 @@
+import collections
+
 import geopandas as gpd
-from geopandas import GeoDataFrame
-import pandas as pd
+import momepy
 import networkx as nx
+import pandas as pd
+from geopandas import GeoDataFrame
 from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint, Point
-import collections
-import momepy
+
 from pgis_toolkit.maps.models import CleaningErrors
+
 
 #===================
 # Checking data
@@ -37,12 +40,12 @@ def check_null(data: GeoDataFrame, layer) -> dict:
 
 def check_multipart(data: GeoDataFrame, layer) -> dict:
     """Check if the data is multipart or not
-    
+
     Parameters
     ----------
     data : GeoDataFrame
         The data to check
-        
+
     Returns
     -------
     content: dict
@@ -104,7 +107,7 @@ def check_overlapping(layer, con) -> dict:
     total_data = len(gdf)
     sql = f'''SELECT a.* From
             (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a
-            INNER JOIN (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) b ON 
+            INNER JOIN (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) b ON
             (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
             WHERE a.id != b.id'''
     try:
@@ -174,8 +177,8 @@ def check_snapping(layer, con) -> dict:
     gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
     try:
         gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='topology')
-        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a 
-            INNER JOIN snap_points b ON 
+        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a
+            INNER JOIN snap_points b ON
             (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
         f_data = gpd.read_postgis(s, con, geom_col="geometry")
         con.execute('''DROP TABLE IF EXISTS snap_points;''')
@@ -198,7 +201,7 @@ def fix_null(data: GeoDataFrame, layer) -> dict:
         return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
     except Exception as e:
         return {'message': str(e)}
-        
+
 
 def fix_multipart(data: GeoDataFrame, layer) -> dict:
     try:
@@ -232,7 +235,7 @@ def fix_duplicate(data: GeoDataFrame, layer) -> dict:
         return {'message': str(e)}
 
 def fix_overlapping(layer, con) -> dict:
-    try: 
+    try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
@@ -243,7 +246,7 @@ def fix_overlapping(layer, con) -> dict:
 
 def convert_distance_to_4326(distance: float) -> float:
     """Convert the distance to WGS 1984 (epsg: 4326)
-    
+
     Parameters
     ----------
     distance : float
@@ -284,15 +287,15 @@ def fix_snapping(layer, con) -> dict:
     try:
         sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
                 from (
-                    select 
+                    select
                         ST_MakeLine(cp.p, point.geom) vec,
-                        ST_MakeLine(cp.p, 
+                        ST_MakeLine(cp.p,
                             ST_LineInterpolatePoint(
-                                line.geom, 
+                                line.geom,
                                 ST_LineLocatePoint(line.geom, cp.p) * 1.01)
                         ) seg
                         from (
-                            select 
+                            select
                                 ST_ClosestPoint(line.geom, point.geom)
                         ) p as cp
                     ) as h'''
@@ -304,3 +307,30 @@ def fix_snapping(layer, con) -> dict:
         return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
     except Exception as e:
         return {'message': str(e)}
+
+'''used to remove id from clean instance'''
+def del_id_from_clean_instance(instance, pk):
+    '''update null'''
+    null_list = instance.null
+    if pk in null_list:
+        null_list.remove(pk)
+    '''update multipart'''
+    multipart_list = instance.multipart
+    if pk in multipart_list:
+        multipart_list.remove(pk)
+    '''update duplicate'''
+    duplicate_list = instance.duplicate
+    if pk in duplicate_list:
+        duplicate_list.remove(pk)
+    '''update overlap'''
+    overlap_list = instance.overlap
+    if pk in overlap_list:
+        overlap_list.remove(pk)
+    '''update self_instersect'''
+    self_instersect_list = instance.self_instersect
+    if pk in self_instersect_list:
+        self_instersect_list.remove(pk)
+    '''update snapping'''
+    snapping_list = instance.snapping
+    if pk in snapping_list:
+        snapping_list.remove(pk)

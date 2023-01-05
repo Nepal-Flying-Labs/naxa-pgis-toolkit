@@ -102,6 +102,7 @@ from pgis_toolkit.maps.utils.data_cleaning import (
     check_overlapping,
     check_self_intersection,
     check_snapping,
+    del_id_from_clean_instance,
     fix_duplicate,
     fix_multipart,
     fix_null,
@@ -122,6 +123,7 @@ from pgis_toolkit.utils.vectortile import (
 from .serializers import (
     CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
+    FeatureCollectionMirrorSerializer,
     FeatureCollectionSerializer,
     LayerAttributeListSerializer,
     LayerAttributeSerializer,
@@ -1736,7 +1738,7 @@ def import_template(request):
                 '''creating project layer template object'''
             project_template_instance = ProjectsLayerTemplate.active.create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance)
             project_template_instance_ids.append(project_template_instance.id)
-            template_attributes_values = LayerTemplateAttribute.active.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
             for attribute in template_attributes_values:
                 ProjectsLayerTemplateAttribute.active.create(name=attribute['name'], alias=attribute['alias'], data_type=attribute['data_type'], length=attribute['length'], precision=attribute['precision'], unit=attribute['unit'], layer_template=project_template_instance)
         return Response(data={'message': f'Templates imported succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
@@ -2621,5 +2623,67 @@ def copy_features(request, *args, **kwargs):
             return Response(data={'message': 'Features were replicated successfully'}, status=200)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
+class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for FeatureCollectionMirror objects
+    '''
+    queryset = FeatureCollectionMirror.active.all()
+    http_method_names = ['get', 'patch', 'post']
+    default_serializer_class = FeatureCollectionMirrorSerializer
+    serializer_classes = {
+        # 'list': FeatureCollectionListSerializer,
+        'retrieve': FeatureCollectionMirrorSerializer
+    }
+    permission_classes=[FeatureCollectionPermission]
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        try:
+            errors=[]
+            instance = self.get_object()
+            pk = int(pk)
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            if serializer.is_valid():
+                is_deleted = request.data.get('is_deleted', False)
+                if is_deleted == True or is_deleted == 'True':
+                    cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
+                    del_id_from_clean_instance(cleaning_err_inst, pk)
+                    cleaning_err_inst.save()
+                serializer.save()
+                return Response(data={'message': 'Feature Update Successful!'}, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+'''Bulk delete null geometries'''
+@api_view(['POST'])
+def bulk_del_null_geom(request, *args, **kwargs):
+    try:
+        feature_ids = request.data.get('feature_ids', None)
+        if not feature_ids:
+            return Response(data={'message': 'params feature_ids is missing'}, status=400)
+        feature_ids = [int(id) for id in feature_ids.split(',')]
+        feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
+        if feature_qs.exists():
+            layer = feature_qs[0].layer.id
+            cleaning_err_inst = CleaningErrors.objects.get(layer_id=layer)
+            for pk in feature_ids:
+                del_id_from_clean_instance(cleaning_err_inst, pk)
+            '''finally update cleaning instance'''
+            feature_qs.update(is_deleted=True)
+            cleaning_err_inst.save()
+        else:
+            return Response(data={'message': 'Feature matching queryset not found'}, status=400)
+        return Response(data={'message': 'Features deleted successful.'}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)

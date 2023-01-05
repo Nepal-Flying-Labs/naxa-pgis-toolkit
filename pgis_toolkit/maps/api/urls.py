@@ -5,6 +5,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
+    FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
@@ -25,6 +26,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     analysis_layers,
     buffer_column,
     buffer_distance,
+    bulk_del_null_geom,
     bulk_template_download,
     category,
     check_duplicate_geometry,
@@ -77,6 +79,9 @@ router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttribu
 #Advance Query
 router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
 
+#Data Cleaning
+router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
+
 app_name = "projects"
 
 data_clean_urls = [
@@ -99,6 +104,7 @@ data_clean_urls = [
     path('fix_overlapping_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
     path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
     path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
+    path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
 ]
 
 data_analysis_urls = [
