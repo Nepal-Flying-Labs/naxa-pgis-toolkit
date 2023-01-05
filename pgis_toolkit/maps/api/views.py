@@ -2624,3 +2624,77 @@ def copy_features(request, *args, **kwargs):
             return Response(data={'message': str(e)}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
+
+class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
+    '''
+    Viewset for FeatureCollectionMirror objects
+    '''
+    queryset = FeatureCollectionMirror.active.all()
+    http_method_names = ['get', 'patch', 'post']
+    default_serializer_class = FeatureCollectionMirrorSerializer
+    serializer_classes = {
+        # 'list': FeatureCollectionListSerializer,
+        'retrieve': FeatureCollectionMirrorSerializer
+    }
+    permission_classes=[FeatureCollectionPermission]
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+    pagination_class = CustomPageNumberPagination
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        try:
+            errors=[]
+            instance = self.get_object()
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            if serializer.is_valid():
+                if 'is_deleted' in request.data and request.data['is_deleted'] == True:
+                    cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
+                    error_type = request.data.get('error_type', None)
+                    if not error_type:
+                        return Response(data={'message': 'params error_type is missing'}, status=400)
+                    if error_type =='null':
+                        null_list = list(cleaning_err_inst.null)
+                        if pk in null_list:
+                            null_list.remove(pk)
+                            cleaning_err_inst.null = null_list
+                            cleaning_err_inst.save()
+                    elif error_type =='multipart':
+                        multipart_list = list(cleaning_err_inst.multipart)
+                        if pk in multipart_list:
+                            multipart_list.remove(pk)
+                            cleaning_err_inst.multipart = multipart_list
+                            cleaning_err_inst.save()
+                    elif error_type =='duplicate':
+                        duplicate_list = list(cleaning_err_inst.duplicate)
+                        if pk in duplicate_list:
+                            duplicate_list.remove(pk)
+                            cleaning_err_inst.duplicate = duplicate_list
+                            cleaning_err_inst.save()
+                    elif error_type =='overlap':
+                        overlap_list = list(cleaning_err_inst.overlap)
+                        if pk in overlap_list:
+                            overlap_list.remove(pk)
+                            cleaning_err_inst.overlap = overlap_list
+                            cleaning_err_inst.save()
+                    elif error_type =='self_instersect':
+                        self_instersect_list = list(cleaning_err_inst.self_instersect)
+                        if pk in self_instersect_list:
+                            overlap_list.remove(pk)
+                            cleaning_err_inst.self_instersect = self_instersect_list
+                            cleaning_err_inst.save()
+                    elif error_type =='snapping':
+                        snapping_list = list(cleaning_err_inst.snapping)
+                        if pk in snapping_list:
+                            overlap_list.remove(pk)
+                            cleaning_err_inst.snapping = snapping_list
+                            cleaning_err_inst.save()
+                serializer.save()
+                return Response(data={'message': 'Feature Update Successful!'}, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)

@@ -199,3 +199,8 @@ class CleaningErrorsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CleaningErrors
         fields = '__all__'
+
+class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollectionMirror
+        fields= '__all__'

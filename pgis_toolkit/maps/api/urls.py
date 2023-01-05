@@ -5,6 +5,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
+    FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
     LayerAttributeViewset,
@@ -76,6 +77,9 @@ router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttribu
 
 #Advance Query
 router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
+
+#Data Cleaning
+router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
 
 app_name = "projects"
 
