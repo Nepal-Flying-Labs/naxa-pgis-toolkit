@@ -80,7 +80,7 @@ def check_duplicate(data: GeoDataFrame, layer) -> dict:
     data = data.drop(axis=1, columns=["attributes"])
     sum = data.duplicated().sum()
     gdf = data.loc[data.duplicated(), :]
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate":[list(gdf['id'])]})
+    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate": list(gdf['id'])})
     content = {"error_data": sum, "total_data": total_data}
     return content
 
@@ -188,14 +188,16 @@ def check_snapping(layer, con) -> dict:
 #===================
 # Cleaning data
 #===================
-def fix_null(data: GeoDataFrame) -> dict:
+def fix_null(data: GeoDataFrame, layer) -> dict:
     try:
         data = data[~data.is_empty]
-        return "Successfully fixed null geometry", data.to_json()
+        content = check_null(data, layer)
+        return {"message": "Successfully fixed null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
     except:
-        return "Failed to fix null geometry", data.to_json()
+        content = check_null(data, layer)
+        return {"message": "Failed to fix null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
 
-def fix_multipart(data: GeoDataFrame) -> dict:
+def fix_multipart(data: GeoDataFrame, layer) -> dict:
     try:
         df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
         for i, row in data.iterrows():
@@ -206,16 +208,20 @@ def fix_multipart(data: GeoDataFrame) -> dict:
                 if value != 'geometry':
                     data.at[i,value] = row[value]
             df = pd.concat([df, data])
-        return "Successfully fixed multipart geometry", df
+        content = check_multipart(df, layer)
+        return {"message": "Successfully fixed multipart geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
     except:
-        return "Failed to fix multipart geometry", data
+        content = check_multipart(data, layer)
+        return {"message": "Failed to fix null geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
 
-def fix_duplicate(data: GeoDataFrame) -> dict:
+def fix_duplicate(data: GeoDataFrame, layer) -> dict:
     try:
         data = data.drop_duplicates(keep='last')
-        return "Successfully fixed duplicate geometry", data
+        content = check_duplicate(data, layer)
+        return {"message": "Successfully fixed duplicate geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
     except:
-        return "Failed to fix duplicate geometry", data
+        content = check_duplicate(data, layer)
+        return {"message": "Failed to fix duplicate geometry", "error_data": content["error_data"], "total_data": content["total_data"]}
 
 def fix_overlapping(data: GeoDataFrame) -> dict:
     try: 
@@ -251,7 +257,7 @@ def fix_self_intersection(data: GeoDataFrame) -> dict:
                 multi_point = MultiPoint(points)
                 result = ops.split(row.geometry, multi_point)
                 for geom in result.geoms:
-                    if geom.length > convert_distance_to_4326(50):
+                    if geom.length > convert_distance_to_4326(10):
                         df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
             else:
                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
