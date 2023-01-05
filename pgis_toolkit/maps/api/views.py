@@ -2698,3 +2698,28 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+'''Bulk delete null geometries'''
+@api_view(['POST'])
+def bulk_del_null_geom(request, *args, **kwargs):
+    try:
+        feature_ids = request.query_params.get('feature_ids', None)
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'params layer is missing'}, status=400)
+        if not feature_ids:
+            return Response(data={'message': 'params feature_ids is missing'}, status=400)
+        feature_ids = [int(id) for id in feature_ids.split(',')]
+        feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
+        if feature_qs.exists():
+            feature_qs.update(is_deleted=True)
+            cleaning_err_inst = CleaningErrors.objects.get(layer_id=layer)
+            null_list = list(cleaning_err_inst.null)
+            for pk in feature_ids:
+                if pk in null_list:
+                    null_list.remove(pk)
+            cleaning_err_inst.null = null_list
+            cleaning_err_inst.save()
+        return Response(data={'message': 'Features deleted successful.'}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)

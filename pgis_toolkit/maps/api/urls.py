@@ -26,6 +26,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     analysis_layers,
     buffer_column,
     buffer_distance,
+    bulk_del_null_geom,
     bulk_template_download,
     category,
     check_duplicate_geometry,
@@ -103,6 +104,7 @@ data_clean_urls = [
     path('fix_overlay_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
     path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
     path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
+    path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
 ]
 
 data_analysis_urls = [
