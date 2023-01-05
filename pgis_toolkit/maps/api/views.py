@@ -2374,7 +2374,7 @@ def fix_null_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_null(gdf)
+            content = fix_null(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2390,9 +2390,9 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry As geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_multipart(gdf)
+            content = fix_multipart(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2410,7 +2410,7 @@ def fix_duplicate_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_duplicate(gdf)
+            content = fix_duplicate(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2428,7 +2428,7 @@ def fix_overlay_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_overlapping(gdf)
+            content = fix_overlapping(layer, con)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2446,7 +2446,7 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_self_intersection(gdf)
+            content = fix_self_intersection(gdf, layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2464,7 +2464,7 @@ def fix_isolated_geometry(request, *args, **kwargs):
         if layer_qs.exists():
             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
-            content = fix_snapping(gdf)
+            content = fix_snapping(layer, con)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
