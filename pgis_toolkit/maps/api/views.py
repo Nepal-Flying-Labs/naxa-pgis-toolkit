@@ -2646,49 +2646,39 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
         try:
             errors=[]
             instance = self.get_object()
+            pk = int(pk)
             serializer = self.get_serializer(instance, data=request.data, partial=True)
             if serializer.is_valid():
-                if 'is_deleted' in request.data and request.data['is_deleted'] == True:
+                is_deleted = request.data.get('is_deleted', False)
+                if is_deleted == True or is_deleted == 'True':
                     cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
-                    error_type = request.data.get('error_type', None)
-                    if not error_type:
-                        return Response(data={'message': 'params error_type is missing'}, status=400)
-                    if error_type =='null':
-                        null_list = list(cleaning_err_inst.null)
-                        if pk in null_list:
-                            null_list.remove(pk)
-                            cleaning_err_inst.null = null_list
-                            cleaning_err_inst.save()
-                    elif error_type =='multipart':
-                        multipart_list = list(cleaning_err_inst.multipart)
-                        if pk in multipart_list:
-                            multipart_list.remove(pk)
-                            cleaning_err_inst.multipart = multipart_list
-                            cleaning_err_inst.save()
-                    elif error_type =='duplicate':
-                        duplicate_list = list(cleaning_err_inst.duplicate)
-                        if pk in duplicate_list:
-                            duplicate_list.remove(pk)
-                            cleaning_err_inst.duplicate = duplicate_list
-                            cleaning_err_inst.save()
-                    elif error_type =='overlap':
-                        overlap_list = list(cleaning_err_inst.overlap)
-                        if pk in overlap_list:
-                            overlap_list.remove(pk)
-                            cleaning_err_inst.overlap = overlap_list
-                            cleaning_err_inst.save()
-                    elif error_type =='self_instersect':
-                        self_instersect_list = list(cleaning_err_inst.self_instersect)
-                        if pk in self_instersect_list:
-                            overlap_list.remove(pk)
-                            cleaning_err_inst.self_instersect = self_instersect_list
-                            cleaning_err_inst.save()
-                    elif error_type =='snapping':
-                        snapping_list = list(cleaning_err_inst.snapping)
-                        if pk in snapping_list:
-                            overlap_list.remove(pk)
-                            cleaning_err_inst.snapping = snapping_list
-                            cleaning_err_inst.save()
+                    '''update null'''
+                    null_list = cleaning_err_inst.null
+                    if pk in null_list:
+                        null_list.remove(pk)
+                    '''update multipart'''
+                    multipart_list = cleaning_err_inst.multipart
+                    if pk in multipart_list:
+                        multipart_list.remove(pk)
+                    '''update duplicate'''
+                    duplicate_list = cleaning_err_inst.duplicate
+                    if pk in duplicate_list:
+                        duplicate_list.remove(pk)
+                    '''update overlap'''
+                    overlap_list = cleaning_err_inst.overlap
+                    if pk in overlap_list:
+                        overlap_list.remove(pk)
+                    '''update self_instersect'''
+                    self_instersect_list = cleaning_err_inst.self_instersect
+                    if pk in self_instersect_list:
+                        self_instersect_list.remove(pk)
+                    '''update snapping'''
+                    snapping_list = cleaning_err_inst.snapping
+                    if pk in snapping_list:
+                        snapping_list.remove(pk)
+                    '''finally update cleaning instance'''
+                    cleaning_err_inst.save()
+
                 serializer.save()
                 return Response(data={'message': 'Feature Update Successful!'}, status=200)
             else:
@@ -2703,22 +2693,44 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
 @api_view(['POST'])
 def bulk_del_null_geom(request, *args, **kwargs):
     try:
-        feature_ids = request.query_params.get('feature_ids', None)
-        layer = request.query_params.get('layer', None)
-        if not layer:
-            return Response(data={'message': 'params layer is missing'}, status=400)
+        feature_ids = request.data.get('feature_ids', None)
+        # layer = request.data.get('layer', None)
+        # if not layer:
+        #     return Response(data={'message': 'params layer is missing'}, status=400)
         if not feature_ids:
             return Response(data={'message': 'params feature_ids is missing'}, status=400)
         feature_ids = [int(id) for id in feature_ids.split(',')]
         feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
         if feature_qs.exists():
-            feature_qs.update(is_deleted=True)
+            layer = feature_qs[0].layer.id
             cleaning_err_inst = CleaningErrors.objects.get(layer_id=layer)
-            null_list = list(cleaning_err_inst.null)
             for pk in feature_ids:
+                '''update null'''
+                null_list = cleaning_err_inst.null
                 if pk in null_list:
                     null_list.remove(pk)
-            cleaning_err_inst.null = null_list
+                '''update multipart'''
+                multipart_list = cleaning_err_inst.multipart
+                if pk in multipart_list:
+                    multipart_list.remove(pk)
+                '''update duplicate'''
+                duplicate_list = cleaning_err_inst.duplicate
+                if pk in duplicate_list:
+                    duplicate_list.remove(pk)
+                '''update overlap'''
+                overlap_list = cleaning_err_inst.overlap
+                if pk in overlap_list:
+                    overlap_list.remove(pk)
+                '''update self_instersect'''
+                self_instersect_list = cleaning_err_inst.self_instersect
+                if pk in self_instersect_list:
+                    self_instersect_list.remove(pk)
+                '''update snapping'''
+                snapping_list = cleaning_err_inst.snapping
+                if pk in snapping_list:
+                    snapping_list.remove(pk)
+            '''finally update cleaning instance'''
+            feature_qs.update(is_deleted=True)
             cleaning_err_inst.save()
         return Response(data={'message': 'Features deleted successful.'}, status=200)
     except Exception as e:
