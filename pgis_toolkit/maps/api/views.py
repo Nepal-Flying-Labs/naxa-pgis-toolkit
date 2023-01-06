@@ -2723,10 +2723,7 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id=request.GET['layer']
         error_type = request.GET['type']
-        print(layer_id, error_type, "are params")
         instance=CleaningErrors.objects.get(layer_id=layer_id)
-        print(instance, "is instance")
-        print(instance.multipart, "is null geoms")
         '''filter by layer id'''
         if error_type == 'null':
             queryset=FeatureCollectionMirror.active.filter(id__in=instance.null)

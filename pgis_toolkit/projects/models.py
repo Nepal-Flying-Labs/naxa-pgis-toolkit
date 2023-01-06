@@ -83,6 +83,7 @@ class Organization(IsDeleted,DateTimeStamp):
     description = models.CharField(max_length=254, blank=True, null=True)
     size = models.CharField(max_length=10,blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
+    cover_image = models.ImageField(upload_to='organization_cover_image/', blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
