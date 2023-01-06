@@ -409,6 +409,10 @@ def project_theme_layers(request):
                     # sub_layer_item['feature_count']=len(FeatureCollection.active.filter(sub_layer=sub_layer['id']))
                     sub_layer_list.append(sub_layer_item)
 
+                icon,style,std_icon=get_style_detail(layer['id'],None,project_style)
+                layer_item['icon']=icon
+                layer_item['std_icon']=std_icon
+                layer_item['style']=style
                 vector_layer = Vectorlayer.objects.filter(layer=layer['id'])
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
@@ -2719,10 +2723,7 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id=request.GET['layer']
         error_type = request.GET['type']
-        print(layer_id, error_type, "are params")
         instance=CleaningErrors.objects.get(layer_id=layer_id)
-        print(instance, "is instance")
-        print(instance.multipart, "is null geoms")
         '''filter by layer id'''
         if error_type == 'null':
             queryset=FeatureCollectionMirror.active.filter(id__in=instance.null)
@@ -2738,6 +2739,5 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
             queryset=FeatureCollectionMirror.active.filter(id__in=instance.snapping)
         else:
             queryset = None
-        print(queryset, "is queryset")
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
