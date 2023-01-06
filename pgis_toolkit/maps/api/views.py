@@ -2216,7 +2216,7 @@ def check_layer(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             null_check = check_null(gdf)
             multipart_check = check_multipart(gdf)
@@ -2238,7 +2238,7 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = check_null(gdf, layer)
             return Response(content)
@@ -2256,7 +2256,7 @@ def check_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = check_multipart(gdf, layer)
             return Response(content)
@@ -2274,7 +2274,7 @@ def check_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = check_duplicate(gdf, layer)
             return Response(content)
@@ -2308,7 +2308,7 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = check_self_intersection(gdf, layer)
             return Response(content)
@@ -2342,7 +2342,7 @@ def check_isolated_geometry(request, *args, **kwargs):
 #             return Response(data={'message': 'layer params is missing!'}, status=400)
 #         layer_qs = Vectorlayer.objects.filter(layer=layer)
 #         if layer_qs.exists():
-#             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#             sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
 #             gdf = geopandas.read_postgis(sql, con)
 #             try:
 #                 error_data = CleaningErrors.objects.get(layer_id=layer)
@@ -2375,7 +2375,7 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = fix_null(gdf, layer)
             return Response(content)
@@ -2393,7 +2393,7 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry As geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry As geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = fix_multipart(gdf, layer)
             return Response(content)
@@ -2411,7 +2411,7 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = fix_duplicate(gdf, layer)
             return Response(content)
@@ -2429,7 +2429,7 @@ def fix_overlay_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = fix_overlapping(layer, con)
             return Response(content)
@@ -2447,7 +2447,7 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
             gdf = geopandas.read_postgis(sql, con)
             content = fix_self_intersection(gdf, layer)
             return Response(content)
