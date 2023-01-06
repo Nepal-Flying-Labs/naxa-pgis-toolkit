@@ -2674,7 +2674,8 @@ def bulk_del_null_geom(request, *args, **kwargs):
         feature_ids = request.data.get('feature_ids', None)
         if not feature_ids:
             return Response(data={'message': 'params feature_ids is missing'}, status=400)
-        feature_ids = [int(id) for id in feature_ids.split(',')]
+        # feature_ids = [int(id) for id in feature_ids.split(',')]
+        feature_ids = json.loads(feature_ids)
         feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
         if feature_qs.exists():
             layer = feature_qs[0].layer.id
