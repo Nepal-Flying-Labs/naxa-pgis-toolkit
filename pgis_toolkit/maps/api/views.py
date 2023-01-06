@@ -2741,3 +2741,19 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
             queryset = None
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''GeoJSON API for features mirror.'''
+'''{{baseURL}}api/maps/feature/2/'''
+class ErrorFeatureGeoJSONAPIView(APIView):
+    permission_classes = [FeatureGeoJSONPermission]
+    def get(self, request, pk=None, *args, **kwargs):
+        try:
+            feature_qs = FeatureCollectionMirror.active.filter(id=pk)
+            if feature_qs.exists():
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer', 'sub_layer'))
+                geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=status.HTTP_200_OK)
+            else:
+                return Response(data={'message': 'FeatureCollectionMirror matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
