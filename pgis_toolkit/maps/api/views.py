@@ -2690,3 +2690,54 @@ def bulk_del_null_geom(request, *args, **kwargs):
         return Response(data={'message': 'Features deleted successful.'}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
+
+
+'''cleaning error features vectortile'''
+class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
+    '''
+    VectorTile Generation for Data cleaning error features
+    url:"http://localhost:8000/api/maps/error_features_vectortile/{z}/{x}/{y}/?layer=816&type=multipart",
+    '''
+    vector_tile_layer_name = None
+    vector_tile_fields = ('pk','layer')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'layer' not in request_keys or request.GET['layer'] == "" or 'type' not in request_keys or request.GET['type'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        layer_id=request.GET['layer']
+        error_type = request.GET['type']
+        print(layer_id, error_type, "are params")
+        instance=CleaningErrors.objects.get(layer_id=layer_id)
+        print(instance, "is instance")
+        print(instance.multipart, "is null geoms")
+        '''filter by layer id'''
+        if error_type == 'null':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.null)
+        elif error_type == 'multipart':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.multipart)
+        elif error_type == 'duplicate':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.duplicate)
+        elif error_type == 'overlap':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.overlap)
+        elif error_type == 'self_instersect':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.self_instersect)
+        elif error_type == 'snapping':
+            queryset=FeatureCollectionMirror.active.filter(id__in=instance.snapping)
+        else:
+            queryset = None
+        print(queryset, "is queryset")
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
