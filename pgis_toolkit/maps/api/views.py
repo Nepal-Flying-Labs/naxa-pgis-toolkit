@@ -2655,8 +2655,10 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
                     cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
                     del_id_from_clean_instance(cleaning_err_inst, pk)
                     cleaning_err_inst.save()
+                    serializer.save()
+                    return Response(data={'message': 'Feature Delete Successful'}, status=200)
                 serializer.save()
-                return Response(data={'message': 'Feature Update Successful!'}, status=200)
+                return Response(data=serializer.data, status=200)
             else:
                 for er in serializer._errors:
                     errors.append(
