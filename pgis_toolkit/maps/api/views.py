@@ -2608,7 +2608,7 @@ def cleaning_error_features(request, *args, **kwargs):
 @api_view(['POST'])
 def copy_features(request, *args, **kwargs):
     try:
-        layer = request.query_params.get('layer', None)
+        layer = request.data.get('layer', None)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
         if not FeatureCollection.active.filter(layer=layer).exists():
@@ -2655,8 +2655,10 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
                     cleaning_err_inst = CleaningErrors.objects.get(layer_id=instance.layer.id)
                     del_id_from_clean_instance(cleaning_err_inst, pk)
                     cleaning_err_inst.save()
+                    serializer.save()
+                    return Response(data={'message': 'Feature Delete Successful'}, status=200)
                 serializer.save()
-                return Response(data={'message': 'Feature Update Successful!'}, status=200)
+                return Response(data=serializer.data, status=200)
             else:
                 for er in serializer._errors:
                     errors.append(
@@ -2672,7 +2674,8 @@ def bulk_del_null_geom(request, *args, **kwargs):
         feature_ids = request.data.get('feature_ids', None)
         if not feature_ids:
             return Response(data={'message': 'params feature_ids is missing'}, status=400)
-        feature_ids = [int(id) for id in feature_ids.split(',')]
+        # feature_ids = [int(id) for id in feature_ids.split(',')]
+        feature_ids = json.loads(feature_ids)
         feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
         if feature_qs.exists():
             layer = feature_qs[0].layer.id
