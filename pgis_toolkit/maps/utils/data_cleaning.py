@@ -102,12 +102,12 @@ def check_overlapping(layer, con) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
     gdf = gpd.read_postgis(sql, con)
     total_data = len(gdf)
     sql = f'''SELECT a.* From
-            (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a
-            INNER JOIN (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) b ON
+            (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+            INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
             (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
             WHERE a.id != b.id'''
     try:
@@ -158,13 +158,13 @@ def check_snapping(layer, con) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
     gdf = gpd.read_postgis(sql, con)
     total_data = len(gdf)
     sql = f'''WITH segments AS (
         SELECT id as id, (
         ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
-        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollection WHERE layer_id={layer}) as dumps
+        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
         )
         SELECT * FROM segments WHERE geometry IS NOT NULL;'''
     data = gpd.read_postgis(sql, con, geom_col="geometry")
@@ -177,7 +177,7 @@ def check_snapping(layer, con) -> dict:
     gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
     try:
         gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='topology')
-        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollection WHERE layer_id={layer}) a
+        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
             INNER JOIN snap_points b ON
             (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
         f_data = gpd.read_postgis(s, con, geom_col="geometry")
