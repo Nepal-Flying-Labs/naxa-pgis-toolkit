@@ -2608,7 +2608,7 @@ def cleaning_error_features(request, *args, **kwargs):
 @api_view(['POST'])
 def copy_features(request, *args, **kwargs):
     try:
-        layer = request.query_params.get('layer', None)
+        layer = request.data.get('layer', None)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
         if not FeatureCollection.active.filter(layer=layer).exists():
