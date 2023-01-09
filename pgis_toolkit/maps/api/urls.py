@@ -60,6 +60,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     project_theme_layers,
     reorder,
     service_area_analysis,
+    sync_features,
     update_template_attributes,
 )
 
@@ -107,6 +108,8 @@ data_clean_urls = [
     path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
     path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
     path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
+    #sync features to feature_collection table after data clean
+    path('sync_features/', sync_features, name='sync_features'),
 ]
 
 data_analysis_urls = [
