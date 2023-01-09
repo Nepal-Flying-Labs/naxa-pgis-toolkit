@@ -352,7 +352,7 @@ def project_theme_layers(request):
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status', 'is_clean')
             for layer in group_layer_qs:
                 layer_item=layer
                 if layer['layer_type']=="Vector":
@@ -388,7 +388,7 @@ def project_theme_layers(request):
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
 
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status')
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status', 'is_clean')
         for layer in layer_qs:
             layer_item=layer
             if layer['layer_type']=="Vector":
@@ -2618,7 +2618,7 @@ def copy_features(request, *args, **kwargs):
         if not FeatureCollection.active.filter(layer=layer).exists():
             return Response(data={'message': 'No any features found for the layer'}, status=400)
         delete_sql = f'DELETE FROM maps_featurecollectionmirror WHERE layer_id={layer}'
-        insert_sql = f'INSERT INTO maps_featurecollectionmirror (layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM maps_featurecollection WHERE layer_id = {layer})'
+        insert_sql = f'INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM maps_featurecollection WHERE layer_id = {layer})'
         try:
             with connection.cursor() as cursor:
                 cursor = connection.cursor()
@@ -2641,7 +2641,7 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
         # 'list': FeatureCollectionListSerializer,
         'retrieve': FeatureCollectionMirrorSerializer
     }
-    permission_classes=[FeatureCollectionPermission]
+    # permission_classes=[FeatureCollectionPermission]
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
@@ -2741,3 +2741,23 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
             queryset = None
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''GeoJSON API for features mirror.'''
+'''{{baseURL}}api/maps/feature/?feature_id=&mirror_id'''
+class ErrorFeatureGeoJSONAPIView(APIView):
+    def get(self, request, pk=None, *args, **kwargs):
+        try:
+            feature_id = request.query_params.get('feature_id', None)
+            mirror_id = request.query_params.get('mirror_id', None)
+            if feature_id:
+                feature_qs = FeatureCollectionMirror.active.filter(feature=feature_id)
+            elif mirror_id:
+                feature_qs = FeatureCollectionMirror.active.filter(id=mirror_id)
+            if feature_qs.exists():
+                data = serialize('geojson', feature_qs, geometry_field='geometry', fields=('pk', 'layer', 'sub_layer'))
+                geojson_data = json.loads(data)
+                return Response(data=geojson_data, status=status.HTTP_200_OK)
+            else:
+                return Response(data={'message': 'FeatureCollectionMirror matching queryset does not exist!'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)

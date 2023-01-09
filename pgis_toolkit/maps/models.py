@@ -75,6 +75,7 @@ class Layer(IsDeleted,DateTimeStamp):
     source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
     # category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name='LayerCategory', blank=True, null=True)
     upload_status = models.CharField(max_length=20, default='uploading', choices=LAYER_UPLOAD_STATUS)
+    is_clean = models.BooleanField(default=False) #data cleaned or not
 
     def __str__(self):
         return f'{self.id} {self.name}'
@@ -297,6 +298,7 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
             print(f'error in def save of feature collection: {str(e)}')
 
 class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
+    feature = models.ForeignKey(FeatureCollection, on_delete=models.CASCADE, blank=True, null=True, related_name="feature")
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature_mirror")
     attributes=models.JSONField(blank=True, null=True)
