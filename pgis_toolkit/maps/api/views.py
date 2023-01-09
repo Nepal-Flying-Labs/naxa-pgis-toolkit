@@ -352,7 +352,7 @@ def project_theme_layers(request):
         group_qs=layer_group_queryset.filter(theme=theme_id).order_by("order")
         for group in group_qs:
             group_layer_list=[]
-            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status')
+            group_layer_qs=layer_queryset.filter(group=group.id).order_by('order').values('id','name','layer_type', 'upload_status', 'is_clean')
             for layer in group_layer_qs:
                 layer_item=layer
                 if layer['layer_type']=="Vector":
@@ -388,7 +388,7 @@ def project_theme_layers(request):
             group_item={"id":group.id,"type":"group","name":group.name,'layer':group_layer_list}
             options.append(group_item)
 
-        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status')
+        layer_qs=layer_queryset.filter(theme=theme_id,group=None).order_by('order').values('id','name','layer_type','upload_status', 'is_clean')
         for layer in layer_qs:
             layer_item=layer
             if layer['layer_type']=="Vector":
