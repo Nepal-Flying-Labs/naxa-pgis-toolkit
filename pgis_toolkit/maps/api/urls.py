@@ -140,7 +140,7 @@ urlpatterns = [
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('cleaning_error_features/', cleaning_error_features, name='cleaning_error_features'),
     path('error_features_vectortile/<int:z>/<int:x>/<int:y>/', ErrorFeaturesVectorTileQuerySet.as_view(), name='error_features_vectortile'),
-    path('error_feature_geojson/<int:pk>/', ErrorFeatureGeoJSONAPIView.as_view(), name='error_feature'),
+    path('error_feature_geojson/', ErrorFeatureGeoJSONAPIView.as_view(), name='error_feature'),
 
 
     # Data Merge
