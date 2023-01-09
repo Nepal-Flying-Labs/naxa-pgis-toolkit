@@ -76,7 +76,7 @@ class FeatureCollectionAdmin(admin.ModelAdmin):
     search_fields=('layer__id',)
 
 class FeatureCollectionMirrorAdmin(admin.ModelAdmin):
-    list_display = ('id', 'layer','sub_layer')
+    list_display = ('id', 'layer','sub_layer', 'feature')
     list_filter = ('layer', )
     search_fields=('layer__id',)
 
