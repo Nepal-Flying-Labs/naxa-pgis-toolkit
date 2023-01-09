@@ -1462,7 +1462,38 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         serializer = self.get_serializer(paginated_queryset, many=True, context={})
         return paginator.get_paginated_response(data=serializer.data)
 
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            instance = self.get_object()
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            if serializer.is_valid():
+                Layer.active.filter(id=instance.layer.id).update(is_clean=False)
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                Layer.active.filter(id=created_object.layer.id).update(is_clean=False)
+                return Response(data=serializer.data, status=201)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 class LayerGroupViewset(viewsets.ModelViewSet):
     '''
