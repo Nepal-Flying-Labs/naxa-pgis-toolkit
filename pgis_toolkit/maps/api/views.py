@@ -2375,9 +2375,7 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_null(gdf, layer)
+            content = fix_null(layer, con)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
