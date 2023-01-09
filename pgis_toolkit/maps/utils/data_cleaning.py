@@ -8,7 +8,7 @@ from geopandas import GeoDataFrame
 from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint, Point
 
-from pgis_toolkit.maps.models import CleaningErrors
+from pgis_toolkit.maps.models import FeatureCollectionMirror, CleaningErrors
 
 
 #===================
@@ -176,7 +176,7 @@ def check_snapping(layer, con) -> dict:
     points = [Point(xy) for xy in isolated]
     gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
     try:
-        gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='topology')
+        gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
         s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
             INNER JOIN snap_points b ON
             (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
@@ -191,12 +191,15 @@ def check_snapping(layer, con) -> dict:
 #===================
 # Cleaning data
 #===================
-def fix_null(data: GeoDataFrame, layer) -> dict:
+def fix_null(layer, con) -> dict:
+    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
+    data = gpd.read_postgis(sql, con)
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
-        data = data[~data.is_empty]
+        for feature in null_error:
+            con.execute("DELETE FROM maps_featurecollectionmirror WHERE layer_id={feature}")
         content = check_null(data, layer)
         return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
     except Exception as e:
@@ -300,6 +303,12 @@ def fix_snapping(layer, con) -> dict:
                         ) p as cp
                     ) as h'''
         s = '''ST_Contains(ST_Buffer(line.geom, 100, 'side=left'), point.geom)'''
+#         SELECT ST_Union(a.geom, b.geom)
+# FROM linestring_table a, linestring_table b
+# WHERE ST_Distance(a.geom, b.geom) < distance_threshold
+# AND a.id = 'given_linestring_id'
+# AND b.id != 'given_linestring_id'
+
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
