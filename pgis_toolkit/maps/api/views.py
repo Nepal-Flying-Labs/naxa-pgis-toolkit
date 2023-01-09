@@ -2615,12 +2615,30 @@ def copy_features(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing'}, status=400)
         if not FeatureCollection.active.filter(layer=layer).exists():
             return Response(data={'message': 'No any features found for the layer'}, status=400)
-        delete_sql = f'DELETE FROM maps_featurecollectionmirror WHERE layer_id={layer}'
-        insert_sql = f'INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM maps_featurecollection WHERE layer_id = {layer})'
+        # delete_sql = f'DELETE FROM maps_featurecollectionmirror WHERE layer_id={layer}'
+        # insert_sql = f'INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM maps_featurecollection WHERE layer_id = {layer})'
+        update_sql = f'''UPDATE maps_featurecollectionmirror m SET
+                            feature_id = f.id,
+                            layer_id = f.layer_id,
+                            sub_layer_id = f.sub_layer_id,
+                            attributes = f.attributes,
+                            geometry = f.geometry,
+                            is_deleted = f.is_deleted,
+                            last_updated = f.last_updated,
+                            uploaded_date = f. uploaded_date
+                        FROM maps_featurecollection f
+                        WHERE f.layer_id = {layer} AND f.id=m.feature_id'''
+
+        insert_sql = f'''INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date)
+                        (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date
+                            FROM maps_featurecollection
+                            WHERE layer_id = {layer} AND id NOT IN (SELECT feature_id FROM maps_featurecollectionmirror WHERE layer_id = {layer} AND feature_id IS NOT NULL)
+                        )'''
+
         try:
             with connection.cursor() as cursor:
                 cursor = connection.cursor()
-                cursor.execute(delete_sql)
+                cursor.execute(update_sql)
                 cursor.execute(insert_sql)
             return Response(data={'message': 'Features were replicated successfully'}, status=200)
         except Exception as e:
