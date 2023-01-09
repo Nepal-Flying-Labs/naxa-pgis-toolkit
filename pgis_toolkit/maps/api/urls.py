@@ -5,6 +5,8 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
+    ErrorFeatureGeoJSONAPIView,
+    ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
@@ -137,6 +139,10 @@ urlpatterns = [
     path('feature_popup/', feature_popup, name='feature_popup'),
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('cleaning_error_features/', cleaning_error_features, name='cleaning_error_features'),
+    path('error_features_vectortile/<int:z>/<int:x>/<int:y>/', ErrorFeaturesVectorTileQuerySet.as_view(), name='error_features_vectortile'),
+    path('error_feature_geojson/', ErrorFeatureGeoJSONAPIView.as_view(), name='error_feature'),
+
+
     # Data Merge
     path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
     path('get_data_merge_update_task_response/', get_data_merge_update_task_response),
