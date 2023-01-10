@@ -15,6 +15,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     LayerViewSet,
+    MirrorFeatureVectorTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
@@ -144,6 +145,7 @@ urlpatterns = [
     path('cleaning_error_features/', cleaning_error_features, name='cleaning_error_features'),
     path('error_features_vectortile/<int:z>/<int:x>/<int:y>/', ErrorFeaturesVectorTileQuerySet.as_view(), name='error_features_vectortile'),
     path('error_feature_geojson/', ErrorFeatureGeoJSONAPIView.as_view(), name='error_feature'),
+    path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
 
 
     # Data Merge
