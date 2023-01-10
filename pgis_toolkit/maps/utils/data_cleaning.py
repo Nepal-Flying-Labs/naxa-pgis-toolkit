@@ -1,6 +1,8 @@
 import collections
 
 import geopandas as gpd
+from rest_framework.response import Response
+from django.db import connection
 import momepy
 import networkx as nx
 from config.settings.base import env
@@ -19,6 +21,22 @@ def get_all_layer(layer):
     sql = f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id={layer} and is_deleted=false"
     data = gpd.read_postgis(sql, con)
     return data
+
+def get_layers(ids):
+    count = len(ids)
+    if count == 0:
+        return Response (data={'features_count': 0}, status=200)
+    if count == 1:
+        feature_ids = ids[0]
+        raw_query=f"SELECT * FROM maps_featurecollectionmirror WHERE id = {feature_ids} and is_deleted=false"
+    else:
+        feature_ids = tuple(ids)
+        raw_query=f"SELECT * FROM maps_featurecollectionmirror WHERE id IN {feature_ids} and is_deleted=false"
+    with connection.cursor() as cursor:
+        cursor.execute(raw_query)
+        result = cursor.fetchall()
+    data = gpd.read_postgis(raw_query, con, geom_col='geometry')
+    print(data)
 
 
 #===================
@@ -131,7 +149,7 @@ def check_overlapping(layer) -> dict:
     except:
         return {"message": "Query failed"}
 
-def check_self_intersection(data: GeoDataFrame, layer) -> dict:
+def check_self_intersection(layer):
     """Check if the geometry has self intersection or not
 
     Parameters
@@ -156,7 +174,7 @@ def check_self_intersection(data: GeoDataFrame, layer) -> dict:
     content = {"error_data": len(self_intersection_rows), "total_data": total_data}
     return content
 
-def check_snapping(layer) -> dict:
+def check_snapping(layer):
     """Check for isolated points
 
     Parameters
@@ -221,16 +239,18 @@ def fix_multipart(layer) -> dict:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             multipart_error = cleaning_error_qs.values('multipart')[0]
-        # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-        # for i, row in data.iterrows():
-        #     data = ops.linemerge(row.geometry)
-        #     data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
-        #     data = data.explode(index_parts=True)
-        #     for value in row.keys():
-        #         if value != 'geometry':
-        #             data.at[i,value] = row[value]
-        #     df = pd.concat([df, data])
-        #     print(type(df))
+        data = get_all_layer(layer)
+        m = get_layers(multipart_error["multipart"])
+        df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
+        for i, row in data.iterrows():
+            data = ops.linemerge(row.geometry)
+            data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
+            data = data.explode(index_parts=True)
+            for value in row.keys():
+                if value != 'geometry':
+                    data.at[i,value] = row[value]
+            df = pd.concat([df, data])
+        print(df)
         content = check_multipart(layer)
         return {"new_error": content["error_data"], "prev_error": len(multipart_error["multipart"])}
     except Exception as e:
@@ -252,6 +272,7 @@ def fix_overlapping(layer) -> dict:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
+        m = get_layers(overlap_error["overlap"])
         content = check_overlapping(layer)
         return {"new_error": content["error_data"], "prev_error": len(overlap_error["overlap"])}
     except Exception as e:
