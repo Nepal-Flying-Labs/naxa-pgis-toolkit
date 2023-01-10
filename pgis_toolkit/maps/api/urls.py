@@ -5,16 +5,17 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     DataMergeUpdateAPIView,
-    ErrorFeatureGeoJSONAPIView,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
+    FeatureMirrorGeoJSONAPIView,
     LayerAttributeViewset,
     LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
     LayerViewSet,
+    MirrorFeatureVectorTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
@@ -139,7 +140,8 @@ urlpatterns = [
     path('map_config/', ProjectMapConfigAPIView.as_view(), name='map_config'),
     path('cleaning_error_features/', cleaning_error_features, name='cleaning_error_features'),
     path('error_features_vectortile/<int:z>/<int:x>/<int:y>/', ErrorFeaturesVectorTileQuerySet.as_view(), name='error_features_vectortile'),
-    path('error_feature_geojson/', ErrorFeatureGeoJSONAPIView.as_view(), name='error_feature'),
+    path('feature_mirror_geojson/', FeatureMirrorGeoJSONAPIView.as_view(), name='feature_mirror_geojson'),
+    path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
 
 
     # Data Merge
