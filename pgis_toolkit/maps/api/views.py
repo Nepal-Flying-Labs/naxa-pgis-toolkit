@@ -1944,7 +1944,7 @@ def road_class_to_kmph(road_class):
     else:
         return 50
 
-class ShortestPathAPIView(APIView):
+class OptimumPathAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwarggs):
         '''
@@ -1991,7 +1991,7 @@ class ShortestPathAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = 'not implemented'
+                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
@@ -2002,102 +2002,33 @@ class ShortestPathAPIView(APIView):
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
-            # result = {}
-            # # download street network data from OSM and construct a MultiDiGraph model
-            # # lat=0.319363
-            # # long = 34.572876
-            # # distance = 5000 #in meters
-            # G = ox.graph_from_point((lat, long), dist=distance)
-            # nodes, edges = ox.graph_to_gdfs(G)
+class ServiceAreaAnalysisAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwarggs):
+        try:
+            request_dict = request.data
+            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
+            for key in check_list:
+                if key not in request_dict or request_dict[key]=='':
+                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
+            source = request_dict['source']
+            origin_long = float(request_dict['origin_long'])
+            origin_lat = float(request_dict['origin_lat'])
+            destination_long = float(request_dict['destination_long'])
+            destination_lat = float(request_dict['destination_lat'])
+        except Exception as e:
+            # analysis_inst.delete()
+            return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
-            # '''create a new col maxspeed which will later be used to calculate time'''
-            # edges["maxspeed"]=None
-            # edges["maxspeed"] = edges["maxspeed"].astype(float).astype(pd.Int64Dtype())
-            # edges["maxspeed"].unique()
+class ClosestPathAnalysisAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwarggs):
+        pass
 
-            # '''Separate rows with / without speed limit information '''
-            # mask = edges["maxspeed"].isnull()
-            # edges_without_maxspeed = edges.loc[mask].copy()
-            # edges_with_maxspeed = edges.loc[~mask].copy()
+class BufferAnalysisAPIView(APIView):
+    def post(self, request, *args, **kwarggs):
+        pass
 
-            # '''Apply the function and update the maxspeed'''
-            # edges_without_maxspeed["maxspeed"] = edges_without_maxspeed["highway"].apply(road_class_to_kmph)
-            # # edges_without_maxspeed.head(5).loc[:, ["maxspeed", "highway"]]
-            # edges = edges_with_maxspeed.append(edges_without_maxspeed)
-            # edges["maxspeed"] = edges["maxspeed"].astype(int)
-            # edges["travel_time_seconds"] = edges["length"] / (edges["maxspeed"]/3.6)
-            # oneway = edges.loc[edges["oneway"]==True].copy().reset_index()
-            # twoway = edges.loc[edges["oneway"].isin([False, None])].copy().reset_index()
-            # '''check'''
-            # try:
-            #     assert len(oneway) + len(twoway) == len(edges)
-            # except AssertionError as e:
-            #     return Response(data={'message': 'error', 'details': 'Sum of oneway and twoway roads do not match with total roads.'}, status=400)
-
-            # '''Make a copy out of twoway edges and reverse the nodes'''
-            # opposite_direction = twoway.copy()
-            # opposite_direction = opposite_direction.rename(columns={"u": "v", "v": "u"})
-
-            # '''obtain edges now with direction'''
-            # directed_edges = pd.concat([oneway, twoway, opposite_direction], ignore_index=True)
-
-            # '''convert both directed edge and nodes to dict format'''
-            # edge_attributes = directed_edges.to_dict(orient="index")
-            # node_attributes = nodes.to_dict(orient="index")
-            # node_attributes = [(k, v) for k, v in node_attributes.items()]
-            # node_ids=nodes.index.values.tolist()
-
-            # edge_list = []
-
-            # for i in range(0, len(directed_edges)):
-            #     e_attrib = edge_attributes[i]
-            #     from_node_id = e_attrib["u"]
-            #     to_node_id = e_attrib["v"]
-
-            #     # Both from_node_id and to_node_id needs to exist in our nodes
-            #     if from_node_id not in node_ids:
-            #         print("Did not find from-node", from_node_id)
-            #         continue
-            #     if to_node_id not in node_ids:
-            #         print("Did not find to-node", to_node_id)
-            #         continue
-
-            #     edge = [from_node_id, to_node_id, e_attrib]
-            #     edge_list.append(edge)
-
-            # # Create the graph
-            # graph = nx.MultiDiGraph(crs=edges.crs)
-            # graph.add_nodes_from(node_attributes)
-            # graph.add_edges_from(edge_list)
-
-            # # What do we have?
-            # G=graph
-
-            # nodes, edges = ox.graph_to_gdfs(graph)
-            # orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=34.549184, Y=0.306370, return_dist=True)
-            # dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=34.5317, Y=0.310894, return_dist=True)
-            # print("Origin node-id:", orig_node_id, "and distance:", dist_to_orig, "meters.")
-            # print("Destination node-id:", dest_node_id, "and distance:", dist_to_dest, "meters.")
-
-            # import folium
-            # routes = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=5, weight='length')
-            # i=0
-            # route_map=None
-            # for route in routes:
-            #     if i==0:
-            #         route_map=ox.plot_route_folium(G, route, popup_attribute='length')
-            #     else:
-            #         route_map=ox.plot_route_folium(G, route, route_map=route_map, color='#ff0000',popup_attribute='length', opacity=0.5)
-            #     i=i+1
-
-            # folium.Marker(
-            #         location=[0.306370, 34.549184],
-            #         popup='Destination',
-            #     ).add_to(route_map)
-            # folium.Marker(
-            #         location=[0.310894, 34.5317],
-            #         popup='Origin',
-            #     ).add_to(route_map)
 
 @api_view(['GET'])
 def get_analysis_task_response(request):
@@ -2121,7 +2052,7 @@ def get_analysis_task_response(request):
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ShortestRoutesTileQuerySet(NetworkRoutesMVTView, DetailView):
+class OptimumPathAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Maps Layer
     url:"http://0.0.0.0:8000/api/maps/shortest_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
@@ -2273,9 +2204,7 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = check_null(gdf, layer)
+            content = check_null(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2291,9 +2220,7 @@ def check_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = check_multipart(gdf, layer)
+            content = check_multipart(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2309,9 +2236,7 @@ def check_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = check_duplicate(gdf, layer)
+            content = check_duplicate(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2327,7 +2252,7 @@ def check_overlapping_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_overlapping(layer, con)
+            content = check_overlapping(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2343,9 +2268,7 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = check_self_intersection(gdf, layer)
+            content = check_self_intersection(layer)
             return Response(content)
         else:
             return Response(data={'messages': "Data does not exists"}, status=200)
@@ -2361,7 +2284,7 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_snapping(layer, con)
+            content = check_snapping(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2410,7 +2333,7 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_null(layer, con)
+            content = fix_null(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2426,9 +2349,7 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry As geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_multipart(gdf, layer)
+            content = fix_multipart(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2444,9 +2365,7 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_duplicate(gdf, layer)
+            content = fix_duplicate(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2462,9 +2381,7 @@ def fix_overlay_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_overlapping(layer, con)
+            content = fix_overlapping(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2480,9 +2397,7 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_self_intersection(gdf, layer)
+            content = fix_self_intersection(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2498,9 +2413,7 @@ def fix_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-            gdf = geopandas.read_postgis(sql, con)
-            content = fix_snapping(layer, con)
+            content = fix_snapping(layer)
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
@@ -2524,8 +2437,6 @@ def buffer_distance(request, *args, **kwargs):
         return Response(data={'message': 'layer params is missing!'}, status=400)
     layer_qs = Vectorlayer.objects.filter(layer=layer)
     if layer_qs.exists():
-        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-        con = create_engine(db_connection_url)
         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
@@ -2551,8 +2462,6 @@ def buffer_column(request, *args, **kwargs):
         return Response(data={'message': 'Params are missing!'}, status=400)
     layer_qs = Vectorlayer.objects.filter(layer=layer)
     if layer_qs.exists():
-        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-        con = create_engine(db_connection_url)
         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
@@ -2568,8 +2477,6 @@ def data_buffer(request, *args, **kwargs):
     distance = request.query_params.get('distance', None)
     layer_qs = Vectorlayer.objects.filter(layer=layer)
     if layer_qs.exists():
-        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-        con = create_engine(db_connection_url)
         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
@@ -2580,33 +2487,6 @@ def data_buffer(request, *args, **kwargs):
             layers_qs.append(gdf)
         data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
         return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def optimum_path_analysis(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        return Response(data={'message': "Successfull"}, status=200)
-    return Response(data={'message': "Data does not exists"}, status=400)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def service_area_analysis(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        return Response(data={'message': "Successfull"}, status=200)
-    return Response(data={'message': "Data does not exists"}, status=400)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def closest_path_analysis(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        return Response(data={'message': "Successfull"}, status=200)
     return Response(data={'message': "Data does not exists"}, status=400)
 
 '''cleaning error map toogle bar api'''

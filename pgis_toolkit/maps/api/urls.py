@@ -20,8 +20,10 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     ProjectMapConfigAPIView,
     ProjectStyleViewset,
     QueryFeatureCollectionViewset,
-    ShortestPathAPIView,
-    ShortestRoutesTileQuerySet,
+    OptimumPathAnalysisAPIView,
+    ServiceAreaAnalysisAPIView,
+    ClosestPathAnalysisAPIView,
+    OptimumPathAnalysisTileQuerySet,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
@@ -39,7 +41,6 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     check_overlapping_geometry,
     check_self_intersecting_geometry,
     cleaning_error_features,
-    closest_path_analysis,
     copy_features,
     data_buffer,
     delete_sequence,
@@ -56,10 +57,8 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     get_layer_upload_task_response,
     import_template,
     layer_download,
-    optimum_path_analysis,
     project_theme_layers,
     reorder,
-    service_area_analysis,
     sync_features,
     update_template_attributes,
 )
@@ -116,9 +115,6 @@ data_analysis_urls = [
     path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
     path('buffer_by_column/', buffer_column, name="buffer_by_column"),
     path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
-    path('optimum_path_analysis/', optimum_path_analysis, name="optimum_path_analysis"),
-    path('service_area_analysis/', service_area_analysis, name="service_area_analysis"),
-    path('closest_path_analysis/', closest_path_analysis, name="closest_path_analysis")
 ]
 
 def trigger_error(request):
@@ -152,9 +148,9 @@ urlpatterns = [
 
     #Analysis
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
-    path('shortest_distance_analysis/', ShortestPathAPIView.as_view(), name='shortest_distance_analysis'),
     path('get_analysis_task_response/', get_analysis_task_response),
-    path('shortest_routes_vectortile/<int:z>/<int:x>/<int:y>/', ShortestRoutesTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('optimum_path_analysis/', OptimumPathAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
+    path('optimum_path_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumPathAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
 
     # Advance Query
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),

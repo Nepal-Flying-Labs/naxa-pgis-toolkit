@@ -3,6 +3,8 @@ import collections
 import geopandas as gpd
 import momepy
 import networkx as nx
+from config.settings.base import env
+from sqlalchemy import create_engine
 import pandas as pd
 from geopandas import GeoDataFrame
 from shapely import ops
@@ -10,11 +12,19 @@ from shapely.geometry import MultiLineString, MultiPoint, Point
 
 from pgis_toolkit.maps.models import FeatureCollectionMirror, CleaningErrors
 
+db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+con = create_engine(db_connection_url)
+
+def get_all_layer(layer):
+    sql = f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id={layer} and is_deleted=false"
+    data = gpd.read_postgis(sql, con)
+    return data
+
 
 #===================
 # Checking data
 #===================
-def check_null(data: GeoDataFrame, layer) -> dict:
+def check_null(layer) -> dict:
     """Check if the geometry is null or not
 
     Parameters
@@ -29,6 +39,7 @@ def check_null(data: GeoDataFrame, layer) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    data = get_all_layer(layer)
     total_data = len(data)
     null_rows = []
     for i, row in data.iterrows():
@@ -38,7 +49,7 @@ def check_null(data: GeoDataFrame, layer) -> dict:
     content = {"error_data": len(null_rows), "total_data": total_data}
     return content
 
-def check_multipart(data: GeoDataFrame, layer) -> dict:
+def check_multipart(layer) -> dict:
     """Check if the data is multipart or not
 
     Parameters
@@ -53,6 +64,7 @@ def check_multipart(data: GeoDataFrame, layer) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    data = get_all_layer(layer)
     total_data = len(data)
     multipart_rows = []
     for i, row in data.iterrows():
@@ -64,7 +76,7 @@ def check_multipart(data: GeoDataFrame, layer) -> dict:
     content = {"error_data": len(multipart_rows), "total_data": total_data}
     return content
 
-def check_duplicate(data: GeoDataFrame, layer) -> dict:
+def check_duplicate(layer) -> dict:
     """Check if the geometry is duplicate or not
 
     Parameters
@@ -79,6 +91,7 @@ def check_duplicate(data: GeoDataFrame, layer) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    data = get_all_layer(layer)
     total_data = len(data)
     data = data.drop(axis=1, columns=["attributes"])
     sum = data.duplicated().sum()
@@ -87,7 +100,7 @@ def check_duplicate(data: GeoDataFrame, layer) -> dict:
     content = {"error_data": sum, "total_data": total_data}
     return content
 
-def check_overlapping(layer, con) -> dict:
+def check_overlapping(layer) -> dict:
     """Check if the geometry has overlapping geometries
 
     Parameters
@@ -102,8 +115,7 @@ def check_overlapping(layer, con) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-    gdf = gpd.read_postgis(sql, con)
+    gdf = get_all_layer(layer)
     total_data = len(gdf)
     sql = f'''SELECT a.* From
             (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
@@ -134,6 +146,7 @@ def check_self_intersection(data: GeoDataFrame, layer) -> dict:
             The message to display
         data : GeoDataFrame
     """
+    data = get_all_layer(layer)
     total_data = len(data)
     self_intersection_rows = []
     for i, row in data.iterrows():
@@ -143,7 +156,7 @@ def check_self_intersection(data: GeoDataFrame, layer) -> dict:
     content = {"error_data": len(self_intersection_rows), "total_data": total_data}
     return content
 
-def check_snapping(layer, con) -> dict:
+def check_snapping(layer) -> dict:
     """Check for isolated points
 
     Parameters
@@ -158,8 +171,7 @@ def check_snapping(layer, con) -> dict:
             The message to display
         data : GeoDataFrame
     """
-    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-    gdf = gpd.read_postgis(sql, con)
+    gdf = get_all_layer(layer)
     total_data = len(gdf)
     sql = f'''WITH segments AS (
         SELECT id as id, (
@@ -191,22 +203,20 @@ def check_snapping(layer, con) -> dict:
 #===================
 # Cleaning data
 #===================
-def fix_null(layer, con) -> dict:
-    sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer
-    data = gpd.read_postgis(sql, con)
+def fix_null(layer) -> dict:
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
         for feature in null_error:
-            con.execute("DELETE FROM maps_featurecollectionmirror WHERE layer_id={feature}")
-        content = check_null(data, layer)
+            con.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE layer_id={feature}")
+        content = check_null(layer)
         return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
     except Exception as e:
         return {'message': str(e)}
 
 
-def fix_multipart(data: GeoDataFrame, layer) -> dict:
+def fix_multipart(layer) -> dict:
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
@@ -221,28 +231,28 @@ def fix_multipart(data: GeoDataFrame, layer) -> dict:
         #             data.at[i,value] = row[value]
         #     df = pd.concat([df, data])
         #     print(type(df))
-        content = check_multipart(data, layer)
+        content = check_multipart(layer)
         return {"new_error": content["error_data"], "prev_error": len(multipart_error["multipart"])}
     except Exception as e:
         return {'message': str(e)}
 
-def fix_duplicate(data: GeoDataFrame, layer) -> dict:
+def fix_duplicate(layer) -> dict:
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             duplicate_error = cleaning_error_qs.values('duplicate')[0]
         # data = data.drop_duplicates(keep='last')
-        content = check_duplicate(data, layer)
+        content = check_duplicate(layer)
         return {"new_error": content["error_data"], "prev_error": len(duplicate_error["duplicate"])}
     except Exception as e:
         return {'message': str(e)}
 
-def fix_overlapping(layer, con) -> dict:
+def fix_overlapping(layer) -> dict:
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
-        content = check_overlapping(layer, con)
+        content = check_overlapping(layer)
         return {"new_error": content["error_data"], "prev_error": len(overlap_error["overlap"])}
     except Exception as e:
         return {'message': str(e)}
@@ -260,7 +270,7 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
-def fix_self_intersection(data: GeoDataFrame, layer) -> dict:
+def fix_self_intersection(layer) -> dict:
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
@@ -281,12 +291,12 @@ def fix_self_intersection(data: GeoDataFrame, layer) -> dict:
         #                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
         #     else:
         #         df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
-        content = check_self_intersection(data, layer)
+        content = check_self_intersection(layer)
         return {"new_error": content["error_data"], "prev_error": len(self_instersect_error["self_instersect"])}
     except Exception as e:
         return {'message': str(e)}
 
-def fix_snapping(layer, con) -> dict:
+def fix_snapping(layer) -> dict:
     try:
         sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
                 from (
@@ -312,7 +322,7 @@ def fix_snapping(layer, con) -> dict:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
-        content = check_snapping(layer, con)
+        content = check_snapping(layer)
         return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
     except Exception as e:
         return {'message': str(e)}

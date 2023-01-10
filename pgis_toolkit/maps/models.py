@@ -421,6 +421,8 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
     travel_time = models.FloatField(max_length=10, verbose_name='Travel Time in seconds')
+    is_optimum = models.BooleanField(blank=True, null=True)
+    obstacles = models.JSONField(default=dict, blank=True, null=True)
     style = models.JSONField(default=dict, blank=True, null=True) #route style
     bbox = models.JSONField(default=list, blank=True, null=True)
 
@@ -456,6 +458,21 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     #     except Exception as e:
     #         print(f'error in def save of NetworkRoutes: {str(e)}')
     #     super(NetworkRoutes, self).save(*args, **kwargs)
+
+class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    class Meta:
+        app_label = 'maps'
+
+class ClosestPathAnalysis(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    class Meta:
+        app_label = 'maps'
+
+class BufferAnalysis(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    class Meta:
+        app_label = 'maps'
 
 '''Celery Task'''
 class CeleryTask(models.Model):

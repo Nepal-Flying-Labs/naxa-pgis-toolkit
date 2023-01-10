@@ -67,5 +67,8 @@ def generate_routes(origin_long, origin_lat, destination_long, destination_lat, 
         print("error occured in generate_routes: " + str(e))
         return (str(e), 400)
 
+def optimum_path_analysis():
+    pass
+
 def service_area_analysis():
     pass
