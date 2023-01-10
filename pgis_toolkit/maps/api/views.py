@@ -2792,8 +2792,8 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''GeoJSON API for features mirror.'''
-'''{{baseURL}}api/maps/feature/?feature_id=&mirror_id'''
-class ErrorFeatureGeoJSONAPIView(APIView):
+'''{{baseURL}}api/maps/feature_mirror_geojson/?feature_id=&mirror_id'''
+class FeatureMirrorGeoJSONAPIView(APIView):
     def get(self, request, pk=None, *args, **kwargs):
         try:
             feature_id = request.query_params.get('feature_id', None)
