@@ -2790,8 +2790,8 @@ class ErrorFeaturesVectorTileQuerySet(LayerMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''GeoJSON API for features mirror.'''
-'''{{baseURL}}api/maps/feature/?feature_id=&mirror_id'''
-class ErrorFeatureGeoJSONAPIView(APIView):
+'''{{baseURL}}api/maps/feature_mirror_geojson/?feature_id=&mirror_id'''
+class FeatureMirrorGeoJSONAPIView(APIView):
     def get(self, request, pk=None, *args, **kwargs):
         try:
             feature_id = request.query_params.get('feature_id', None)
@@ -2845,3 +2845,36 @@ def sync_features(request, *args, **kwargs):
             return Response(data={'message': str(e)}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
+
+class MirrorFeatureVectorTileQuerySet(LayerMVTView, DetailView):
+    '''
+    VectorTile Generation for Maps Layer
+    url:"http://localhsot:8000/api/maps/feature_mirror_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
+    '''
+    vector_tile_layer_name = None
+    vector_tile_fields = ('pk', 'layer', 'sub_layer', 'feature')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        '''filter by layer id'''
+        if 'layer' not in request_keys or request.GET['layer'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        layer_id=request.GET['layer']
+        queryset=FeatureCollectionMirror.active.filter(layer=layer_id)
+        if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
+            sub_layer_id=request.GET['sub_layer']
+            queryset=queryset.filter(sub_layer=sub_layer_id)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
