@@ -64,7 +64,7 @@ def check_null(layer):
     content = {"error_data": len(null_rows), "total_data": total_data}
     return content
 
-def check_multipart(layer) -> dict:
+def check_multipart(layer):
     """Check if the data is multipart or not
 
     Parameters
@@ -91,7 +91,7 @@ def check_multipart(layer) -> dict:
     content = {"error_data": len(multipart_rows), "total_data": total_data}
     return content
 
-def check_duplicate(layer) -> dict:
+def check_duplicate(layer):
     """Check if the geometry is duplicate or not
 
     Parameters
@@ -115,7 +115,7 @@ def check_duplicate(layer) -> dict:
     content = {"error_data": sum, "total_data": total_data}
     return content
 
-def check_overlapping(layer) -> dict:
+def check_overlapping(layer):
     """Check if the geometry has overlapping geometries
 
     Parameters
@@ -218,66 +218,79 @@ def check_snapping(layer):
 #===================
 # Cleaning data
 #===================
-def fix_null(layer) -> dict:
+def fix_null(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
-        count = len(null_error['null'])
-        if count == 1:
-            feature = null_error["null"][0]
-            db = con.connect()
-            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id={feature}")
-        elif count > 1:
-            features = tuple(null_error["null"])
-            db = con.connect()
-            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
+            nulls = null_error['null']
+            count = len(nulls)
+            if count == 1:
+                feature = nulls[0]
+                db = con.connect()
+                db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id={feature}")
+            elif count > 1:
+                features = tuple(nulls)
+                db = con.connect()
+                db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
         content = check_null(layer)
-        return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
+        return {"new_error": content["error_data"], "prev_error": len(nulls)}
     except Exception as e:
         return {'message': str(e)}
 
-
-def fix_multipart(layer) -> dict:
+def fix_multipart(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             multipart_error = cleaning_error_qs.values('multipart')[0]
-        data = get_layers(multipart_error["multipart"])
-        df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-        for i, row in data.iterrows():
-            data = ops.linemerge(row.geometry)
-            data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
-            data = data.explode(index_parts=True)
-            for value in row.keys():
-                if value != 'geometry':
-                    data.at[i,value] = row[value]
-            df = pd.concat([df, data])
-        print(df)
+            multiparts = multipart_error["multipart"]
+            if len(multiparts) > 0:
+                data = get_layers(multiparts)
+                # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
+                # for i, row in data.iterrows():
+                #     data = ops.linemerge(row.geometry)
+                #     data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
+                #     data = data.explode(index_parts=True)
+                #     for value in row.keys():
+                #         if value != 'geometry':
+                #             data.at[i,value] = row[value]
+                #     df = pd.concat([df, data])
+                # print(df)
         content = check_multipart(layer)
-        return {"new_error": content["error_data"], "prev_error": len(multipart_error["multipart"])}
+        return {"new_error": content["error_data"], "prev_error": len(multiparts)}
     except Exception as e:
         return {'message': str(e)}
 
-def fix_duplicate(layer) -> dict:
+def fix_duplicate(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             duplicate_error = cleaning_error_qs.values('duplicate')[0]
-        # data = data.drop_duplicates(keep='last')
+            duplicates = duplicate_error['duplicate']
+            count = len(duplicates)
+            if count == 1:
+                feature = duplicates[0]
+                db = con.connect()
+                db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id={feature}")
+            elif count > 1:
+                features = tuple(duplicates)
+                db = con.connect()
+                db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
         content = check_duplicate(layer)
-        return {"new_error": content["error_data"], "prev_error": len(duplicate_error["duplicate"])}
+        return {"new_error": content["error_data"], "prev_error": len(duplicates)}
     except Exception as e:
         return {'message': str(e)}
 
-def fix_overlapping(layer) -> dict:
+def fix_overlapping(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
-        data = get_layers(overlap_error["overlap"])
+            overlaps = overlap_error["overlap"]
+            if len(overlaps) > 0:
+                data = get_layers(overlaps)
         content = check_overlapping(layer)
-        return {"new_error": content["error_data"], "prev_error": len(overlap_error["overlap"])}
+        return {"new_error": content["error_data"], "prev_error": len(overlaps)}
     except Exception as e:
         return {'message': str(e)}
 
@@ -294,7 +307,7 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
-def fix_self_intersection(layer) -> dict:
+def fix_self_intersection(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
@@ -320,7 +333,7 @@ def fix_self_intersection(layer) -> dict:
     except Exception as e:
         return {'message': str(e)}
 
-def fix_snapping(layer) -> dict:
+def fix_snapping(layer):
     try:
         sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
                 from (

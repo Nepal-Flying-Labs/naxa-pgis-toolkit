@@ -68,7 +68,6 @@ PROJECT_STATUS_CHOICES = (
 
 ANALYSIS_TYPE_CHOICES = (
     ('Optimum Path Analysis', _('Optimum Path Analysis')),
-    ('Closest Path Analysis', _('Closest Path Analysis')),
     ('Service Area Analysis', _('Service Area Analysis')),
     ('Buffer Analysis', _('Buffer Analysis')),
 )

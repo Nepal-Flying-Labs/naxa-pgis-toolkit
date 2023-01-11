@@ -82,6 +82,7 @@ from pgis_toolkit.maps.permissions import (
 )
 from pgis_toolkit.maps.tasks import (
     CreateNetworkGraph,
+    CreateNetworkGraphSystem,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -1962,20 +1963,23 @@ class OptimumPathAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
             destination_long = float(request_dict['destination_long'])
             destination_lat = float(request_dict['destination_lat'])
-            k = int(request_dict['k']) if 'k' in request_dict and request_dict['k'] != '' else 3
+            road_network = int(request_dict['road_network']) if 'road_network' in request_dict and request_dict['road_network'] != '' else None
+            obstcles = json.loads(request_dict['obstcles']) if 'obstcles' in request_dict and request_dict['obstcles'] != '' else None
+            k = int(request_dict['paths']) if 'paths' in request_dict and request_dict['paths'] != '' else 3
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
             type=request_dict['type']
+            mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             project = int(request_dict['project'])
             '''create analysis_instance'''
@@ -1991,13 +1995,13 @@ class OptimumPathAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
                 return Response(data={'message': response}, status=status)
             clear_dir('cache/')
-            return Response(status=200, data={'message': 'Performing Network Analysis', 'task_id': response.task_id})
+            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response.task_id})
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
