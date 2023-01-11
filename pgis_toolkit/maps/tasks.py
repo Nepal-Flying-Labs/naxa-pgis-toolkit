@@ -483,6 +483,17 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
         print("error occured in handleDataMergeUpdate: " + str(e))
         return (str(e), 400)
 
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id):
+    
+    from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
+    try:
+        response, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id)
+        return response, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return Response(data={"message": str(e)}, status=400)
+
 @shared_task(bind=True, max_retries=3, soft_time_limit=800)
 def delete_query_layers(self):
     try:
