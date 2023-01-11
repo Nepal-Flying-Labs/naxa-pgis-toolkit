@@ -223,9 +223,15 @@ def fix_null(layer) -> dict:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
-        for feature in null_error:
+        count = len(null_error['null'])
+        if count == 1:
+            feature = null_error["null"][0]
             db = con.connect()
             db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE layer_id={feature}")
+        elif count > 1:
+            feature = tuple(null_error["null"])
+            db = con.connect()
+            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE layer_id IN {feature}")
         content = check_null(layer)
         return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
     except Exception as e:
