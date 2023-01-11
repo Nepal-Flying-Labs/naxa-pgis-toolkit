@@ -1356,9 +1356,10 @@ def layer_download(request):
         return Response(data={'message': 'Only vector layers are available for download!'}, status=status.HTTP_400_BAD_REQUEST)
     '''connect to database and pull required data'''
     try:
-        layer_download_id = str(get_next_value(
-                sequence_name="layer_download_id", initial_value=1))
-        dir = f'{MEDIA_ROOT}/layer_download/{layer_download_id}/'
+        # layer_download_id = str(get_next_value(
+        #         sequence_name="layer_download_id", initial_value=1))
+        dir = f'{MEDIA_ROOT}/layer_download/{layer_instance.name}/'
+        root_dir = f'{MEDIA_ROOT}/layer_download/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
         sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
@@ -1374,11 +1375,11 @@ def layer_download(request):
         if output_format == "shapefile":
             gdf.to_file(dir+layer_instance.name+".shp")
             # create a ZipFile
-            zipfile_path = dir + f'{layer_instance.name}'
-            files = dir
-            shutil.make_archive(zipfile_path, 'zip', files)
+            zipfile_name = root_dir + f'{layer_instance.name}'
+            base_dir = f'{layer_instance.name}/' #relative dir of files to zip from the root dir
+            shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
             # zip file path
-            file_url = dir + f'{layer_instance.name}.zip'
+            file_url = root_dir + f'{layer_instance.name}.zip'
         elif output_format == "geojson":
             gdf.to_file(dir+layer_instance.name+".geojson", driver='GeoJSON')
             file_url = dir + f'{layer_instance.name}.geojson'
@@ -1412,10 +1413,12 @@ def layer_download(request):
         elif output_format == "gpx":
             response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.gpx'
         '''clearing the directory'''
-        clear_dir(dir)
+        # clear_dir(root_dir)
+        if os.path.exists(root_dir): shutil.rmtree(root_dir)
         return response
     except Exception as e:
-        clear_dir(dir)
+        # clear_dir(root_dir)
+        if os.path.exists(root_dir): shutil.rmtree(root_dir)
         return Response(status=404, data={'message': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
