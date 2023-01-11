@@ -227,11 +227,11 @@ def fix_null(layer) -> dict:
         if count == 1:
             feature = null_error["null"][0]
             db = con.connect()
-            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE layer_id={feature}")
+            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id={feature}")
         elif count > 1:
-            feature = tuple(null_error["null"])
+            features = tuple(null_error["null"])
             db = con.connect()
-            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE layer_id IN {feature}")
+            db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
         content = check_null(layer)
         return {"new_error": content["error_data"], "prev_error": len(null_error["null"])}
     except Exception as e:
