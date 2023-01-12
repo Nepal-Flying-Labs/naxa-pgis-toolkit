@@ -28,6 +28,7 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     SubLayerViewset,
     ThemeViewset,
     analysis_layers,
+    analysis_layer,
     buffer_column,
     buffer_distance,
     bulk_del_null_geom,
@@ -149,6 +150,7 @@ urlpatterns = [
 
     #Analysis
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
+    path('analysis_layer/', analysis_layer, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
     path('optimum_route_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
