@@ -49,6 +49,7 @@ from pgis_toolkit.maps.models import (
     LayerGroup,
     LayerStyle,
     NetworkRoutes,
+    OptimumRoute,
     ProjectMapConfig,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
@@ -1990,6 +1991,8 @@ class OptimumRouteAnalysisAPIView(APIView):
                 return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
             analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
             analysis_id = analysis_inst.id
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat)
+            optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
@@ -1998,7 +2001,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
