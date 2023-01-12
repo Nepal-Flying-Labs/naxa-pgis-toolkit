@@ -415,9 +415,8 @@ class Analysis(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
-class OptimumRouteAnalysis(DateTimeStamp,IsDeleted):
+class OptimumRoute(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
-    name = models.CharField(max_length=254)
     mode = models.CharField(max_length=100, choices=NETWORK_MODE)
     paths = models.IntegerField(null=True, blank=True)
     origin_long = models.FloatField(max_length=20, null=True, blank=True)
@@ -430,7 +429,7 @@ class OptimumRouteAnalysis(DateTimeStamp,IsDeleted):
 
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
-    optimum_route_analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    optimum_route_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
