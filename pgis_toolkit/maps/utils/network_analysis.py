@@ -7,7 +7,7 @@ import osmnx as ox
 import pandas as pd
 
 from pgis_toolkit.maps.api.serializers import NetworkRoutesSerializer
-from pgis_toolkit.maps.models import Analysis, NetworkRoutes
+from pgis_toolkit.maps.models import Analysis, OptimumRoute, NetworkRoutes
 from sqlalchemy import create_engine
 from config.settings.base import env
 from shapely.geometry import LineString
@@ -153,25 +153,68 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
             G.add_edge(u, v, **dict_row)
     return G
 
-def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id):
+def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id):
+    errors=[]
     try:
         sql = f'''WITH segments AS (
             SELECT id as id, (
             ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
-            FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network})) as dumps
+            FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
             )
-            SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+            SELECT * FROM segments WHERE geometry IS NOT NULL'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
-        origin = ox.distance.get_nearest_node(G, (origin_lat, origin_long))
-        destination = ox.distance.get_nearest_node(G, (destination_lat, destination_long))
-        routes = ox.distance.k_shortest_paths(G=G, orig=origin, dest=destination, k=k)
-        for route in routes:
-            print(route)
+        orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
+        dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
+        routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
+        road_max_speed = 50 #kmph
+        average_velocity = 3.6 #kmph
+        nodes, edges = ox.graph_to_gdfs(G)
+        '''retrieve edges from array of nodes inside routes_list'''
+        network_routes_objs = []
+        bbox_list = []
+        # analysis_id = uuid.uuid4()
+        for route in routes_list:
+            edge_df_list = []
+            for i in range(0,len(route)-1):
+                edge_df_list.append(edges.loc[route[i] , route[i+1], [0]])
+            final_df = pd.concat(edge_df_list, ignore_index=False)
+            merged_geom = final_df['geometry'].unary_union
+            bbox = list(final_df.total_bounds)
+            bbox_list.append(bbox)
+            total_length = round(final_df['length'].sum(),2)
+            total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
+            result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'optimum_route_id': optimum_route_id}
+            serializer = NetworkRoutesSerializer(data=result_dict)
+            if serializer.is_valid():
+                network_routes_objs.append(NetworkRoutes(**result_dict))
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return str(errors),400
+        network_routes_objs.sort(key = lambda x: x.length)
+        route_index=1
+        for nr in network_routes_objs:
+            nr.route_no = route_index
+            route_index+=1
+        NetworkRoutes.active.bulk_create(network_routes_objs)
+        '''update Analysis object bbox'''
+        analysis_bbox = bbox_list[0]
+        for bbox in bbox_list:
+            if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
+            if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
+            if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
+            if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
+        analysis_inst = Analysis.active.get(id=analysis_id)
+        analysis_inst.bbox=analysis_bbox
+        analysis_inst.save()
         return analysis_id, 200
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
+        if OptimumRoute.objects.filter(id=optimum_route_id).exists():
+            OptimumRoute.objects.get(id=optimum_route_id).delete()
         return (str(e), 400)
 
 def service_area_analysis():
