@@ -215,7 +215,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
-            return "Sorry No Routes Found", 400
+            return "route_not_found", 200
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
