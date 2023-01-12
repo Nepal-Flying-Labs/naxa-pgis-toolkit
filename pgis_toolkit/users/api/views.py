@@ -100,7 +100,7 @@ class PreliminaryUserAPIView(APIView):
             created_object_list = []
             org_proj_name = 'USAFIRI'
             if organization_name:
-                org_proj_name=organization_name[0]
+                org_proj_name=organization_name[0]+', USAFIRI'
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
                     return Response(data={'message': 'Your organization is already registered!'}, status=status.HTTP_400_BAD_REQUEST)
@@ -110,7 +110,7 @@ class PreliminaryUserAPIView(APIView):
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
                 request.data['project'] = None
             elif project_name:
-                org_proj_name=project_name[0]
+                org_proj_name=project_name[0]+', USAFIRI'
                 # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
@@ -135,12 +135,13 @@ class PreliminaryUserAPIView(APIView):
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
                     org_proj_name = Organization.active.get(id=int(organization)).name
+                    org_proj_name = org_proj_name+', USAFIRI'
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
-                    org_proj_name=project_inst.name
+                    org_proj_name=project_inst.name+', USAFIRI'
             '''create multiple or single preliminary user instances'''
 
             # created_object_list = []
@@ -167,8 +168,8 @@ class PreliminaryUserAPIView(APIView):
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
                     # subject = 'Email Invitation, USAFIRI'
-                    name = data['proj_org']
-                    subject = f"You're invited! to join {name}, USAFIRI."
+                    # name = data['proj_org']
+                    subject = f"You're invited to join {org_proj_name}."
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
@@ -769,12 +770,13 @@ class ForgotPasswordEmailView(APIView):
                     user.save()
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'Greetings {user.full_name}!\nClick in the link to password of account with username {user.username}.\nLink: {reset_url}{user.email_verification_token}',
+                    'username': user.username,
+                    'link': f'{reset_url}{user.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/reset_password.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Password Reset Verification, USAFIRI'
+                    subject = 'Reset Password, USAFIRI'
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [user.email]
                     send_mail(subject, message, from_email, recipient_list,
