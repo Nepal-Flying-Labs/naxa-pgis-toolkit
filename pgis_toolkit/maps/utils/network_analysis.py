@@ -8,6 +8,12 @@ import pandas as pd
 
 from pgis_toolkit.maps.api.serializers import NetworkRoutesSerializer
 from pgis_toolkit.maps.models import Analysis, NetworkRoutes
+from sqlalchemy import create_engine
+from config.settings.base import env
+from shapely.geometry import LineString
+
+db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+con = create_engine(db_connection_url)
 
 
 def generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G, analysis_id):
@@ -67,8 +73,106 @@ def generate_routes(origin_long, origin_lat, destination_long, destination_lat, 
         print("error occured in generate_routes: " + str(e))
         return (str(e), 400)
 
-def optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id):
-    return analysis_id, 200
+def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
+    """
+    Converts shapefile to routable networkx graph.
+
+    Parameters
+    ----------
+    p : str, File path - allowed formats geojson and ESRI Shapefile and other formats Fiona can read and write
+    make_G_bidi : bool, if True, assumes linestrings are bidirectional
+    name : str, Optional name of graph
+
+    Returns
+    -------
+    G : graph
+    """
+
+    #gdf=gdf.to_crs(32645)
+    gdf = gdf.explode(index_parts=True)
+    gdf['length'] = None
+    for i, row in gdf.iterrows():
+        gdf.at[i,'length'] = row.geometry.length
+
+    # shapefile needs to include minimal: geometry linestring and the length computed (e.g. in QGIS)
+    if 'length' not in gdf.columns:
+        raise Exception('Shapefile is invalid: length not in attributes:\n{}'.format(gdf.columns))
+
+    if  not gdf.geometry.map(lambda x: type(x) ==  LineString).all():
+        s_invalid_geo = gdf.geometry[gdf.geometry.map(lambda x: type(x) ==  LineString)]
+        raise Exception('Shapefile is invalid: geometry not all linestring \n{}'.format(s_invalid_geo))
+
+    # Compute the start- and end-position based on linestring
+    gdf['Start_pos'] = gdf.geometry.apply(lambda x: x.coords[0])
+    gdf['End_pos'] = gdf.geometry.apply(lambda x: x.coords[-1])
+
+    # Create Series of unique nodes and their associated position
+    s_points = gdf.Start_pos.append(gdf.End_pos).reset_index(drop=True)
+
+    # Add index of start and end node of linestring to geopandas DataFrame
+    df_points = pd.DataFrame(s_points, columns=['Start_pos'])
+    df_points['FNODE_'] = df_points.index
+    gdf = pd.merge(gdf, df_points, on='Start_pos', how='inner')
+
+    df_points = pd.DataFrame(s_points, columns=['End_pos'])
+    df_points['TNODE_'] = df_points.index
+    gdf = pd.merge(gdf, df_points, on='End_pos', how='inner')
+
+    # Bring nodes and their position in form needed for osmnx (give arbitrary osmid (index) despite not osm file)
+    df_points.columns = ['pos', 'osmid']
+    df_points[['x', 'y']] = df_points['pos'].apply(pd.Series)
+    df_node_xy = df_points.drop('pos', 1)
+
+    # Create Graph Object
+    G = nx.MultiDiGraph(name=name, crs=gdf.crs)
+
+    # Add nodes to graph
+    for node, data in df_node_xy.T.to_dict().items():
+        G.add_node(node, **data)
+
+    # Add edges to graph
+    for i, row  in gdf.iterrows():
+        dict_row  = row.to_dict()
+        if 'geometry' in dict_row: del dict_row['geometry']
+        u=dict_row['FNODE_']
+        v=dict_row['TNODE_']
+        G.add_edge(u, v, **dict_row)
+
+    if make_G_bidi:
+        gdf.rename(columns={'Start_pos': 'End_pos',
+                   'End_pos': 'Start_pos',
+                   'FNODE_': 'TNODE_',
+                   'TNODE_': 'FNODE_', }, inplace=True)
+
+        # Add edges to graph
+        for i, row  in gdf.iterrows():
+            dict_row  = row.to_dict()
+            if 'geometry' in dict_row: del dict_row['geometry']
+            u=dict_row['FNODE_']
+            v=dict_row['TNODE_']
+            G.add_edge(u, v, **dict_row)
+    return G
+
+def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id):
+    try:
+        sql = f'''WITH segments AS (
+            SELECT id as id, (
+            ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+            FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network})) as dumps
+            )
+            SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+        segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
+        G = convert_shp2graph(segments)
+        origin = ox.distance.get_nearest_node(G, (origin_lat, origin_long))
+        destination = ox.distance.get_nearest_node(G, (destination_lat, destination_long))
+        routes = ox.distance.k_shortest_paths(G=G, orig=origin, dest=destination, k=k)
+        for route in routes:
+            print(route)
+        return analysis_id, 200
+    except Exception as e:
+        if Analysis.objects.filter(id=analysis_id).exists():
+            Analysis.objects.get(id=analysis_id).delete()
+        return (str(e), 400)
 
 def service_area_analysis():
     pass

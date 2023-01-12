@@ -109,9 +109,13 @@ class AnalysisAdmin(admin.ModelAdmin):
     list_display = ('id','is_deleted', 'name', 'type', 'geom_type', 'display', 'project', 'uploaded_date')
     list_filter = ('type', 'display', 'project')
 
+class OptimumRouteAnalysisAdmin(admin.ModelAdmin):
+    list_display = ('id', 'is_deleted', 'analysis_id', 'name', 'mode', 'paths', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'uploaded_date')
+    list_filter = ('analysis_id', 'mode', 'paths')
+
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
-    list_filter = ('route_no', 'analysis_id')
+    list_display = ('id','is_deleted', 'optimum_route_analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
+    list_filter = ('route_no', 'optimum_route_analysis_id')
 
 class CeleryTaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'task_id', 'layer_id')
@@ -146,6 +150,7 @@ admin.site.register(LayerStyle,LayerStyleAdmin)
 admin.site.register(SubLayerStyle,SubLayerStyleAdmin)
 admin.site.register(NetworkRoutes, NetworkRoutesAdmin)
 admin.site.register(Analysis, AnalysisAdmin)
+admin.site.register(OptimumRouteAnalysis, OptimumRouteAnalysisAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(CeleryTask, CeleryTaskAdmin)
 admin.site.register(QueryLayer, QueryLayerAdmin)

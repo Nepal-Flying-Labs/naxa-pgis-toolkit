@@ -1948,7 +1948,7 @@ def road_class_to_kmph(road_class):
     else:
         return 50
 
-class OptimumPathAnalysisAPIView(APIView):
+class OptimumRouteAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwarggs):
         '''
@@ -2008,6 +2008,9 @@ class OptimumPathAnalysisAPIView(APIView):
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
+    
+    def get(self, request, *args, **kwarggs):
+        pass
 
 class ServiceAreaAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
@@ -2026,11 +2029,6 @@ class ServiceAreaAnalysisAPIView(APIView):
         except Exception as e:
             # analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
-
-class ClosestPathAnalysisAPIView(APIView):
-    # permission_classes = [IsAuthenticated]
-    def post(self, request, *args, **kwarggs):
-        pass
 
 class BufferAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
@@ -2059,7 +2057,7 @@ def get_analysis_task_response(request):
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class OptimumPathAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
+class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Maps Layer
     url:"http://0.0.0.0:8000/api/maps/shortest_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
