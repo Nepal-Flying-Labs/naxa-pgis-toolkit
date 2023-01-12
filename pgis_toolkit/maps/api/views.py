@@ -1996,7 +1996,7 @@ class OptimumRouteAnalysisAPIView(APIView):
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': "server error: celery is not working"})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
             if source == 'osm':
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
@@ -2045,16 +2045,16 @@ def get_analysis_task_response(request):
         result = AsyncResult(task_id, app=app)
         if result.ready():   # check task state: true/false
             try:
-                response, stat, code = result.get()
+                response, stat, message, code = result.get()
                 if code == 200:
-                    return Response(data={'analysis_id':response, 'status': stat}, status=status.HTTP_200_OK)
+                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'analysis_id':response, 'status': stat}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
-                return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'analysis_id': "null", 'status': "processing"}, status=200)
+                return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'status': "processing", 'message': ""}, status=200)
     except Exception as e:
-        return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
