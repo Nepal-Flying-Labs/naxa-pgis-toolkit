@@ -2001,13 +2001,13 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
+                response = CreateNetworkGraphSystem(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
                 return Response(data={'message': response}, status=status)
             clear_dir('cache/')
-            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response.task_id})
+            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response})
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
@@ -2123,24 +2123,47 @@ def analysis_layers(request, *args, **kwargs):
     options={}
     try:
         project = request.query_params.get('project', None)
+        analysis_type = int(request.quer_params.get('analysis_type', None))
         if not project or project == '':
             return Response(data={'message': 'project params is missing!'}, status=400)
-        analysis_types = Analysis.active.filter(project=project).values_list('type', flat=True).distinct()
-        for ana_type in analysis_types:
-            print(ana_type, type(ana_type), "is ana type")
-            '''say network analysis'''
-            ana_type_list=[]
-            analys_qs = Analysis.active.filter(project=project, type=ana_type)
-            for analysis in analys_qs:
-                analysis_dict={}
-                analysis_dict['id'] = analysis.id
-                analysis_dict['name'] = analysis.name
-                analysis_dict['geom_type'] = analysis.geom_type
-                analysis_dict['bbox'] = analysis.bbox
-                analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=analysis.id).values('id', 'route_no', 'style', 'bbox')
-                ana_type_list.append(analysis_dict)
-            options[ana_type]=ana_type_list
+        '''say network analysis'''
+        ana_type_list=[]
+        analys_qs = Analysis.active.filter(project=project, type=analysis_type)
+        for analysis in analys_qs:
+            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
+            optimum_route = optimum_route_qs[0]
+            analysis_dict={}
+            analysis_dict['id'] = analysis.id
+            analysis_dict['name'] = analysis.name
+            analysis_dict['geom_type'] = analysis.geom_type
+            analysis_dict['bbox'] = analysis.bbox
+            analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'style', 'bbox')
+            ana_type_list.append(analysis_dict)
+            options[analysis.name]=ana_type_list
         return Response(options,status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+'''Analysis layers api for map page'''
+@api_view(['GET'])
+def analysis_layer(request, *args, **kwargs):
+    try:
+        project = request.query_params.get('project', None)
+        analysis_id = int(request.quer_params.get('analysis_id', None))
+        if not project or project == '':
+            return Response(data={'message': 'project params is missing!'}, status=400)
+        '''say network analysis'''
+        analys_qs = Analysis.active.filter(project=project, id=analysis_id)
+        analysis = analys_qs[0]
+        optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+        optimum_route = optimum_route_qs[0]
+        analysis_dict={}
+        analysis_dict['id'] = analysis.id
+        analysis_dict['name'] = analysis.name
+        analysis_dict['geom_type'] = analysis.geom_type
+        analysis_dict['bbox'] = analysis.bbox
+        analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'style', 'bbox')
+        return Response(analysis_dict, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 

@@ -173,43 +173,49 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
         '''retrieve edges from array of nodes inside routes_list'''
         network_routes_objs = []
         bbox_list = []
-        # analysis_id = uuid.uuid4()
-        for route in routes_list:
-            edge_df_list = []
-            for i in range(0,len(route)-1):
-                edge_df_list.append(edges.loc[route[i] , route[i+1], [0]])
-            final_df = pd.concat(edge_df_list, ignore_index=False)
-            merged_geom = final_df['geometry'].unary_union
-            bbox = list(final_df.total_bounds)
-            bbox_list.append(bbox)
-            total_length = round(final_df['length'].sum(),2)
-            total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
-            result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'optimum_route_id': optimum_route_id}
-            serializer = NetworkRoutesSerializer(data=result_dict)
-            if serializer.is_valid():
-                network_routes_objs.append(NetworkRoutes(**result_dict))
-            else:
-                for er in serializer._errors:
-                    errors.append(
-                        {'errorName': er, 'details': serializer._errors[er][0]})
-                return str(errors),400
-        network_routes_objs.sort(key = lambda x: x.length)
-        route_index=1
-        for nr in network_routes_objs:
-            nr.route_no = route_index
-            route_index+=1
-        NetworkRoutes.active.bulk_create(network_routes_objs)
-        '''update Analysis object bbox'''
-        analysis_bbox = bbox_list[0]
-        for bbox in bbox_list:
-            if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
-            if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
-            if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
-            if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
-        analysis_inst = Analysis.active.get(id=analysis_id)
-        analysis_inst.bbox=analysis_bbox
-        analysis_inst.save()
-        return analysis_id, 200
+        try:
+            for route in routes_list:
+                edge_df_list = []
+                for i in range(0,len(route)-1):
+                    edge_df_list.append(edges.loc[route[i] , route[i+1], [0]])
+                final_df = pd.concat(edge_df_list, ignore_index=False)
+                merged_geom = final_df['geometry'].unary_union
+                bbox = list(final_df.total_bounds)
+                bbox_list.append(bbox)
+                total_length = round(final_df['length'].sum(),2)
+                total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
+                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'optimum_route_id': optimum_route_id}
+                serializer = NetworkRoutesSerializer(data=result_dict)
+                if serializer.is_valid():
+                    network_routes_objs.append(NetworkRoutes(**result_dict))
+                else:
+                    for er in serializer._errors:
+                        errors.append(
+                            {'errorName': er, 'details': serializer._errors[er][0]})
+                    return str(errors),400
+            network_routes_objs.sort(key = lambda x: x.length)
+            route_index=1
+            for nr in network_routes_objs:
+                nr.route_no = route_index
+                route_index+=1
+            NetworkRoutes.active.bulk_create(network_routes_objs)
+            '''update Analysis object bbox'''
+            analysis_bbox = bbox_list[0]
+            for bbox in bbox_list:
+                if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
+                if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
+                if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
+                if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
+            analysis_inst = Analysis.active.get(id=analysis_id)
+            analysis_inst.bbox=analysis_bbox
+            analysis_inst.save()
+            return analysis_id, 200
+        except:
+            if Analysis.objects.filter(id=analysis_id).exists():
+                Analysis.objects.get(id=analysis_id).delete()
+            if OptimumRoute.objects.filter(id=optimum_route_id).exists():
+                OptimumRoute.objects.get(id=optimum_route_id).delete()
+            return "Sorry No Routes Found", 400
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
