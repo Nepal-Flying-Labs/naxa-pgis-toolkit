@@ -294,13 +294,11 @@ class ProjectViewset(viewsets.ModelViewSet):
                 if file_input == True:
                     if file_type == "Shapefile":
                         if file_extension == ".zip":
-                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                                is_deleted=True)  # Archive existing features
+                            location_ids = list(ProjectLocationFeatureCollection.active.filter(project=project_id).values_list('id', flat=True))# for Archiving existing features
                             response = handleProjectShapeFile(project_id)
                             if response == "successful":
-                                # '''change project status to ongoing'''
-                                # project.status='ongoing'
-                                # project.save()
+                                #archive previous locations
+                                ProjectLocationFeatureCollection.active.filter(id__in=location_ids).update(is_deleted=True)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -311,13 +309,11 @@ class ProjectViewset(viewsets.ModelViewSet):
                         '''Location file as Shapfile'''
                     elif file_type == "GeoJSON":
                         if file_extension == ".geojson":
-                            ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                                is_deleted=True)  # Archive existing features
+                            location_ids = list(ProjectLocationFeatureCollection.active.filter(project=project_id).values_list('id', flat=True))# for Archiving existing features
                             response = handleProjectGeoJSON(project_id)
                             if response == "successful":
-                                # '''change project status to ongoing'''
-                                # project.status='ongoing'
-                                # project.save()
+                                #archive previous locations
+                                ProjectLocationFeatureCollection.active.filter(id__in=location_ids).update(is_deleted=True)
                                 return Response({'message': response, 'data': serializer.data}, status=status.HTTP_201_CREATED)
                             else:
                                 return Response({'message': response}, status=status.HTTP_400_BAD_REQUEST)
@@ -329,9 +325,8 @@ class ProjectViewset(viewsets.ModelViewSet):
                 else:
                     '''Location as wkt from Custom Draw on map'''
                     if 'location_wkt' in request_keys:
-                        ProjectLocationFeatureCollection.active.filter(project=project_id).update(
-                            is_deleted=True)  # Archive existing features
                         project.file.delete(save=True)
+                        location_ids = list(ProjectLocationFeatureCollection.active.filter(project=project_id).values_list('id', flat=True))# for Archiving existing features
                         wkt_name = request_dict['location_wkt']
                         wkt_list = json.loads(request_dict['location_wkt'])
                         merged_geom = GEOSGeometry(wkt_list[0])
@@ -352,8 +347,6 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 merged_geom = merged_geom.union(geom)
                             bbox = merged_geom.extent
                             project.bbox = bbox
-                            # '''change project status to ongoing'''
-                            # project.status='ongoing'
                             project.geometry_type=geom_type
                             project.save()
                             vector_layer_instance.bbox=bbox
@@ -369,11 +362,11 @@ class ProjectViewset(viewsets.ModelViewSet):
                                 merged_geom = merged_geom.union(geom)
                             bbox = merged_geom.extent
                             project.bbox = bbox
-                            # '''change project status to ongoing'''
-                            # project.status='ongoing'
                             project.geometry_type=geom_type
                             project.save()
                         ''''''
+                        #archive previous locations
+                        ProjectLocationFeatureCollection.active.filter(id__in=location_ids).update(is_deleted=True)
                 serializer = ProjectSerializer(
                     project, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
