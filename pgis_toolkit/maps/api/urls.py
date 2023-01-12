@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_error_data,
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
+    ClosestPathAnalysisAPIView,
     DataMergeUpdateAPIView,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
@@ -16,15 +17,14 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     LayerVectorTileQuerySet,
     LayerViewSet,
     MirrorFeatureVectorTileQuerySet,
+    OptimumPathAnalysisAPIView,
+    OptimumPathAnalysisTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
     ProjectStyleViewset,
     QueryFeatureCollectionViewset,
-    OptimumPathAnalysisAPIView,
     ServiceAreaAnalysisAPIView,
-    ClosestPathAnalysisAPIView,
-    OptimumPathAnalysisTileQuerySet,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
@@ -65,7 +65,9 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
 )
 
 router = DefaultRouter()
-# Map
+#==================
+#       Map
+#==================
 router.register(r'theme', ThemeViewset, basename='theme')
 router.register(r'project_style', ProjectStyleViewset, basename='project_style')
 router.register(r'standard_icon', StandardIconViewset, basename='standard_icon')
@@ -75,14 +77,20 @@ router.register(r'feature_collection', FeatureCollectionViewset, basename='featu
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
 
-# Template
+#==================
+#     Template
+#==================
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
 
-#Advance Query
+#==================
+#   Advance Query
+#==================
 router.register(r'query_feature_collection', QueryFeatureCollectionViewset, basename='query_feature_collection')
 
-#Data Cleaning
+#==================
+#  Feature Mirror
+#==================
 router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
 
 app_name = "projects"
@@ -128,7 +136,9 @@ urlpatterns = [
     # path('layer/', LayerAPIView.as_view(), name='layer'),
     # path('layer/<int:pk>/', LayerAPIView.as_view(), name='layer_update'),
 
-    # Map
+    #==================
+    #       Map
+    #==================
     path('project_theme_layers/', project_theme_layers, name='project_theme_layers'),
     path('get_layer_upload_task_response/', get_layer_upload_task_response),
     path('reorder/',reorder, name='reorder'),
@@ -144,26 +154,36 @@ urlpatterns = [
     path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
 
 
-    # Data Merge
+    #==================
+    #    Data Merge
+    #==================
     path('data_merge_update/', DataMergeUpdateAPIView.as_view(), name='data_merge_update'),
     path('get_data_merge_update_task_response/', get_data_merge_update_task_response),
 
-    #Analysis
+    #==================
+    #     Analysis
+    #==================
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_path_analysis/', OptimumPathAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
     path('optimum_path_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumPathAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
 
-    # Advance Query
+    #==================
+    #   Advance Query
+    #==================
     path('advance_query/', AdvanceQueryAPIView.as_view(), name='advance_query'),
     path('layer_from_query/', LayerFromQueryAPIView.as_view(), name='layer_from_query'),
 
-    # Template
+    #==================
+    #     Template
+    #==================
     path('update_template_attributes/', update_template_attributes, name='update_template_attributes'),
     path('import_template/', import_template, name='import_template'),
     path('bulk_template_download/', bulk_template_download, name='bulk_template_download'),
 
-    # Miscellaneous
+    #==================
+    #   Miscellaneous
+    #==================
     path('category/', category, name='category'),
     path('delete_sequence/', delete_sequence, name='delete_sequence'),
 ] + data_clean_urls + data_analysis_urls
