@@ -16,8 +16,8 @@ GEOSERVER_PASSWORD=geoserver
 CONNECTION_DB=postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit
 
 #email
-DJANGO_EMAIL_HOST_USER=naxasmtptest@gmail.com
-DJANGO_EMAIL_HOST_PASSWORD=hsumoifjuozvhipc
+DJANGO_EMAIL_HOST_USER=usafiritest@gmail.com
+DJANGO_EMAIL_HOST_PASSWORD=pyjsghsnbyzqffgu
 
 
 

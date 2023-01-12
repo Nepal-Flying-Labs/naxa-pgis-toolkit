@@ -1420,7 +1420,7 @@ def layer_download(request):
     except Exception as e:
         # clear_dir(root_dir)
         if os.path.exists(root_dir): shutil.rmtree(root_dir)
-        return Response(status=404, data={'message': str(e)})
+        return Response(status=400, data={'message': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
