@@ -417,6 +417,7 @@ class Analysis(DateTimeStamp,IsDeleted):
 
 class OptimumRoute(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    road_network = models.IntegerField(null=True, blank=True)
     mode = models.CharField(max_length=100, choices=NETWORK_MODE)
     paths = models.IntegerField(null=True, blank=True)
     origin_long = models.FloatField(max_length=20, null=True, blank=True)
