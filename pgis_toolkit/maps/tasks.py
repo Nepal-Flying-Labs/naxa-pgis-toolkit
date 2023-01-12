@@ -488,8 +488,8 @@ def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destina
     
     from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
     try:
-        response, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
-        return response, status
+        response, stat, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
+        return response, stat, status
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))
         return Response(data={"message": str(e)}, status=400)
