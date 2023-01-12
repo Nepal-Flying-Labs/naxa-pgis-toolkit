@@ -209,19 +209,19 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             analysis_inst = Analysis.active.get(id=analysis_id)
             analysis_inst.bbox=analysis_bbox
             analysis_inst.save()
-            return analysis_id, "success", 200
+            return analysis_id, "success", "", 200
         except:
             if Analysis.objects.filter(id=analysis_id).exists():
                 Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
-            return "null", "route_not_found", 200
+            return None, "route_not_found", "", 200
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
         if OptimumRoute.objects.filter(id=optimum_route_id).exists():
             OptimumRoute.objects.get(id=optimum_route_id).delete()
-        return "null", str(e), 400
+        return None, "error", str(e), 400
 
 def service_area_analysis():
     pass
