@@ -164,9 +164,9 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             SELECT * FROM segments WHERE geometry IS NOT NULL'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
-        origin = ox.distance.get_nearest_node(G, (origin_lat, origin_long))
-        destination = ox.distance.get_nearest_node(G, (destination_lat, destination_long))
-        routes_list = ox.distance.k_shortest_paths(G=G, orig=origin, dest=destination, k=k)
+        orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
+        dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
+        routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
         road_max_speed = 50 #kmph
         average_velocity = 3.6 #kmph
         nodes, edges = ox.graph_to_gdfs(G)
