@@ -72,6 +72,12 @@ ANALYSIS_TYPE_CHOICES = (
     ('Buffer Analysis', _('Buffer Analysis')),
 )
 
+NETWORK_MODE = (
+    ('Drive', _('Drive')),
+    ('Cycle', _('Cycle')),
+    ('Walk', _('Walk')),
+)
+
 LAYER_STATUS_CHOICES = (
     ('valid', _('Valid')),
     ('invalid', _('Invalid')),

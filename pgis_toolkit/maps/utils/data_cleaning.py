@@ -2,7 +2,6 @@ import collections
 
 import geopandas as gpd
 from rest_framework.response import Response
-from django.db import connection
 import momepy
 import networkx as nx
 from config.settings.base import env
