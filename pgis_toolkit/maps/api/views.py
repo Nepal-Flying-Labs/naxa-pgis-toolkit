@@ -2052,7 +2052,7 @@ def get_analysis_task_response(request):
                     return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
                 return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': "Processing"}, status=200)
+        return Response({'message': "processing"}, status=200)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2123,12 +2123,14 @@ def analysis_layers(request, *args, **kwargs):
     options={}
     try:
         project = request.query_params.get('project', None)
-        analysis_type = int(request.quer_params.get('analysis_type', None))
+        analysis_type = request.query_params.get('analysis_type', None)
         if not project or project == '':
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
         ana_type_list=[]
+        print(analysis_type)
         analys_qs = Analysis.active.filter(project=project, type=analysis_type)
+        print(analys_qs)
         for analysis in analys_qs:
             optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
             optimum_route = optimum_route_qs[0]
@@ -2140,7 +2142,7 @@ def analysis_layers(request, *args, **kwargs):
             analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'style', 'bbox')
             ana_type_list.append(analysis_dict)
             options[analysis.name]=ana_type_list
-        return Response(options,status=200)
+        return Response(options, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
@@ -2149,7 +2151,7 @@ def analysis_layers(request, *args, **kwargs):
 def analysis_layer(request, *args, **kwargs):
     try:
         project = request.query_params.get('project', None)
-        analysis_id = int(request.quer_params.get('analysis_id', None))
+        analysis_id = request.query_params.get('analysis_id', None)
         if not project or project == '':
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
