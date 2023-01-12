@@ -2008,9 +2008,6 @@ class OptimumRouteAnalysisAPIView(APIView):
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
-    
-    def get(self, request, *args, **kwarggs):
-        pass
 
 class ServiceAreaAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
@@ -2137,7 +2134,7 @@ def analysis_layers(request, *args, **kwargs):
                 analysis_dict['name'] = analysis.name
                 analysis_dict['geom_type'] = analysis.geom_type
                 analysis_dict['bbox'] = analysis.bbox
-                analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'style', 'bbox')
+                analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=analysis.id).values('id', 'route_no', 'style', 'bbox')
                 ana_type_list.append(analysis_dict)
             options[ana_type]=ana_type_list
         return Response(options,status=200)
