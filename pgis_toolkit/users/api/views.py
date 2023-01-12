@@ -770,12 +770,13 @@ class ForgotPasswordEmailView(APIView):
                     user.save()
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'Greetings {user.full_name}!\nClick in the link to password of account with username {user.username}.\nLink: {reset_url}{user.email_verification_token}',
+                    'username': user.username,
+                    'link': f'{reset_url}{user.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/reset_password.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Password Reset Verification, USAFIRI'
+                    subject = 'Reset Password, USAFIRI'
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [user.email]
                     send_mail(subject, message, from_email, recipient_list,
