@@ -2120,7 +2120,6 @@ def feature_popup(request, *args, **kwargs):
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layers(request, *args, **kwargs):
-    options={}
     try:
         project = request.query_params.get('project', None)
         analysis_type = request.query_params.get('analysis_type', None)
@@ -2128,9 +2127,7 @@ def analysis_layers(request, *args, **kwargs):
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
         ana_type_list=[]
-        print(analysis_type)
         analys_qs = Analysis.active.filter(project=project, type=analysis_type)
-        print(analys_qs)
         for analysis in analys_qs:
             optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
             optimum_route = optimum_route_qs[0]
@@ -2139,10 +2136,14 @@ def analysis_layers(request, *args, **kwargs):
             analysis_dict['name'] = analysis.name
             analysis_dict['geom_type'] = analysis.geom_type
             analysis_dict['bbox'] = analysis.bbox
-            analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'style', 'bbox')
+            analysis_dict['mode'] = optimum_route.mode
+            analysis_dict['origin_long'] = optimum_route.origin_long
+            analysis_dict['origin_lat'] = optimum_route.origin_lat
+            analysis_dict['destination_long'] = optimum_route.destination_long
+            analysis_dict['destination_lat'] = optimum_route.destination_lat
+            analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
             ana_type_list.append(analysis_dict)
-            options[analysis.name]=ana_type_list
-        return Response(options, status=200)
+        return Response(ana_type_list, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
@@ -2164,7 +2165,12 @@ def analysis_layer(request, *args, **kwargs):
         analysis_dict['name'] = analysis.name
         analysis_dict['geom_type'] = analysis.geom_type
         analysis_dict['bbox'] = analysis.bbox
-        analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'style', 'bbox')
+        analysis_dict['mode'] = optimum_route.mode
+        analysis_dict['origin_long'] = optimum_route.origin_long
+        analysis_dict['origin_lat'] = optimum_route.origin_lat
+        analysis_dict['destination_long'] = optimum_route.destination_long
+        analysis_dict['destination_lat'] = optimum_route.destination_lat
+        analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
         return Response(analysis_dict, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
