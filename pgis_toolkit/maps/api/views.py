@@ -2007,7 +2007,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 status = 400
                 return Response(data={'message': response}, status=status)
             clear_dir('cache/')
-            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response.task_id})
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
@@ -2045,14 +2045,14 @@ def get_analysis_task_response(request):
         result = AsyncResult(task_id, app=app)
         if result.ready():   # check task state: true/false
             try:
-                response, code = result.get()
+                response, stat, code = result.get()
                 if code == 200:
-                    return Response(data={'analysis_id':response}, status=status.HTTP_200_OK)
+                    return Response(data={'analysis_id':response, 'status': stat}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(data={'analysis_id':response, 'status': stat}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
                 return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': "processing"}, status=200)
+        return Response({'analysis_id': "null", 'status': "processing"}, status=200)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
