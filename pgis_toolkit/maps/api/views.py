@@ -2001,13 +2001,13 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
                 return Response(data={'message': response}, status=status)
             clear_dir('cache/')
-            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response})
+            return Response(status=200, data={'message': 'Performing Optimum Route Analysis', 'task_id': response.task_id})
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
@@ -2052,7 +2052,7 @@ def get_analysis_task_response(request):
                     return Response(data={'message': response}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
                 return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': "Please wait for result"}, status=200)
+        return Response({'message': "Processing"}, status=200)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
