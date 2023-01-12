@@ -17,6 +17,7 @@ from pgis_toolkit.projects.models import (
 )
 from pgis_toolkit.utils.constants import (
     ANALYSIS_TYPE_CHOICES,
+    NETWORK_MODE,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_SOURCE_CHOICES,
@@ -414,9 +415,22 @@ class Analysis(DateTimeStamp,IsDeleted):
     class Meta:
         app_label = 'maps'
 
+class OptimumRouteAnalysis(DateTimeStamp,IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    name = models.CharField(max_length=254)
+    mode = models.CharField(max_length=100, choices=NETWORK_MODE)
+    paths = models.IntegerField(null=True, blank=True)
+    origin_long = models.FloatField(max_length=20, null=True, blank=True)
+    origin_lat = models.FloatField(max_length=20, null=True, blank=True)
+    destination_long = models.FloatField(max_length=20, null=True, blank=True)
+    destination_lat = models.FloatField(max_length=20, null=True, blank=True)
+
+    class Meta:
+        app_label = 'maps'
+
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
-    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    optimum_route_analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
@@ -460,11 +474,6 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     #     super(NetworkRoutes, self).save(*args, **kwargs)
 
 class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
-    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
-    class Meta:
-        app_label = 'maps'
-
-class ClosestPathAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     class Meta:
         app_label = 'maps'

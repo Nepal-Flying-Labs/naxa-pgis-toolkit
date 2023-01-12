@@ -19,6 +19,8 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     MirrorFeatureVectorTileQuerySet,
     OptimumPathAnalysisAPIView,
     OptimumPathAnalysisTileQuerySet,
+    OptimumRouteAnalysisAPIView,
+    OptimumRouteAnalysisTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
@@ -165,8 +167,8 @@ urlpatterns = [
     #==================
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
-    path('optimum_path_analysis/', OptimumPathAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
-    path('optimum_path_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumPathAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
+    path('optimum_route_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
 
     #==================
     #   Advance Query
