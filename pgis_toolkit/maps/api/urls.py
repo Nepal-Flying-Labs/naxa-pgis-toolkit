@@ -1,10 +1,10 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_error_data,
+# ReorderView,; project_layers,; get_error_data,
+from pgis_toolkit.maps.api.views import (
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
-    ClosestPathAnalysisAPIView,
     DataMergeUpdateAPIView,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
@@ -17,8 +17,6 @@ from pgis_toolkit.maps.api.views import (  # ReorderView,; project_layers,; get_
     LayerVectorTileQuerySet,
     LayerViewSet,
     MirrorFeatureVectorTileQuerySet,
-    OptimumPathAnalysisAPIView,
-    OptimumPathAnalysisTileQuerySet,
     OptimumRouteAnalysisAPIView,
     OptimumRouteAnalysisTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
