@@ -210,18 +210,22 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
                     iterate=False
             buffer_distance = 0.00004499640028797696 # 5m in degree
-            for network in network_list:
-                network_id = network.id
-                obs_dict = {}
-                for obstcle in obstcles:
-                    obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
-                                JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false) p ON
-                                ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
-                    obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
-                    obs_dict[obstcle] = list(obs['id'])
-                route_inst = NetworkRoutes.active.get(id=network_id)
-                route_inst.obstacles = json.dumps(obs_dict)
-                route_inst.save()
+            if obstcles is not None:
+                try:
+                    for network in network_list:
+                        network_id = network.id
+                        obs_dict = {}
+                        for obstcle in obstcles:
+                            obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
+                                        JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false) p ON
+                                        ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
+                            obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
+                            obs_dict[obstcle] = list(obs['id'])
+                        route_inst = NetworkRoutes.active.get(id=network_id)
+                        route_inst.obstacles = json.dumps(obs_dict)
+                        route_inst.save()
+                except:
+                    pass
             '''update Analysis object bbox'''
             analysis_bbox = bbox_list[0]
             for bbox in bbox_list:
@@ -233,12 +237,12 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             analysis_inst.bbox=analysis_bbox
             analysis_inst.save()
             return analysis_id, "success", "", 200
-        except:
+        except Exception as e:
             if Analysis.objects.filter(id=analysis_id).exists():
                 Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
-            return None, "route_not_found", "", 200
+            return None, "route_not_found", str(e), 200
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
