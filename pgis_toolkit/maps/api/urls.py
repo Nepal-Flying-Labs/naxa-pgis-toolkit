@@ -12,6 +12,7 @@ from pgis_toolkit.maps.api.views import (
     FeatureGeoJSONAPIView,
     FeatureMirrorGeoJSONAPIView,
     LayerAttributeViewset,
+    LayerFromOptimumPathAnalysis,
     LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
@@ -28,8 +29,8 @@ from pgis_toolkit.maps.api.views import (
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
-    analysis_layers,
     analysis_layer,
+    analysis_layers,
     buffer_column,
     buffer_distance,
     bulk_del_null_geom,
@@ -168,7 +169,8 @@ urlpatterns = [
     path('analysis_layer/', analysis_layer, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
-    path('optimum_route_analysis_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('optimum_route_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('layer_from_optimum_path/', LayerFromOptimumPathAnalysis.as_view(), name='LayerFromOptimumPathAnalysis'),
 
     #==================
     #   Advance Query
