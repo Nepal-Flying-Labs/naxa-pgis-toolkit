@@ -67,9 +67,9 @@ PROJECT_STATUS_CHOICES = (
 )
 
 ANALYSIS_TYPE_CHOICES = (
-    ('Optimum Path Analysis', _('Optimum Path Analysis')),
-    ('Service Area Analysis', _('Service Area Analysis')),
-    ('Buffer Analysis', _('Buffer Analysis')),
+    ('optimum_route', _('Optimum Route Analysis')),
+    ('service_area', _('Service Area Analysis')),
+    ('buffer', _('Buffer Analysis')),
 )
 
 NETWORK_MODE = (
