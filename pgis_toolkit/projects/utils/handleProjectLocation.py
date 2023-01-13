@@ -52,7 +52,7 @@ def handleProjectGeoJSON(project_id):
                 vector_layer_instance.bbox = []
                 vector_layer_instance.geom_type=geometry_type
                 vector_layer_instance.save()
-            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+            feature_ids = list(FeatureCollection.active.filter(layer=layer_instance).values_list('id', flat=True))
 
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
@@ -62,8 +62,10 @@ def handleProjectGeoJSON(project_id):
                                                                 attributes=dropped_geometry_dict,
                                                                 geometry=geometry)
                 FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
-                layer_instance.upload_status='successful'
-                layer_instance.save()
+            layer_instance.upload_status='successful'
+            layer_instance.save()
+            FeatureCollection.active.filter(id__in=feature_ids).update(is_deleted=True)
+
         else:
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
@@ -117,7 +119,7 @@ def handleProjectShapeFile(project_id):
                 vector_layer_instance.bbox = []
                 vector_layer_instance.geom_type=geometry_type
                 vector_layer_instance.save()
-            FeatureCollection.active.filter(layer=layer_instance).update(is_deleted=True)
+            feature_ids = list(FeatureCollection.active.filter(layer=layer_instance).values_list('id', flat=True))
 
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
@@ -129,6 +131,7 @@ def handleProjectShapeFile(project_id):
                 FeatureCollection.active.create(layer=layer_instance, attributes=dropped_geometry_dict, geometry=geometry)
             layer_instance.upload_status='successful'
             layer_instance.save()
+            FeatureCollection.active.filter(id__in=feature_ids).update(is_deleted=True)
         else:
             for index, row in gdf.iterrows():
                 dropped_geometry = row.drop(["geometry"])
