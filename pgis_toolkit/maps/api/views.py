@@ -2126,7 +2126,7 @@ def analysis_layers(request, *args, **kwargs):
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
         ana_type_list=[]
-        analys_qs = Analysis.active.filter(project=project, type=analysis_type)
+        analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
         for analysis in analys_qs:
             optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
             optimum_route = optimum_route_qs[0]
