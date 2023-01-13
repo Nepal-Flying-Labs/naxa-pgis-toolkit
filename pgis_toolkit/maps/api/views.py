@@ -134,6 +134,8 @@ from .serializers import (
     LayerListSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
+    NetworkRoutesObstaclesSerializer,
+    NetworkRoutesSerializer,
     ProjectLayerTemplateListSerializer,
     ProjectLayerTemplateSerializer,
     ProjectsLayerTemplateAttributeListSerializer,
@@ -2789,6 +2791,10 @@ class MirrorFeatureVectorTileQuerySet(LayerMVTView, DetailView):
         if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
             sub_layer_id=request.GET['sub_layer']
             queryset=queryset.filter(sub_layer=sub_layer_id)
+        if 'ids' in request_keys and request.GET['ids'] != "":
+            ids = request.GET['ids']
+            id_list = [int(id) for id in ids.split(',')]
+            queryset=queryset.filter(id__in=id_list)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
@@ -2847,3 +2853,31 @@ class LayerFromOptimumPathAnalysis(APIView):
             if layer_instance: layer_instance.delete()
             if vector_layer_instance: vector_layer_instance.delete()
             return Response(data={'message': str(e)}, status=400)
+
+'''Optimum Path Routes Table'''
+class NetworkRoutesCollection(viewsets.ModelViewSet):
+    '''
+    Viewset for NetworkRoutes objects
+    '''
+    queryset = NetworkRoutes.active.all()
+    http_method_names = ['get', 'patch']
+    default_serializer_class = NetworkRoutesSerializer
+    serializer_classes = {
+        'list': NetworkRoutesObstaclesSerializer,
+        'retrieve': NetworkRoutesObstaclesSerializer,
+    }
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            analysis_id = self.request.query_params.get('analysis', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif analysis_id:
+                queryset=self.queryset.filter(analysis_id=analysis_id)
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)

@@ -18,6 +18,7 @@ from pgis_toolkit.maps.api.views import (
     LayerVectorTileQuerySet,
     LayerViewSet,
     MirrorFeatureVectorTileQuerySet,
+    NetworkRoutesCollection,
     OptimumRouteAnalysisAPIView,
     OptimumRouteAnalysisTileQuerySet,
     ProjectLayerTemplateAttributeViewset,
@@ -94,6 +95,11 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 #  Feature Mirror
 #==================
 router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
+
+#==================
+#  NetworkRoutes
+#==================
+router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
 
 app_name = "projects"
 

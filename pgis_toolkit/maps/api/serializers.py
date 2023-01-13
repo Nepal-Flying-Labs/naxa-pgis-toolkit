@@ -204,3 +204,29 @@ class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollectionMirror
         fields= '__all__'
+
+class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields= ('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        optimum_route_instance = OptimumRoute.active.get(analysis_id=instance.analysis_id)
+        representation['origin'] = f'({optimum_route_instance.origin_long}, {optimum_route_instance.origin_lat})'
+        representation['destination'] = f'({optimum_route_instance.destination_long}, {optimum_route_instance.destination_lat})'
+        '''obstacles'''
+        obstacles_list= []
+        obstacles = instance.obstacles
+        if obstacles:
+            obstacles_json = {}
+            for key, value in obstacles.items():
+                layer = Layer.active.get(id=key)
+                obstacles_json['layer_id'] = layer.id
+                obstacles_json['feature_mirror_ids'] = value
+                obstacles_json['layer_name'] = layer.name
+                obstacles_json['count'] = len(value)
+                obstacles_list.append(obstacles_json)
+                obstacles_json = {}
+        representation['obstacles'] = obstacles_list
+        return representation
