@@ -1,5 +1,6 @@
 import uuid
 
+import json
 import geopandas as gpd
 # import matplotlib.pyplot as plt
 import networkx as nx
@@ -162,11 +163,6 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
             )
             SELECT * FROM segments WHERE geometry IS NOT NULL'''
-        for obstcle in obstcles:
-            obstcle_sql = f'''SELECT id, geometry as geom, attributes FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false'''
-            obs = gpd.read_postgis(obstcle_sql, con=con, crs="epsg:4326")
-            print(obs)
-        print(m)
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
         orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
@@ -208,7 +204,24 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             for nr in network_routes_objs:
                 nr.route_no = route_index
                 route_index+=1
-            NetworkRoutes.active.bulk_create(network_routes_objs)
+            network_list = NetworkRoutes.active.bulk_create(network_routes_objs)
+            iterate = True
+            while iterate:
+                if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
+                    iterate=False
+            buffer_distance = 0.00004499640028797696 # 5m in degree
+            for network in network_list:
+                network_id = network.id
+                obs_dict = {}
+                for obstcle in obstcles:
+                    obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
+                                JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false) p ON
+                                ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
+                    obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
+                    obs_dict[obstcle] = list(obs['id'])
+                route_inst = NetworkRoutes.active.get(id=network_id)
+                route_inst.obstacles = json.dumps(obs_dict)
+                route_inst.save()
             '''update Analysis object bbox'''
             analysis_bbox = bbox_list[0]
             for bbox in bbox_list:
