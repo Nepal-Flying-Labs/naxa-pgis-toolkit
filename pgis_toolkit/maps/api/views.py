@@ -2059,11 +2059,11 @@ def get_analysis_task_response(request):
 
 class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
-    VectorTile Generation for Maps Layer
-    url:"http://0.0.0.0:8000/api/maps/shortest_routes_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
+    VectorTile Generation for Optimum Route
+    url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = None
-    vector_tile_fields = ('id','route_no','length','travel_time')
+    vector_tile_fields = ('id', 'analysis_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -2079,13 +2079,10 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
         if not User.active.filter(id=user_id).exists():
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         request_keys = request.GET.keys()
-        if 'analysis_id' not in request_keys or request.GET['analysis_id'] == "":
+        if 'route' not in request_keys or request.GET['route'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
-        analysis_id=request.GET['analysis_id']
-        queryset=NetworkRoutes.active.filter(analysis_id=analysis_id)
-        if 'route_no' in request_keys and request.GET['route_no'] != "":
-            route_no=request.GET['route_no']
-            queryset=queryset.filter(route_no=int(route_no))
+        route_id=request.GET['route']
+        queryset=NetworkRoutes.active.filter(id=route_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
