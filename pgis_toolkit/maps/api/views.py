@@ -2808,51 +2808,43 @@ class LayerFromOptimumPathAnalysis(APIView):
                 return Response(data={'message': 'theme params is missing!'}, status=400)
             if not name:
                 return Response(data={'message': 'name params is missing!'}, status=400)
+            layer_instance,vector_layer_instance = None, None
             anlaysis_layer_qs = Analysis.active.filter(id=analysis)
             if anlaysis_layer_qs.exists():
-                layer_instance,vector_layer_instance = None, None
                 anlaysis_layer = anlaysis_layer_qs[0]
                 theme = Theme.objects.get(id=theme)
                 if Layer.active.filter(theme=theme, name=name).exists():
                     return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
-                optimum_path_instance = OptimumRoute.active.get(id=analysis)
-                route_features = NetworkRoutes.active.filter(optimum_route_id=optimum_path_instance.id)
-                # if query_features:
-                #     try:
-                #         layer_instance = Layer.active.create(theme=theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
-                #     except Exception as e:
-                #         return Response(data={'message': str(e)}, status=400)
-                #     vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
-                #     vector_layer_instance.bbox=query_layer.bbox
-                #     vector_layer_instance.geom_type=query_layer.geom_type
-                #     vector_layer_instance.save()
-
-                #     from django.db import connection
-                #     try:
-                #         with connection.cursor() as cursor:
-                #             # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
-                #             raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
-                #             cursor = connection.cursor()
-                #             cursor.execute(raw_query)
-                #     except Exception as e:
-                #         if layer_instance: layer_instance.delete()
-                #         if vector_layer_instance: vector_layer_instance.delete()
-                #         return Response(data={'message': str(e)}, status=400)
-
-                #     '''create Layer attributes as well'''
-                #     attribute_objs = []
-                #     field_list = query_features[0].attributes.keys()
-                #     for field in field_list:
-                #         attribute_objs.append(LayerAttribute(layer=layer_instance, name=field))
-                #     LayerAttribute.objects.bulk_create(attribute_objs)
-                #     layer_instance.upload_status = 'successful'
-                #     layer_instance.save()
-                #     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
-
-                # else:
-                #     return Response(data={'message': "Query features not found for the layer"}, status=404)
+                route_features = NetworkRoutes.active.filter(analysis_id=analysis)
+                if route_features:
+                    try:
+                        layer_instance = Layer.active.create(theme=theme, name=name, layer_type='Vector',display_on_map=True)
+                    except Exception as e:
+                        return Response(data={'message': str(e)}, status=400)
+                    vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
+                    vector_layer_instance.bbox=anlaysis_layer.bbox
+                    vector_layer_instance.geom_type=anlaysis_layer.geom_type
+                    vector_layer_instance.save()
+                    '''create features'''
+                    feature_objs = []
+                    for route in route_features:
+                        attributes_json = {
+                            'analysis_id': route.analysis_id,
+                            'route_no': route.route_no,
+                            'length': route.length,
+                            'travel_time': route.travel_time,
+                            'is_optimum': route.is_optimum,
+                        }
+                        feature_objs.append(FeatureCollection(geometry=route.geometry, layer=layer_instance, attributes=attributes_json))
+                    FeatureCollection.active.bulk_create(feature_objs)
+                    layer_instance.upload_status='successful'
+                    layer_instance.is_clean = True
+                    layer_instance.save()
+                    return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=201)
+                else:
+                    return Response(data={'message': "Network Routes not found for the analysis"}, status=404)
             else:
-                return Response(data={'message': "QueryLayer matching queryset does not exist!"}, status=404)
+                return Response(data={'message': "Analysis matching queryset does not exist!"}, status=404)
 
         except Exception as e:
             if layer_instance: layer_instance.delete()
