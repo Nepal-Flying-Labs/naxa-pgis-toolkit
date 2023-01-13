@@ -5,12 +5,12 @@ import geopandas as gpd
 import networkx as nx
 import osmnx as ox
 import pandas as pd
-
-from pgis_toolkit.maps.api.serializers import NetworkRoutesSerializer
-from pgis_toolkit.maps.models import Analysis, OptimumRoute, NetworkRoutes
-from sqlalchemy import create_engine
-from config.settings.base import env
 from shapely.geometry import LineString
+from sqlalchemy import create_engine
+
+from config.settings.base import env
+from pgis_toolkit.maps.api.serializers import NetworkRoutesSerializer
+from pgis_toolkit.maps.models import Analysis, NetworkRoutes, OptimumRoute
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -194,7 +194,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 bbox_list.append(bbox)
                 total_length = round(final_df['length'].sum(),2)
                 total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
-                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'optimum_route_id': optimum_route_id}
+                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id}
                 serializer = NetworkRoutesSerializer(data=result_dict)
                 if serializer.is_valid():
                     network_routes_objs.append(NetworkRoutes(**result_dict))

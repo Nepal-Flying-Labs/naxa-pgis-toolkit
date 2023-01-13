@@ -114,8 +114,8 @@ class OptimumRouteAdmin(admin.ModelAdmin):
     list_filter = ('analysis_id', 'mode', 'paths')
 
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'optimum_route_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
-    list_filter = ('route_no', 'optimum_route_id')
+    list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
+    list_filter = ('route_no', 'analysis_id')
 
 class CeleryTaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'task_id', 'layer_id')

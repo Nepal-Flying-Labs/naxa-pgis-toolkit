@@ -2141,7 +2141,7 @@ def analysis_layers(request, *args, **kwargs):
             analysis_dict['origin_lat'] = optimum_route.origin_lat
             analysis_dict['destination_long'] = optimum_route.destination_long
             analysis_dict['destination_lat'] = optimum_route.destination_lat
-            analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
+            analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
             ana_type_list.append(analysis_dict)
         return Response(ana_type_list, status=200)
     except Exception as e:
@@ -2170,7 +2170,7 @@ def analysis_layer(request, *args, **kwargs):
         analysis_dict['origin_lat'] = optimum_route.origin_lat
         analysis_dict['destination_long'] = optimum_route.destination_long
         analysis_dict['destination_lat'] = optimum_route.destination_lat
-        analysis_dict['routes'] = NetworkRoutes.active.filter(optimum_route_id=optimum_route.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
+        analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'bbox')
         return Response(analysis_dict, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
@@ -2794,3 +2794,67 @@ class MirrorFeatureVectorTileQuerySet(LayerMVTView, DetailView):
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''Save Optimum Analysis Layer into main Layer Table'''
+class LayerFromOptimumPathAnalysis(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            analysis = request.data.get('analysis', None)
+            theme = request.data.get('theme', None)
+            name = request.data.get('name', None)
+            if not analysis:
+                return Response(data={'message': "analysis params is missing!"}, status=400)
+            if not theme:
+                return Response(data={'message': 'theme params is missing!'}, status=400)
+            if not name:
+                return Response(data={'message': 'name params is missing!'}, status=400)
+            anlaysis_layer_qs = Analysis.active.filter(id=analysis)
+            if anlaysis_layer_qs.exists():
+                layer_instance,vector_layer_instance = None, None
+                anlaysis_layer = anlaysis_layer_qs[0]
+                theme = Theme.objects.get(id=theme)
+                if Layer.active.filter(theme=theme, name=name).exists():
+                    return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
+                optimum_path_instance = OptimumRoute.active.get(id=analysis)
+                route_features = NetworkRoutes.active.filter(optimum_route_id=optimum_path_instance.id)
+                # if query_features:
+                #     try:
+                #         layer_instance = Layer.active.create(theme=theme, group=query_layer.group, name=name, layer_type='Vector',display_on_map=True)
+                #     except Exception as e:
+                #         return Response(data={'message': str(e)}, status=400)
+                #     vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
+                #     vector_layer_instance.bbox=query_layer.bbox
+                #     vector_layer_instance.geom_type=query_layer.geom_type
+                #     vector_layer_instance.save()
+
+                #     from django.db import connection
+                #     try:
+                #         with connection.cursor() as cursor:
+                #             # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
+                #             raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
+                #             cursor = connection.cursor()
+                #             cursor.execute(raw_query)
+                #     except Exception as e:
+                #         if layer_instance: layer_instance.delete()
+                #         if vector_layer_instance: vector_layer_instance.delete()
+                #         return Response(data={'message': str(e)}, status=400)
+
+                #     '''create Layer attributes as well'''
+                #     attribute_objs = []
+                #     field_list = query_features[0].attributes.keys()
+                #     for field in field_list:
+                #         attribute_objs.append(LayerAttribute(layer=layer_instance, name=field))
+                #     LayerAttribute.objects.bulk_create(attribute_objs)
+                #     layer_instance.upload_status = 'successful'
+                #     layer_instance.save()
+                #     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
+
+                # else:
+                #     return Response(data={'message': "Query features not found for the layer"}, status=404)
+            else:
+                return Response(data={'message': "QueryLayer matching queryset does not exist!"}, status=404)
+
+        except Exception as e:
+            if layer_instance: layer_instance.delete()
+            if vector_layer_instance: vector_layer_instance.delete()
+            return Response(data={'message': str(e)}, status=400)

@@ -17,13 +17,13 @@ from pgis_toolkit.projects.models import (
 )
 from pgis_toolkit.utils.constants import (
     ANALYSIS_TYPE_CHOICES,
-    NETWORK_MODE,
     DATA_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_SOURCE_CHOICES,
     LAYER_STATUS_CHOICES,
     LAYER_TYPE_CHOICES,
     LAYER_UPLOAD_STATUS,
+    NETWORK_MODE,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.validators import (
@@ -417,7 +417,7 @@ class Analysis(DateTimeStamp,IsDeleted):
 
 class OptimumRoute(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
-    road_network = models.IntegerField(null=True, blank=True)
+    road_network = models.IntegerField(null=True, blank=True) #layer
     mode = models.CharField(max_length=100, choices=NETWORK_MODE)
     paths = models.IntegerField(null=True, blank=True)
     origin_long = models.FloatField(max_length=20, null=True, blank=True)
@@ -430,7 +430,7 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
 
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
-    optimum_route_id = models.IntegerField(db_index=True, blank=True, null=True)
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
