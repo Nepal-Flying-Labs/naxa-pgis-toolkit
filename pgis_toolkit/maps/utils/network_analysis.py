@@ -154,7 +154,7 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
             G.add_edge(u, v, **dict_row)
     return G
 
-def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id):
+def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
     errors=[]
     try:
         sql = f'''WITH segments AS (
@@ -210,17 +210,17 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
                     iterate=False
             buffer_distance = 0.00004499640028797696 # 5m in degree
-            if obstcles is not None:
+            if obstacles is not None:
                 try:
                     for network in network_list:
                         network_id = network.id
                         obs_dict = {}
-                        for obstcle in obstcles:
+                        for obstacle in obstacles:
                             obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
-                                        JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false) p ON
+                                        JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstacle} and is_deleted=false) p ON
                                         ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
                             obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
-                            obs_dict[obstcle] = list(obs['id'])
+                            obs_dict[obstacle] = list(obs['id'])
                         route_inst = NetworkRoutes.active.get(id=network_id)
                         route_inst.obstacles = json.dumps(obs_dict)
                         route_inst.save()

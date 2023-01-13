@@ -1977,7 +1977,7 @@ class OptimumRouteAnalysisAPIView(APIView):
             destination_long = float(request_dict['destination_long'])
             destination_lat = float(request_dict['destination_lat'])
             road_network = int(request_dict['road_network']) if 'road_network' in request_dict and request_dict['road_network'] != '' else None
-            obstcles = json.loads(request_dict['obstcles']) if 'obstcles' in request_dict and request_dict['obstcles'] != '' else None
+            obstacles = json.loads(request_dict['obstacles']) if 'obstacles' in request_dict and request_dict['obstacles'] != '' else None
             k = int(request_dict['paths']) if 'paths' in request_dict and request_dict['paths'] != '' else 3
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
@@ -2001,7 +2001,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstcles, analysis_id, optimum_route_id)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
