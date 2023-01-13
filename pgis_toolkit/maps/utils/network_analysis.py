@@ -162,13 +162,23 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
             )
             SELECT * FROM segments WHERE geometry IS NOT NULL'''
+        for obstcle in obstcles:
+            obstcle_sql = f'''SELECT id, geometry as geom, attributes FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false'''
+            obs = gpd.read_postgis(obstcle_sql, con=con, crs="epsg:4326")
+            print(obs)
+        print(m)
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
         orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
         dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
         routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
         road_max_speed = 50 #kmph
-        average_velocity = 3.6 #kmph
+        if mode == "walk":
+            average_velocity = 3.6
+        elif mode == "cycle":
+            average_velocity = 20
+        else:
+            average_velocity = 50
         nodes, edges = ox.graph_to_gdfs(G)
         '''retrieve edges from array of nodes inside routes_list'''
         network_routes_objs = []
