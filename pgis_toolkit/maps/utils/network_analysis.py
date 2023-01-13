@@ -1,5 +1,6 @@
 import uuid
 
+import json
 import geopandas as gpd
 # import matplotlib.pyplot as plt
 import networkx as nx
@@ -168,7 +169,12 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
         dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
         routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
         road_max_speed = 50 #kmph
-        average_velocity = 3.6 #kmph
+        if mode == "walk":
+            average_velocity = 3.6
+        elif mode == "cycle":
+            average_velocity = 20
+        else:
+            average_velocity = 50
         nodes, edges = ox.graph_to_gdfs(G)
         '''retrieve edges from array of nodes inside routes_list'''
         network_routes_objs = []
@@ -198,7 +204,24 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             for nr in network_routes_objs:
                 nr.route_no = route_index
                 route_index+=1
-            NetworkRoutes.active.bulk_create(network_routes_objs)
+            network_list = NetworkRoutes.active.bulk_create(network_routes_objs)
+            iterate = True
+            while iterate:
+                if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
+                    iterate=False
+            buffer_distance = 0.00004499640028797696 # 5m in degree
+            for network in network_list:
+                network_id = network.id
+                obs_dict = {}
+                for obstcle in obstcles:
+                    obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
+                                JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstcle} and is_deleted=false) p ON
+                                ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
+                    obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
+                    obs_dict[obstcle] = list(obs['id'])
+                route_inst = NetworkRoutes.active.get(id=network_id)
+                route_inst.obstacles = json.dumps(obs_dict)
+                route_inst.save()
             '''update Analysis object bbox'''
             analysis_bbox = bbox_list[0]
             for bbox in bbox_list:
