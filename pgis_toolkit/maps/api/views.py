@@ -2066,7 +2066,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     VectorTile Generation for Optimum Route
     url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
-    vector_tile_layer_name = None
+    vector_tile_layer_name = 'route'
     vector_tile_fields = ('id', 'analysis_id')
 
     def get(self, request, *args, **kwargs):
@@ -2768,7 +2768,7 @@ class MirrorFeatureVectorTileQuerySet(LayerMVTView, DetailView):
     VectorTile Generation for Maps Layer
     url:"http://localhsot:8000/api/maps/feature_mirror_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
-    vector_tile_layer_name = None
+    vector_tile_layer_name = 'feature_mirror'
     vector_tile_fields = ('pk', 'layer', 'sub_layer', 'feature')
 
     def get(self, request, *args, **kwargs):
