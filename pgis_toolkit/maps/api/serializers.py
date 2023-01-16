@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from pgis_toolkit.maps.models import *
 from pgis_toolkit.maps.utils.project_style import get_style_detail
+import json
 
 
 class LayerSerializer(serializers.ModelSerializer):
@@ -230,3 +231,27 @@ class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
                 obstacles_json = {}
         representation['obstacles'] = obstacles_list
         return representation
+
+class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields= ('id', 'route_no', 'is_optimum')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        '''obstacles'''
+        obstacles_list= []
+        obstacles = instance.obstacles
+        obstacles = json.loads(obstacles)
+        print(type(obstacles))
+        if obstacles:
+            obstacles_json = {}
+            for key, value in obstacles.items():
+                layer = Layer.active.get(id=key)
+                obstacles_json['layer_id'] = layer.id
+                obstacles_json['feature_mirror_ids'] = value
+                obstacles_list.append(obstacles_json)
+                obstacles_json = {}
+        representation['obstacles'] = obstacles_list
+        return representation
+

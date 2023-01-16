@@ -163,6 +163,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
             )
             SELECT * FROM segments WHERE geometry IS NOT NULL'''
+        # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
         orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
@@ -203,6 +204,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             route_index=1
             for nr in network_routes_objs:
                 nr.route_no = route_index
+                nr.is_optimum = True if route_index == 1 else False
                 route_index+=1
             network_list = NetworkRoutes.active.bulk_create(network_routes_objs)
             iterate = True
