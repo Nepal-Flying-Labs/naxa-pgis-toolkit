@@ -1,9 +1,10 @@
+import json
+
 from attr import fields
 from rest_framework import serializers
 
 from pgis_toolkit.maps.models import *
 from pgis_toolkit.maps.utils.project_style import get_style_detail
-import json
 
 
 class LayerSerializer(serializers.ModelSerializer):
@@ -209,7 +210,7 @@ class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
 class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkRoutes
-        fields= ('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles')
+        fields= ('id', 'route_no', 'length', 'travel_time', 'is_optimum')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -254,4 +255,3 @@ class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
                 obstacles_json = {}
         representation['obstacles'] = obstacles_list
         return representation
-
