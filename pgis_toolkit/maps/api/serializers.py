@@ -255,3 +255,8 @@ class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
                 obstacles_json = {}
         representation['obstacles'] = obstacles_list
         return representation
+
+class AnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Analysis
+        fields = '__all__'
