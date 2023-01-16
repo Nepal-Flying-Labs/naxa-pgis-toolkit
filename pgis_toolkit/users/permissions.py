@@ -92,7 +92,8 @@ class UpdatePreliminaryUserPermission(BasePermission):
             if request.user.is_superuser:
                 return True
             pre_user_inst = PreliminaryUser.objects.get(id=pk)
-            group_id=get_user_group(user_id, pre_user_inst.organization.id, pre_user_inst.project.id)
+            print(user_id, pre_user_inst.organization, pre_user_inst.project, "is user, organization, project ids")
+            group_id=get_user_group(user_id, pre_user_inst.organization, pre_user_inst.project)
             print(group_id, "is group_id")
             permission_list=get_permission_list(group_id)
             if 'change_preliminaryuser' in permission_list:
