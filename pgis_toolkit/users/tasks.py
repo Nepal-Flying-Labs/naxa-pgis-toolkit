@@ -11,7 +11,7 @@ def check_token_expiration(self):
         from pgis_toolkit.users.models import PreliminaryUser
         pre_user_objs = PreliminaryUser.active.filter(status='Pending').values('id', 'email_verification_token', 'last_updated')
         current_datetime = datetime.now().replace(tzinfo=timezone.utc)
-        threshold = 15
+        threshold = 7
         for obj in pre_user_objs:
             time_diff = current_datetime - obj['last_updated']
             if time_diff.days >= threshold:

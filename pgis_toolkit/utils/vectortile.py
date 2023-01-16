@@ -69,7 +69,7 @@ class BaseVectorTileMixin:
         """
         Get feature limit by tile dynamically
         """
-        return self.vector_tile_layer_name
+        return self.vector_tile_queryset_limit
 
     def get_vector_tile_layer_name(self):
         """

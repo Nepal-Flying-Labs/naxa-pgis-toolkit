@@ -123,6 +123,7 @@ from pgis_toolkit.utils.vectortile import (
 )
 
 from .serializers import (
+    AnalysisSerializer,
     CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
@@ -134,8 +135,8 @@ from .serializers import (
     LayerListSerializer,
     LayerSerializer,
     LayerUpdateSerializer,
-    NetworkRoutesObstaclesSerializer,
     NetworkRoutesObstaclesMapSerializer,
+    NetworkRoutesObstaclesSerializer,
     NetworkRoutesSerializer,
     ProjectLayerTemplateListSerializer,
     ProjectLayerTemplateSerializer,
@@ -2065,7 +2066,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     VectorTile Generation for Optimum Route
     url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
-    vector_tile_layer_name = None
+    vector_tile_layer_name = 'route'
     vector_tile_fields = ('id', 'analysis_id')
 
     def get(self, request, *args, **kwargs):
@@ -2145,11 +2146,14 @@ def analysis_layers(request, *args, **kwargs):
         '''say network analysis'''
         ana_type_list=[]
         analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
+        print(analys_qs, "is analysis qs")
         for analysis in analys_qs:
             optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
             optimum_route = optimum_route_qs[0]
             analysis_dict=get_analysis_dict(analysis, optimum_route)
+            print(analysis_dict, "is analysis dict")
             ana_type_list.append(analysis_dict)
+        print(ana_type_list, "is ana_type_list")
         return Response(ana_type_list, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
@@ -2764,7 +2768,7 @@ class MirrorFeatureVectorTileQuerySet(LayerMVTView, DetailView):
     VectorTile Generation for Maps Layer
     url:"http://localhsot:8000/api/maps/feature_mirror_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
-    vector_tile_layer_name = None
+    vector_tile_layer_name = 'feature_mirror'
     vector_tile_fields = ('pk', 'layer', 'sub_layer', 'feature')
 
     def get(self, request, *args, **kwargs):
@@ -2876,6 +2880,31 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
             return queryset
         except Exception as e:
             return str(e)
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+class AnalysisViewset(viewsets.ModelViewSet):
+    '''Analysis CRUD operations'''
+    queryset = Analysis.active.all()
+    http_method_names = ['patch']
+    default_serializer_class = AnalysisSerializer
+    serializer_classes = {
+        'list': AnalysisSerializer,
+        'retrieve': AnalysisSerializer,
+    }
+
+    # def get_queryset(self, pk=None, *args, **kwargs):
+    #     try:
+    #         id = self.request.resolver_match.kwargs.get('pk')
+    #         project = self.request.query_params.get('project', None)
+    #         if id:
+    #             queryset=self.queryset.filter(id=id)
+    #         elif project:
+    #             queryset=self.queryset.filter(project=project)
+    #         return queryset
+    #     except Exception as e:
+    #         return str(e)
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)

@@ -1,6 +1,6 @@
+import json
 import uuid
 
-import json
 import geopandas as gpd
 # import matplotlib.pyplot as plt
 import networkx as nx
@@ -220,7 +220,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                         network_id = network.id
                         obs_dict = {}
                         for obstacle in obstacles:
-                            obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l 
+                            obs_sql = f'''SELECT p.* FROM (SELECT * FROM maps_networkroutes WHERE id={network_id}) l
                                         JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={obstacle} and is_deleted=false) p ON
                                         ST_Contains(ST_Buffer(l.geometry, {buffer_distance}), p.geometry)'''
                             obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
