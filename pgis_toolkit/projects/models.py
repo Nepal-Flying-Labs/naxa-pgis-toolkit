@@ -80,7 +80,7 @@ class Organization(IsDeleted,DateTimeStamp):
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
     thematic_areas=models.JSONField(default=list, blank=True, null=True)
-    description = models.CharField(max_length=254, blank=True, null=True)
+    description=models.TextField(blank=True,null=True)
     size = models.CharField(max_length=10,blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
     cover_image = models.ImageField(upload_to='organization_cover_image/', blank=True, null=True)
