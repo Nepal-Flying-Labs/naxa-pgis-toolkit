@@ -135,6 +135,7 @@ from .serializers import (
     LayerSerializer,
     LayerUpdateSerializer,
     NetworkRoutesObstaclesSerializer,
+    NetworkRoutesObstaclesMapSerializer,
     NetworkRoutesSerializer,
     ProjectLayerTemplateListSerializer,
     ProjectLayerTemplateSerializer,
@@ -2127,7 +2128,10 @@ def get_analysis_dict(analysis, optimum_route):
     analysis_dict['origin_lat'] = optimum_route.origin_lat
     analysis_dict['destination_long'] = optimum_route.destination_long
     analysis_dict['destination_lat'] = optimum_route.destination_lat
-    analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
+    # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
+    queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
+    serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+    analysis_dict['routes'] = serialize.data
     return analysis_dict
 
 '''Analysis layers api for map page'''
