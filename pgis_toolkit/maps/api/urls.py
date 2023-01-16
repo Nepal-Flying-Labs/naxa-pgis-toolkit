@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from pgis_toolkit.maps.api.views import (
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
+    AnalysisViewset,
     DataMergeUpdateAPIView,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
@@ -99,6 +100,7 @@ router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, ba
 #==================
 #  NetworkRoutes
 #==================
+router.register(r'analysis', AnalysisViewset, basename='analysis')
 router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
 
 app_name = "projects"
