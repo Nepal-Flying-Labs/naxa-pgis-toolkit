@@ -112,10 +112,12 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
 
     # Add index of start and end node of linestring to geopandas DataFrame
     df_points = pd.DataFrame(s_points, columns=['Start_pos'])
+    df_points = df_points.drop_duplicates(subset=['Start_pos'], keep='last')
     df_points['FNODE_'] = df_points.index
     gdf = pd.merge(gdf, df_points, on='Start_pos', how='inner')
 
     df_points = pd.DataFrame(s_points, columns=['End_pos'])
+    df_points = df_points.drop_duplicates(subset=['End_pos'], keep='last')
     df_points['TNODE_'] = df_points.index
     gdf = pd.merge(gdf, df_points, on='End_pos', how='inner')
 

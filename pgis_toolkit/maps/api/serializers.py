@@ -245,7 +245,6 @@ class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
         obstacles_list= []
         obstacles = instance.obstacles
         obstacles = json.loads(obstacles)
-        print(type(obstacles))
         if obstacles:
             obstacles_json = {}
             for key, value in obstacles.items():
