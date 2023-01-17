@@ -424,6 +424,8 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
     origin_lat = models.FloatField(max_length=20, null=True, blank=True)
     destination_long = models.FloatField(max_length=20, null=True, blank=True)
     destination_lat = models.FloatField(max_length=20, null=True, blank=True)
+    route_origin = models.JSONField(default=list, blank=True, null=True)
+    route_destination = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'

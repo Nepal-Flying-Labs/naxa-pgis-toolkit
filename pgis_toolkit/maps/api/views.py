@@ -2129,6 +2129,8 @@ def get_analysis_dict(analysis, optimum_route):
     analysis_dict['origin_lat'] = optimum_route.origin_lat
     analysis_dict['destination_long'] = optimum_route.destination_long
     analysis_dict['destination_lat'] = optimum_route.destination_lat
+    analysis_dict['route_origin'] = optimum_route.route_origin
+    analysis_dict['route_destination'] = optimum_route.route_destination
     # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
     queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
     serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
@@ -2146,14 +2148,11 @@ def analysis_layers(request, *args, **kwargs):
         '''say network analysis'''
         ana_type_list=[]
         analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
-        print(analys_qs, "is analysis qs")
         for analysis in analys_qs:
             optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
             optimum_route = optimum_route_qs[0]
             analysis_dict=get_analysis_dict(analysis, optimum_route)
-            print(analysis_dict, "is analysis dict")
             ana_type_list.append(analysis_dict)
-        print(ana_type_list, "is ana_type_list")
         return Response(ana_type_list, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
