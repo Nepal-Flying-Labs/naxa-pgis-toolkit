@@ -93,7 +93,7 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
     gdf = gdf.explode(index_parts=True)
     gdf['length'] = None
     for i, row in gdf.iterrows():
-        gdf.at[i,'length'] = row.geometry.length
+        gdf.at[i,'length'] = row.geometry.length * 111000 # 1 degree ~ 111km
 
     # shapefile needs to include minimal: geometry linestring and the length computed (e.g. in QGIS)
     if 'length' not in gdf.columns:
@@ -192,7 +192,8 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 bbox = list(final_df.total_bounds)
                 bbox_list.append(bbox)
                 total_length = round(final_df['length'].sum(),2)
-                total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
+                # total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
+                total_time_secs = round(total_length/average_velocity,2)
                 result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id}
                 serializer = NetworkRoutesSerializer(data=result_dict)
                 if serializer.is_valid():
@@ -226,7 +227,8 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                             obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
                             obs_dict[obstacle] = list(obs['id'])
                         route_inst = NetworkRoutes.active.get(id=network_id)
-                        route_inst.obstacles = json.dumps(obs_dict)
+                        # route_inst.obstacles = json.dumps(obs_dict)
+                        route_inst.obstacles = obs_dict
                         route_inst.save()
                 except:
                     pass

@@ -221,7 +221,7 @@ class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
         obstacles_list= []
         obstacles = instance.obstacles
         if obstacles:
-            obstacles = json.loads(obstacles)
+            # obstacles = json.loads(obstacles)
             obstacles_json = {}
             for key, value in obstacles.items():
                 layer = Layer.active.get(id=key)
@@ -244,8 +244,8 @@ class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
         '''obstacles'''
         obstacles_list= []
         obstacles = instance.obstacles
-        obstacles = json.loads(obstacles)
         if obstacles:
+            # obstacles = json.loads(obstacles)
             obstacles_json = {}
             for key, value in obstacles.items():
                 layer = Layer.active.get(id=key)
