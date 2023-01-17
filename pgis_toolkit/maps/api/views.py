@@ -2085,8 +2085,8 @@ class BufferAnalysisAPIView(APIView):
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id)
-            return Response(status=200, data={'message': 'success', 'task_id': response})
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
