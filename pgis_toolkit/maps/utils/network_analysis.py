@@ -226,7 +226,8 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                             obs = gpd.read_postgis(obs_sql, con=con, geom_col='geometry', crs="epsg:4326")
                             obs_dict[obstacle] = list(obs['id'])
                         route_inst = NetworkRoutes.active.get(id=network_id)
-                        route_inst.obstacles = json.dumps(obs_dict)
+                        # route_inst.obstacles = json.dumps(obs_dict)
+                        route_inst.obstacles = obs_dict
                         route_inst.save()
                 except:
                     pass
