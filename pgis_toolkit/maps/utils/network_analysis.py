@@ -240,6 +240,10 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             analysis_inst = Analysis.active.get(id=analysis_id)
             analysis_inst.bbox=analysis_bbox
             analysis_inst.save()
+            optimum_route_inst = OptimumRoute.active.get(id=optimum_route_id)
+            optimum_route_inst.route_origin = [G.nodes[orig_node_id]['y'], G.nodes[orig_node_id]['x']]
+            optimum_route_inst.route_destination = [G.nodes[dest_node_id]['y'], G.nodes[dest_node_id]['x']]
+            optimum_route_inst.save()
             return analysis_id, "success", "", 200
         except Exception as e:
             if Analysis.objects.filter(id=analysis_id).exists():
