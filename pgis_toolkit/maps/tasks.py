@@ -496,6 +496,17 @@ def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destina
         print("error occured in handleDataMergeUpdate: " + str(e))
         return None, "error", str(e), 400
 
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id):
+    
+    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis
+    try:
+        response, stat, message, status = buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id)
+        return response, stat, message, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return None, "error", str(e), 400
+
 @shared_task(bind=True, max_retries=3, soft_time_limit=800)
 def delete_query_layers(self):
     try:

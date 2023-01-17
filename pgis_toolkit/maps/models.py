@@ -482,6 +482,20 @@ class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
 
 class BufferAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    origins = models.JSONField(default=list, blank=True, null=True)
+    radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
+    dissolve_output = models.BooleanField(default=False)
+    total_area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+
+    class Meta:
+        app_label = 'maps'
+
+class BufferAreas(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    geometry=md.GeometryField(srid=4326)
+    area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
     class Meta:
         app_label = 'maps'
 
