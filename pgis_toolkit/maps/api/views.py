@@ -38,6 +38,7 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    BufferAnalysis,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -84,6 +85,7 @@ from pgis_toolkit.maps.permissions import (
 from pgis_toolkit.maps.tasks import (
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
+    CreateBuffer,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -2019,6 +2021,17 @@ class OptimumRouteAnalysisAPIView(APIView):
 class ServiceAreaAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwarggs):
+        '''Service Area Analysis
+
+        Parameters
+        ----------
+        distance : float
+
+        Returns
+        -------
+        message : string
+        task_id : string
+        '''
         try:
             request_dict = request.data
             check_list = ['source', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
@@ -2036,7 +2049,47 @@ class ServiceAreaAnalysisAPIView(APIView):
 
 class BufferAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
-        pass
+        '''Buffer Analysis
+
+        Parameters
+        ----------
+        distance : float
+
+        Returns
+        -------
+        message : string
+        task_id : string
+        '''
+        try:
+            request_dict = request.data
+            check_list = ['origins', 'radius', 'project', 'name', 'type']
+            for key in check_list:
+                if key not in request_dict or request_dict[key]=='':
+                    return Response(data={'message': 'origins, radius, project, name, type are required!'}, status=400)
+            name = request_dict['name']
+            type = request_dict['type']
+            project = int(request_dict['project'])
+            origins = json.loads(request_dict['origins'])
+            radius = float(request_dict['radius'])
+            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
+            dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
+            dissolve_output = True if dissolve_output == 'true' else False
+            '''create analysis_instance'''
+            if Analysis.active.filter(name=name, type=type, project=project).exists():
+                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
+            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='Polygon', project=project)
+            analysis_id = analysis_inst.id
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output)
+            buffer_id = buffer_inst.id
+            is_working=get_celery_worker_status()
+            if is_working != "working":
+                analysis_inst.delete()
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
+            response = CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id)
+            return Response(status=200, data={'message': 'success', 'task_id': response})
+        except Exception as e:
+            analysis_inst.delete()
+            return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
 
 @api_view(['GET'])
