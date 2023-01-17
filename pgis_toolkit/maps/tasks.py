@@ -52,7 +52,7 @@ def UploadVectorLayer(layer_id,request_data):
     errors=[]
     dir = MEDIA_ROOT+"/geofiles/"
     try:
-        layer = Layer.active.get(id=layer_id)
+        layer_inst = Layer.objects.get(id=layer_id)
         layer_file_instance=None
         tries=1
         while tries<3:
@@ -61,8 +61,8 @@ def UploadVectorLayer(layer_id,request_data):
                 break
             time.sleep(3)
         if not layer_file_instance:
-            layer.upload_status='failed'
-            layer.save()
+            layer_inst.upload_status='failed'
+            layer_inst.save()
             return 'Error Occured from UploadVectorLayer: couldnot save/extract upoaded file', None
 
         '''Knowing file extension'''
@@ -84,25 +84,27 @@ def UploadVectorLayer(layer_id,request_data):
             response = handleGPX(layer_id)
         else:
             clear_dir(dir)
-            layer.upload_status='failed'
-            layer.save()
+            layer_inst.upload_status='failed'
+            layer_inst.save()
             return 'Error Occured: Invalid file extension', None
 
         clear_dir(dir)
         if response=="successful":
             # layer = Layer.active.get(id=layer_id)
-            layer.upload_status='successful'
-            layer.save()
+            layer_inst.upload_status='successful'
+            layer_inst.save()
             return "successful", layer_id
         else:
             # layer = Layer.active.get(id=layer_id)
-            layer.upload_status='failed'
-            layer.save()
+            layer_inst.upload_status='failed'
+            layer_inst.save()
             # Layer.objects.filter(id=layer_id).delete()
             return response, None
 
     except Exception as e:
         clear_dir(dir)
+        layer_inst.upload_status='failed'
+        layer_inst.save()
         # Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
@@ -485,7 +487,7 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
-    
+
     from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
     try:
         response, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
