@@ -54,7 +54,8 @@ class OrganizationRetrieveSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         project_qs = Project.active.select_related('organization').filter(organization__id=instance.id)
         representation['projects'] = project_qs.count()
-        representation['ongoing'] = project_qs.filter(status__in=['draft', 'ongoing']).count()
+        representation['draft'] = project_qs.filter(status='draft').count()
+        representation['ongoing'] = project_qs.filter(status='ongoing').count()
         representation['completed'] = project_qs.filter(status='completed').count()
         contact_person_qs = ContactPerson.active.filter(organization=instance).values('id', 'name', 'email')
         representation['contact_person'] = contact_person_qs if contact_person_qs else []
