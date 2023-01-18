@@ -47,6 +47,17 @@ def get_project_queryset(request, user):
                     organization_project_qs = organization_project_qs.filter(id__in=user_org_proj_list)
         else:
             return 'No any user role of the requesting user found!', 400
+        '''filter by state'''
+        if 'state' in request_keys and request.GET['state'] != "":
+            state = request.GET['state']
+            organization_project_qs = organization_project_qs.filter(state__id=state)
+            '''filter by state'''
+        elif 'country' in request_keys and request.GET['country'] != "":
+            country = request.GET['country']
+            organization_project_qs = organization_project_qs.filter(country__id=country)
+        if 'status' in request_keys and request.GET['status'] != "":
+            status = request.GET['status']
+            organization_project_qs = organization_project_qs.filter(status=status)
         '''search_key'''
         if 'search' in request_keys and request.GET['search'] != "":
             search_key = request.GET['search']
@@ -58,14 +69,6 @@ def get_project_queryset(request, user):
                             for key, val in filter_kwargs.items()]
             organization_project_qs = organization_project_qs.filter(
                 reduce(operator.or_, list_of_Q)) if search_fields else organization_project_qs
-        '''filter by state'''
-        if 'state' in request_keys and request.GET['state'] != "":
-            state = request.GET['state']
-            organization_project_qs = organization_project_qs.filter(state__id=state)
-            '''filter by state'''
-        elif 'country' in request_keys and request.GET['country'] != "":
-            country = request.GET['country']
-            organization_project_qs = organization_project_qs.filter(country__id=country)
         return organization_project_qs, 200
     except Exception as e:
         error = 'Error occured in get_project_queryset method. Details: '+ str(e)
