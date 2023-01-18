@@ -21,6 +21,7 @@ from pgis_toolkit.projects.api.views import (
     image_download,
     layer_template_download,
     project_location_geojson,
+    projects_centroid_geojson,
 )
 
 router = DefaultRouter()
@@ -43,6 +44,7 @@ urlpatterns = [
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
     path('project_location_geojson/', project_location_geojson, name='project_location_geojson'),
     path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet.as_view(), name='project_location_vectortile'),
+    path('projects_centroid_geojson/', projects_centroid_geojson, name='projects_centroid_geojson'),
     path('document_download/', document_download, name='document_download'),
     path('image_download/', image_download, name='image_download'),
     path('project_detail/', get_project_detail, name='project_detail'),
