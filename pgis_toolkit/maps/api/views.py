@@ -86,6 +86,7 @@ from pgis_toolkit.maps.tasks import (
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
     CreateBuffer,
+    BufferData,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -2089,6 +2090,35 @@ class BufferAnalysisAPIView(APIView):
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             analysis_inst.delete()
+            return Response(data={'message': 'error', 'details': str(e)}, status=400)
+
+class BufferAnalysisDataAPIView(APIView):
+    def post(self, request, *args, **kwarggs):
+        '''Buffer Analysis
+
+        Parameters
+        ----------
+        distance : float
+
+        Returns
+        -------
+        message : string
+        task_id : string
+        '''
+        try:
+            request_dict = request.data
+            check_list = ['analysis_id', 'layer_ids']
+            for key in check_list:
+                if key not in request_dict or request_dict[key]=='':
+                    return Response(data={'message': 'analysis_id, layer_ids are required!'}, status=400)
+            analysis_id = int(request_dict['analysis_id'])
+            layer_ids = json.loads(request_dict['layer_ids'])
+            is_working=get_celery_worker_status()
+            if is_working != "working":
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
+            response = BufferData(analysis_id, layer_ids)
+            return Response(status=200, data={'message': 'success', 'task_id': response})
+        except Exception as e:
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
 

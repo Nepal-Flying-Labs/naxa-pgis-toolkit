@@ -310,51 +310,76 @@ def fix_self_intersection(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
-            self_instersect_error = cleaning_error_qs.values('self_instersect')[0]
-        # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-        # for i, row in data.iterrows():
-        #     mls = ops.unary_union(row.geometry)
-        #     if isinstance(mls, MultiLineString):
-        #         coords_list = []
-        #         for part in mls.geoms:
-        #             coords_list.extend(part.coords)
-        #         points = [item for item, count in collections.Counter(coords_list).items() if count > 1]
+            self_intersect_error = cleaning_error_qs.values('self_instersect')[0]
+            self_intersect_errors = self_intersect_error["self_instersect"]
+            if len(self_intersect_errors) > 0:
+                data = get_layers(self_intersect_errors)
+                # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
+                # for i, row in data.iterrows():
+                #     mls = ops.unary_union(row.geometry)
+                #     if isinstance(mls, MultiLineString):
+                #         coords_list = []
+                #         for part in mls.geoms:
+                #             coords_list.extend(part.coords)
+                #         points = [item for item, count in collections.Counter(coords_list).items() if count > 1]
 
-        #         multi_point = MultiPoint(points)
-        #         result = ops.split(row.geometry, multi_point)
-        #         for geom in result.geoms:
-        #             if geom.length > convert_distance_to_4326(10):
-        #                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
-        #     else:
-        #         df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
+                #         multi_point = MultiPoint(points)
+                #         result = ops.split(row.geometry, multi_point)
+                #         for geom in result.geoms:
+                #             if geom.length > convert_distance_to_4326(10):
+                #                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
+                #     else:
+                #         df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
         content = check_self_intersection(layer)
-        return {"new_error": content["error_data"], "prev_error": len(self_instersect_error["self_instersect"])}
+        return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}
     except Exception as e:
         return {'message': str(e)}
 
 def fix_snapping(layer):
     try:
-        sql = '''select (ST_Azimuth(h.vec) - ST_Azimuth(h.seg))
-                from (
-                    select
-                        ST_MakeLine(cp.p, point.geom) vec,
-                        ST_MakeLine(cp.p,
-                            ST_LineInterpolatePoint(
-                                line.geom,
-                                ST_LineLocatePoint(line.geom, cp.p) * 1.01)
-                        ) seg
-                        from (
-                            select
-                                ST_ClosestPoint(line.geom, point.geom)
-                        ) p as cp
-                    ) as h'''
-        s = '''ST_Contains(ST_Buffer(line.geom, 100, 'side=left'), point.geom)'''
-#         SELECT ST_Union(a.geom, b.geom)
-# FROM linestring_table a, linestring_table b
-# WHERE ST_Distance(a.geom, b.geom) < distance_threshold
-# AND a.id = 'given_linestring_id'
-# AND b.id != 'given_linestring_id'
-
+        sql = f'''WITH segments AS (
+        SELECT id as id, (
+        ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
+        )
+        SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+        data = gpd.read_postgis(sql, con, geom_col="geometry")
+        graph = momepy.gdf_to_nx(data, approach='primal')
+        components = list(nx.connected_components(graph))
+        components.sort(key=len, reverse=True)
+        largest = components.pop(0)
+        isolated = list( g for cc in components for g in cc )
+        if len(isolated) > 0:
+            points = [Point(xy) for xy in isolated]
+            gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
+            gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
+            iso = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                INNER JOIN snap_points b ON
+                (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
+            isolated_feature = gpd.read_postgis(iso, con, geom_col="geometry")
+            l_points = [Point(xy) for xy in list(largest)]
+            gdf = gpd.GeoDataFrame(crs=4326, geometry=l_points)
+            gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
+            iso = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                INNER JOIN snap_points b ON
+                (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
+            largest_feature = gpd.read_postgis(iso, con, geom_col="geometry")
+            find_sql = f'''WITH buffered_network AS (SELECT ST_Buffer(b.st_union, 0.000449) FROM (SELECT ST_Union(a.geometry) FROM (
+                        SELECT * FROM maps_featurecollectionmirror
+                        WHERE id in {tuple(largest_feature['id'])} ) a) b), 
+                        isolated_network AS (SELECT * FROM maps_featurecollectionmirror WHERE id in {tuple(isolated_feature['id'])})
+                        SELECT * FROM isolated_network WHERE ST_Within(isolated_network.geometry, (SELECT st_buffer FROM buffered_network));'''
+            selected_isolates = gpd.read_postgis(find_sql, con=con, geom_col='geometry', crs=4326)
+            if len(selected_isolates) > 0:
+                for i, row in selected_isolates.iterrows():
+                    update_sql = f'''UPDATE maps_featurecollectionmirror
+                            SET geometry = ST_Union((SELECT ST_MakeLine(ST_ClosestPoint((SELECT ST_Union(a.geometry) FROM (
+                                SELECT * FROM maps_featurecollectionmirror
+                                WHERE id in {tuple(largest_feature['id'])}
+                            ) a), (SELECT geometry from maps_featurecollectionmirror where id={row.id})), ST_EndPoint((SELECT geometry from maps_featurecollectionmirror where id={row.id})))), (SELECT geometry from maps_featurecollectionmirror where id={row.id}))
+                            WHERE id = {row.id};'''
+                    db = con.connect()
+                    db.execute(update_sql)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
