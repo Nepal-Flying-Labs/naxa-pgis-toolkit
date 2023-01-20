@@ -245,16 +245,56 @@ def fix_multipart(layer):
             multiparts = multipart_error["multipart"]
             if len(multiparts) > 0:
                 data = get_layers(multiparts)
-                # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-                # for i, row in data.iterrows():
-                #     data = ops.linemerge(row.geometry)
-                #     data = gpd.GeoDataFrame(crs='epsg:4326', geometry=[data])
-                #     data = data.explode(index_parts=True)
-                #     for value in row.keys():
-                #         if value != 'geometry':
-                #             data.at[i,value] = row[value]
-                #     df = pd.concat([df, data])
-                # print(df)
+                db = con.connect()
+                for i, row in data.iterrows():
+                    try:
+                        sql = f'''UPDATE maps_featurecollectionmirror
+                                SET geometry = (SELECT ST_LineMerge(geometry) FROM maps_featurecollectionmirror WHERE id={row.id})
+                                WHERE id={row.id};'''
+                        db.execute(sql)
+                    except:
+                        pass
+                get_multi = f'''SELECT * FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                                WHERE ST_GeometryType(geometry) IN ('ST_MultiPoint', 'ST_MultiLineString', 'ST_MultiPolygon', 'ST_GeometryCollection')'''
+                multis = gpd.read_postgis(get_multi, con=con, geom_col='geometry', crs=4326)
+                if len(multis) > 0:
+                    for i, row in multis.iterrows():
+                        try:
+                            sql = f'''WITH individual_geoms AS (
+                                            SELECT id, (ST_Dump(geometry)).geom as geom
+                                            FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id})
+                                        )
+                                        UPDATE maps_featurecollectionmirror
+                                        SET geometry = (SELECT geom FROM individual_geoms WHERE id={row.id})
+                                        WHERE id={row.id};'''
+                            db.execute(sql)
+                        except:
+                            pass
+                left_multies = gpd.read_postgis(get_multi, con=con, geom_col='geometry', crs=4326)
+                if len(left_multies) > 0:
+                    for i, row in left_multies.iterrows():
+                        try:
+                            sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom 
+                                        FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
+                            sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
+                            sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                            if len(sql_result) == 1:
+                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                            else:
+                                for i, s_row in sql_result.iterrows():
+                                    if i == 0:
+                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                    else:
+                                        s_row.pop('id')
+                                        obj_dict = {}
+                                        for key, value in s_row.items():
+                                            if key == 'geom':
+                                                obj_dict['geometry'] = value.wkt
+                                            else:
+                                                obj_dict[key] = value
+                                        FeatureCollectionMirror.objects.create(**obj_dict)
+                        except:
+                            pass
         content = check_multipart(layer)
         return {"new_error": content["error_data"], "prev_error": len(multiparts)}
     except Exception as e:
@@ -288,6 +328,56 @@ def fix_overlapping(layer):
             overlaps = overlap_error["overlap"]
             if len(overlaps) > 0:
                 data = get_layers(overlaps)
+                try:
+                    for i, row in data.iterrows():
+                        sql = f'''SELECT * FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                                WHERE EXISTS (SELECT 1 FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) b 
+                                WHERE a.id != b.id AND ST_Overlaps(a.geometry, b.geometry) = true)'''
+                        result = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
+                        for i, o_row in result.iterrows():
+                            try:
+                                over_sql = f'''WITH overlapping_lines AS (
+                                                SELECT ST_Intersection(a.geometry, b.geometry) AS overlap
+                                                FROM (SELECT * FROM maps_featurecollectionmirror WHERE id = {row.id}) a, (SELECT * FROM maps_featurecollectionmirror WHERE id = {o_row.id}) b
+                                                WHERE a.id != b.id AND ST_Overlaps(a.geometry, b.geometry) = true
+                                            )
+                                            UPDATE maps_featurecollectionmirror
+                                            SET geometry = (SELECT ST_Difference(a.geometry, (SELECT overlap FROM overlapping_lines))
+                                            FROM maps_featurecollectionmirror a
+                                            WHERE a.id = {o_row.id}) WHERE id={o_row.id}'''
+                                db = con.connect()
+                                db.execute(over_sql)
+                            except:
+                                pass
+                        get_multi = f'''SELECT * FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                                WHERE ST_GeometryType(geometry) IN ('ST_MultiPoint', 'ST_MultiLineString', 'ST_MultiPolygon', 'ST_GeometryCollection')'''
+                        left_multies = gpd.read_postgis(get_multi, con=con, geom_col='geometry', crs=4326)
+                        if len(left_multies) > 0:
+                            for i, row in left_multies.iterrows():
+                                try:
+                                    sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom 
+                                                FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
+                                    sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
+                                    sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                                    if len(sql_result) == 1:
+                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                                    else:
+                                        for i, s_row in sql_result.iterrows():
+                                            if i == 0:
+                                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                            else:
+                                                s_row.pop('id')
+                                                obj_dict = {}
+                                                for key, value in s_row.items():
+                                                    if key == 'geom':
+                                                        obj_dict['geometry'] = value.wkt
+                                                    else:
+                                                        obj_dict[key] = value
+                                                FeatureCollectionMirror.objects.create(**obj_dict)
+                                except:
+                                    pass
+                except:
+                    pass
         content = check_overlapping(layer)
         return {"new_error": content["error_data"], "prev_error": len(overlaps)}
     except Exception as e:
@@ -314,22 +404,29 @@ def fix_self_intersection(layer):
             self_intersect_errors = self_intersect_error["self_instersect"]
             if len(self_intersect_errors) > 0:
                 data = get_layers(self_intersect_errors)
-                # df = gpd.GeoDataFrame(crs='epsg:4326', geometry=[], columns=data.columns.values)
-                # for i, row in data.iterrows():
-                #     mls = ops.unary_union(row.geometry)
-                #     if isinstance(mls, MultiLineString):
-                #         coords_list = []
-                #         for part in mls.geoms:
-                #             coords_list.extend(part.coords)
-                #         points = [item for item, count in collections.Counter(coords_list).items() if count > 1]
-
-                #         multi_point = MultiPoint(points)
-                #         result = ops.split(row.geometry, multi_point)
-                #         for geom in result.geoms:
-                #             if geom.length > convert_distance_to_4326(10):
-                #                 df = pd.concat([df, gpd.GeoDataFrame(geometry=[geom])], ignore_index=True)
-                #     else:
-                #         df = pd.concat([df, gpd.GeoDataFrame(geometry=[row.geometry])], ignore_index=True)
+                try:
+                    for i, row in data.iterrows():
+                        sql = f'''SELECT a.*, (ST_Dump(ST_Node(a.geometry))).geom
+                                    FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
+                        sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
+                        sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                        if len(sql_result) == 1:
+                            FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                        else:
+                            for i, s_row in sql_result.iterrows():
+                                if i == 0:
+                                    FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                else:
+                                    s_row.pop('id')
+                                    obj_dict = {}
+                                    for key, value in s_row.items():
+                                        if key == 'geom':
+                                            obj_dict['geometry'] = value.wkt
+                                        else:
+                                            obj_dict[key] = value
+                                    FeatureCollectionMirror.objects.create(**obj_dict)
+                except:
+                    pass
         content = check_self_intersection(layer)
         return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}
     except Exception as e:
@@ -337,52 +434,45 @@ def fix_self_intersection(layer):
 
 def fix_snapping(layer):
     try:
-        sql = f'''WITH segments AS (
-        SELECT id as id, (
-        ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
-        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
-        )
-        SELECT * FROM segments WHERE geometry IS NOT NULL;'''
-        data = gpd.read_postgis(sql, con, geom_col="geometry")
-        graph = momepy.gdf_to_nx(data, approach='primal')
-        components = list(nx.connected_components(graph))
-        components.sort(key=len, reverse=True)
-        largest = components.pop(0)
-        isolated = list( g for cc in components for g in cc )
-        if len(isolated) > 0:
-            points = [Point(xy) for xy in isolated]
-            gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
-            gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
-            iso = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-                INNER JOIN snap_points b ON
-                (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
-            isolated_feature = gpd.read_postgis(iso, con, geom_col="geometry")
-            l_points = [Point(xy) for xy in list(largest)]
-            gdf = gpd.GeoDataFrame(crs=4326, geometry=l_points)
-            gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
-            iso = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-                INNER JOIN snap_points b ON
-                (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
-            largest_feature = gpd.read_postgis(iso, con, geom_col="geometry")
-            find_sql = f'''WITH buffered_network AS (SELECT ST_Buffer(b.st_union, 0.000449) FROM (SELECT ST_Union(a.geometry) FROM (
-                        SELECT * FROM maps_featurecollectionmirror
-                        WHERE id in {tuple(largest_feature['id'])} ) a) b), 
-                        isolated_network AS (SELECT * FROM maps_featurecollectionmirror WHERE id in {tuple(isolated_feature['id'])})
-                        SELECT * FROM isolated_network WHERE ST_Within(isolated_network.geometry, (SELECT st_buffer FROM buffered_network));'''
-            selected_isolates = gpd.read_postgis(find_sql, con=con, geom_col='geometry', crs=4326)
-            if len(selected_isolates) > 0:
-                for i, row in selected_isolates.iterrows():
-                    update_sql = f'''UPDATE maps_featurecollectionmirror
-                            SET geometry = ST_Union((SELECT ST_MakeLine(ST_ClosestPoint((SELECT ST_Union(a.geometry) FROM (
-                                SELECT * FROM maps_featurecollectionmirror
-                                WHERE id in {tuple(largest_feature['id'])}
-                            ) a), (SELECT geometry from maps_featurecollectionmirror where id={row.id})), ST_EndPoint((SELECT geometry from maps_featurecollectionmirror where id={row.id})))), (SELECT geometry from maps_featurecollectionmirror where id={row.id}))
-                            WHERE id = {row.id};'''
-                    db = con.connect()
-                    db.execute(update_sql)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
+            isolated = snapping_error["snapping"]
+            if len(isolated) > 0:
+                sql = f'''WITH segments AS (
+                SELECT id as id, (
+                ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+                FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
+                )
+                SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+                data = gpd.read_postgis(sql, con, geom_col="geometry")
+                graph = momepy.gdf_to_nx(data, approach='primal')
+                components = list(nx.connected_components(graph))
+                components.sort(key=len, reverse=True)
+                largest = components.pop(0)
+                l_points = [Point(xy) for xy in list(largest)]
+                gdf = gpd.GeoDataFrame(crs=4326, geometry=l_points)
+                gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
+                iso = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                    INNER JOIN snap_points b ON
+                    (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
+                largest_feature = gpd.read_postgis(iso, con, geom_col="geometry")
+                find_sql = f'''WITH buffered_network AS (SELECT ST_Buffer(b.st_union, 0.0000449) FROM (SELECT ST_Union(a.geometry) FROM (
+                            SELECT * FROM maps_featurecollectionmirror
+                            WHERE id in {tuple(largest_feature['id'])} ) a) b), 
+                            isolated_network AS (SELECT * FROM maps_featurecollectionmirror WHERE id in {tuple(isolated)})
+                            SELECT * FROM isolated_network WHERE ST_Within(isolated_network.geometry, (SELECT st_buffer FROM buffered_network));'''
+                selected_isolates = gpd.read_postgis(find_sql, con=con, geom_col='geometry', crs=4326)
+                if len(selected_isolates) > 0:
+                    for i, row in selected_isolates.iterrows():
+                        update_sql = f'''UPDATE maps_featurecollectionmirror
+                                SET geometry = ST_Union((SELECT ST_MakeLine(ST_ClosestPoint((SELECT ST_Union(a.geometry) FROM (
+                                    SELECT * FROM maps_featurecollectionmirror
+                                    WHERE id in {tuple(largest_feature['id'])}
+                                ) a), (SELECT geometry from maps_featurecollectionmirror where id={row.id})), ST_EndPoint((SELECT geometry from maps_featurecollectionmirror where id={row.id})))), (SELECT geometry from maps_featurecollectionmirror where id={row.id}))
+                                WHERE id = {row.id};'''
+                        db = con.connect()
+                        db.execute(update_sql)
         content = check_snapping(layer)
         return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
     except Exception as e:
