@@ -1,6 +1,12 @@
 import geopandas as gpd
 from pgis_toolkit.maps.models import Analysis, BufferAnalysis, BufferAreas
 from shapely.geometry import Point
+from sqlalchemy import create_engine
+
+from config.settings.base import env
+
+db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+con = create_engine(db_connection_url)
 
 def dissolve_data(data):
     """Disolve overlapping geometires
@@ -134,4 +140,13 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id):
             Analysis.objects.get(id=analysis_id).delete()
         if BufferAnalysis.objects.filter(id=buffer_id).exists():
             BufferAnalysis.objects.get(id=buffer_id).delete()
+        return None, "error", str(e), 400
+
+def buffer_analysis_data(analysis_id, layer_ids):
+    try:
+        sql = f'''SELECT id, geometry FROM maps_bufferareas WHERE analysis_id={analysis_id}'''
+        gdf = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
+        print(gdf)
+        return analysis_id, "success", "", 200
+    except Exception as e:
         return None, "error", str(e), 400
