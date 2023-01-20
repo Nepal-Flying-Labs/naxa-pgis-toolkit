@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.serializers import serialize
+from django.db import connection
 from django.db.models import Count, Q
 from django.db.models.query import QuerySet
 from django.http import Http404, HttpResponse
@@ -1070,3 +1071,47 @@ class ContactPersonViewset(viewsets.ModelViewSet):
             return queryset
         except Exception as e:
             return str(e)
+
+@api_view(['GET'])
+def projects_centroid_geojson(request, *args, **kwargs):
+    """
+    geojson of project location centroids
+    """
+    try:
+        result = []
+        organization = request.query_params.get('organization', None)
+        if not organization:
+            return Response(data={'message': 'organization params is missing'}, status=400)
+        if Project.active.filter(organization=organization).exists():
+            project_cluster_sql = f'''
+                                    SELECT json_build_object(
+                                        'type', 'FeatureCollection',
+                                        'crs',  json_build_object(
+                                            'type',      'name',
+                                            'properties', json_build_object(
+                                                'name', 'EPSG:4326')),
+                                        'features', json_agg(ST_AsGeoJSON(t.*)::json)
+                                        )
+                                    FROM (
+                                            SELECT project_id, ST_Centroid(ST_Union(geometry))
+                                            FROM projects_projectlocationfeaturecollection l
+                                            WHERE is_deleted = false AND project_id IN
+                                                (SELECT id
+                                                FROM projects_project
+                                                WHERE is_deleted=false AND organization_id=1
+                                                ORDER BY id)
+                                            GROUP BY project_id
+                                        ) as t;
+                                    '''
+            try:
+                with connection.cursor() as cursor:
+                    cursor = connection.cursor()
+                    cursor.execute(project_cluster_sql)
+                    result = cursor.fetchone()[0]
+                return Response(data=result, status=200)
+            except Exception as e:
+                return Response(data={'message': str(e)}, status=400)
+        else:
+            return Response(data={'message': 'Project matching queryset not found!'}, status=404)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
