@@ -260,5 +260,21 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             OptimumRoute.objects.get(id=optimum_route_id).delete()
         return None, "error", str(e), 400
 
-def service_area_analysis():
-    pass
+def service_area_analysis(road_network, analysis_id, optimum_route_id):
+    errors=[]
+    try:
+        sql = f'''WITH segments AS (
+            SELECT id as id, (
+            ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+            FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
+            )
+            SELECT * FROM segments WHERE geometry IS NOT NULL'''
+        # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
+        segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
+        G = convert_shp2graph(segments)
+    except Exception as e:
+        if Analysis.objects.filter(id=analysis_id).exists():
+            Analysis.objects.get(id=analysis_id).delete()
+        if OptimumRoute.objects.filter(id=optimum_route_id).exists():
+            OptimumRoute.objects.get(id=optimum_route_id).delete()
+        return None, "error", str(e), 400

@@ -507,6 +507,17 @@ def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id):
         print("error occured in handleDataMergeUpdate: " + str(e))
         return None, "error", str(e), 400
 
+@shared_task(max_retries=1, soft_time_limit=8000)
+def BufferData(analysis_id, layer_ids):
+    
+    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis_data
+    try:
+        response, stat, message, status = buffer_analysis_data(analysis_id, layer_ids)
+        return response, stat, message, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return None, "error", str(e), 400
+
 @shared_task(bind=True, max_retries=3, soft_time_limit=800)
 def delete_query_layers(self):
     try:
