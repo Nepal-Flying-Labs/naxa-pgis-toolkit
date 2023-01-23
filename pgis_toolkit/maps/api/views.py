@@ -2064,11 +2064,12 @@ class BufferAnalysisAPIView(APIView):
         task_id : string
         '''
         try:
+            analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'poi']
+            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, poi are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, project, name, type, pois are required!'}, status=400)
             name = request_dict['name']
             type = request_dict['type']
             project = int(request_dict['project'])
@@ -2077,7 +2078,7 @@ class BufferAnalysisAPIView(APIView):
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
-            poi = json.loads(request['poi'])
+            pois = json.loads(request_dict['pois'])
             '''create analysis_instance'''
             if Analysis.active.filter(name=name, type=type, project=project).exists():
                 return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
@@ -2089,10 +2090,11 @@ class BufferAnalysisAPIView(APIView):
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, poi)
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
-            analysis_inst.delete()
+            print('Error occured in BufferAnalysisAPIView',str(e))
+            if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
 class BufferAnalysisDataAPIView(APIView):

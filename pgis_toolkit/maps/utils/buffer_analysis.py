@@ -1,4 +1,5 @@
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import Point
 from sqlalchemy import create_engine
 
@@ -109,7 +110,7 @@ def find_data_within_buffer(data, distance: float, layers: list) -> dict:
         datas.append(df)
     return datas
 
-def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, poi):
+def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
     try:
         points = []
         for origin in origins:
@@ -127,7 +128,31 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         for i, row in data.iterrows():
             result_dict = {'geometry': row.geometry.wkt, 'area': area, 'bbox': list(row.geometry.bounds), 'analysis_id': analysis_id}
             buffer_objs.append(BufferAreas(**result_dict))
-        BufferAreas.active.bulk_create(buffer_objs)
+        buffer_areas_list = BufferAreas.active.bulk_create(buffer_objs)
+        iterate = True
+        while iterate:
+            if BufferAreas.active.filter(analysis_id=analysis_id).exists():
+                iterate=False
+        if pois:
+            try:
+                for buff_area in buffer_areas_list:
+                    buff_area_id = buff_area.id
+                    pois_dict = {}
+                    for poi in pois:
+                        pois_sql = f'''
+                        SELECT mirror.id
+                        FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                        JOIN (SELECT id, geometry FROM maps_featurecollectionmirror WHERE layer_id={poi} and is_deleted=false) mirror
+                        ON ST_Contains(buffer.geometry, mirror.geometry);
+                        '''
+                        # mirror = gpd.read_postgis(pois_sql, con=con, geom_col='geometry', crs="epsg:4326")
+                        mirror= pd.read_sql_query(pois_sql, con)
+                        pois_dict[poi] = list(mirror['id'])
+                    buff_area.pois = pois_dict
+                    buff_area.save()
+            except Exception as e:
+                print('eror in checking pois within buffer zones:', str(e))
+                pass
         analysis_inst = Analysis.active.get(id=analysis_id)
         analysis_inst.bbox = list(data.total_bounds)
         analysis_inst.save()
