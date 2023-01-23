@@ -14,6 +14,7 @@ from pgis_toolkit.projects.models import (
     RequestDemo,
 )
 from pgis_toolkit.users.models import UserRole
+from pgis_toolkit.utils.validators import CustomURLValidator
 
 
 class OrganizationCategoryListSerializer(serializers.ModelSerializer):
