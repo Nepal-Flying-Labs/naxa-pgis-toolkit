@@ -1,9 +1,9 @@
 import geopandas as gpd
-from pgis_toolkit.maps.models import Analysis, BufferAnalysis, BufferAreas
 from shapely.geometry import Point
 from sqlalchemy import create_engine
 
 from config.settings.base import env
+from pgis_toolkit.maps.models import Analysis, BufferAnalysis, BufferAreas
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -109,7 +109,7 @@ def find_data_within_buffer(data, distance: float, layers: list) -> dict:
         datas.append(df)
     return datas
 
-def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id):
+def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, poi):
     try:
         points = []
         for origin in origins:
