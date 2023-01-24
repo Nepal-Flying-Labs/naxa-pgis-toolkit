@@ -264,7 +264,7 @@ class AnalysisSerializer(serializers.ModelSerializer):
 class BufferAreasMapSerializer(serializers.ModelSerializer):
     class Meta:
         model = BufferAreas
-        fields = ('id', 'area', 'bbox')
+        fields = ('id', 'area', 'bbox', 'origin')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

@@ -1167,7 +1167,7 @@ class AdvanceQueryAPIView(APIView):
                         # raw_query=f"INSERT INTO maps_queryfeaturecollection (layer_id, is_deleted, attributes, geometry) (SELECT {query_layer.id} AS layer_id , is_deleted, attributes, geometry FROM maps_featurecollection WHERE id IN {feature_ids})"
                         # bbox_query = f"SELECT ST_Extent(geometry) AS bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #faster
                         # bbox_query= f"SELECT ST_Envelope(ST_Union(ST_Envelope(geometry))) as bbox FROM maps_featurecollection WHERE id IN {feature_ids}" #slower
-                        cursor = connection.cursor()
+                        # cursor = connection.cursor()
                         cursor.execute(raw_query)
                         cursor.execute(bbox_query)
                         #result[0] takes the form: 'BOX(85.4090132495848 27.66365506380353,85.51751110375923 27.717172880622645)'
@@ -1308,7 +1308,7 @@ class LayerFromQueryAPIView(APIView):
                         with connection.cursor() as cursor:
                             # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
                             raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
-                            cursor = connection.cursor()
+                            # cursor = connection.cursor()
                             cursor.execute(raw_query)
                     except Exception as e:
                         if layer_instance: layer_instance.delete()
@@ -2642,7 +2642,7 @@ def cleaning_error_features(request, *args, **kwargs):
         # null = "SELECT ARRAY_LENGTH (snapping, 1) FROM maps_cleaningerrors WHERE layer_id=" + layer
         try:
             with connection.cursor() as cursor:
-                cursor = connection.cursor()
+                # cursor = connection.cursor()
                 cursor.execute(features)
                 features = cursor.fetchone()
                 features_count = features[0]
@@ -2689,7 +2689,7 @@ def copy_features(request, *args, **kwargs):
 
         try:
             with connection.cursor() as cursor:
-                cursor = connection.cursor()
+                # cursor = connection.cursor()
                 cursor.execute(update_sql)
                 cursor.execute(insert_sql)
             return Response(data={'message': 'Features were replicated successfully'}, status=200)
@@ -2857,7 +2857,7 @@ def sync_features(request, *args, **kwargs):
                         )'''
         try:
             with connection.cursor() as cursor:
-                cursor = connection.cursor()
+                # cursor = connection.cursor()
                 cursor.execute(update_sql)
                 cursor.execute(insert_sql)
             Layer.active.filter(id=layer).update(is_clean=True)
