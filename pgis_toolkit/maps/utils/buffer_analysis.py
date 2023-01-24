@@ -114,7 +114,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
     try:
         points = []
         for origin in origins:
-            point = Point(origin[1], origin[0])
+            point = Point(origin[0], origin[1])
             points.append(point)
         gdf = gpd.GeoDataFrame(geometry=points, crs=4326)
         # points = []
