@@ -142,8 +142,8 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                 iterate=False
         if pois:
             try:
+                i=0
                 for buff_area in buffer_areas_list:
-                    i=0
                     buff_area_id = buff_area.id
                     pois_dict = {}
                     for poi in pois:
@@ -158,8 +158,8 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                         pois_dict[poi] = list(mirror['id'])
                     buff_area.pois = pois_dict
                     buff_area.origin = origins[i]
-                    i=i+1
                     buff_area.save()
+                    i=i+1
             except Exception as e:
                 print('eror in checking pois within buffer zones:', str(e))
                 pass
