@@ -3012,3 +3012,32 @@ class AnalysisViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
+    '''
+    VectorTile Generation for Buffer Regions
+    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
+    '''
+    vector_tile_layer_name = 'buffer_area'
+    vector_tile_fields = ('id', 'analysis_id')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'area' not in request_keys or request.GET['area'] == "":
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        area=request.GET['area']
+        queryset=BufferAreas.active.filter(id=area)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
