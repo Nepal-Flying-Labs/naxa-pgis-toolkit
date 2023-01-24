@@ -117,6 +117,13 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
             point = Point(origin[1], origin[0])
             points.append(point)
         gdf = gpd.GeoDataFrame(geometry=points, crs=4326)
+        # points = []
+        # for origin in origins:
+        #     point = f'POINT ({origin[1]}, {origin[0]})'
+        #     points.append(point)
+        # points ={'geometry': points, 'origin': origins}
+        # gdf = gpd.GeoDataFrame(points, crs="EPSG:4326")
+        # print(gdf, type(gdf), "is gdf")
         gdf = gdf.to_crs("epsg:3857")
         data = gdf.buffer(float(radius))
         data = gpd.GeoDataFrame(crs='epsg:3857', geometry=data, columns=gdf.columns.values)
@@ -136,6 +143,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         if pois:
             try:
                 for buff_area in buffer_areas_list:
+                    i=0
                     buff_area_id = buff_area.id
                     pois_dict = {}
                     for poi in pois:
@@ -149,6 +157,8 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                         mirror= pd.read_sql_query(pois_sql, con)
                         pois_dict[poi] = list(mirror['id'])
                     buff_area.pois = pois_dict
+                    buff_area.origin = origins[i]
+                    i=i+1
                     buff_area.save()
             except Exception as e:
                 print('eror in checking pois within buffer zones:', str(e))

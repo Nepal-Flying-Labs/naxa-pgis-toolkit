@@ -492,6 +492,7 @@ class BufferAnalysis(DateTimeStamp, IsDeleted):
 
 class BufferAreas(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    origin = models.JSONField(default=list, blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
     bbox = models.JSONField(default=list, blank=True, null=True)

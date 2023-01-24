@@ -8,6 +8,7 @@ from pgis_toolkit.maps.api.views import (
     AnalysisViewset,
     BufferAnalysisAPIView,
     BufferAnalysisDataAPIView,
+    BufferAreaTileQuerySet,
     DataMergeUpdateAPIView,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
@@ -183,6 +184,8 @@ urlpatterns = [
     path('layer_from_optimum_path/', LayerFromOptimumPathAnalysis.as_view(), name='LayerFromOptimumPathAnalysis'),
     path('buffer_analysis/', BufferAnalysisAPIView.as_view(), name='buffer_analysis'),
     path('buffer_analysis_data/', BufferAnalysisDataAPIView.as_view(), name='buffer_analysis_data'),
+    path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+
 
     #==================
     #   Advance Query
