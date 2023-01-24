@@ -495,7 +495,7 @@ class BufferAreas(DateTimeStamp, IsDeleted):
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
     bbox = models.JSONField(default=list, blank=True, null=True)
-
+    pois = models.JSONField(default=dict, blank=True, null=True) # json of layer and feature ids
     class Meta:
         app_label = 'maps'
 

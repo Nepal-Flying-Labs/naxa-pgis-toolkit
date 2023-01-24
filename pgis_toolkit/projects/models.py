@@ -19,6 +19,7 @@ from pgis_toolkit.utils.constants import (
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
+from pgis_toolkit.utils.validators import CustomURLValidator
 
 from .utils.managers import ActiveManager
 

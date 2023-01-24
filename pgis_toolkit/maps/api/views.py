@@ -39,6 +39,7 @@ from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
     BufferAnalysis,
+    BufferAreas,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -83,10 +84,10 @@ from pgis_toolkit.maps.permissions import (
     ThemePermission,
 )
 from pgis_toolkit.maps.tasks import (
+    BufferData,
+    CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
-    CreateBuffer,
-    BufferData,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -127,6 +128,7 @@ from pgis_toolkit.utils.vectortile import (
 
 from .serializers import (
     AnalysisSerializer,
+    BufferAreasMapSerializer,
     CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
@@ -2062,11 +2064,12 @@ class BufferAnalysisAPIView(APIView):
         task_id : string
         '''
         try:
+            analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type']
+            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, project, name, type, pois are required!'}, status=400)
             name = request_dict['name']
             type = request_dict['type']
             project = int(request_dict['project'])
@@ -2075,6 +2078,7 @@ class BufferAnalysisAPIView(APIView):
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
+            pois = json.loads(request_dict['pois'])
             '''create analysis_instance'''
             if Analysis.active.filter(name=name, type=type, project=project).exists():
                 return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
@@ -2086,10 +2090,11 @@ class BufferAnalysisAPIView(APIView):
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id)
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
-            analysis_inst.delete()
+            print('Error occured in BufferAnalysisAPIView',str(e))
+            if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
 class BufferAnalysisDataAPIView(APIView):
@@ -2240,6 +2245,19 @@ def analysis_layers(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+def get_buffer_dict(analysis, buffer_analysis):
+    analysis_dict={}
+    analysis_dict['id'] = analysis.id
+    analysis_dict['name'] = analysis.name
+    analysis_dict['geom_type'] = analysis.geom_type
+    analysis_dict['bbox'] = analysis.bbox
+    analysis_dict['origins'] = buffer_analysis.origins
+    analysis_dict['total_area'] = buffer_analysis.total_area
+    queryset = BufferAreas.active.filter(analysis_id=analysis.id)
+    serializer = BufferAreasMapSerializer(queryset, many=True)
+    analysis_dict['buffer_areas'] = serializer.data
+    return analysis_dict
+
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layer(request, *args, **kwargs):
@@ -2251,13 +2269,17 @@ def analysis_layer(request, *args, **kwargs):
         '''say network analysis'''
         analys_qs = Analysis.active.filter(project=project, id=analysis_id)
         analysis = analys_qs[0]
-        optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
-        optimum_route = optimum_route_qs[0]
-        analysis_dict=get_analysis_dict(analysis, optimum_route)
+        if analysis.type == 'optimum_route':
+            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+            optimum_route = optimum_route_qs[0]
+            analysis_dict=get_analysis_dict(analysis, optimum_route)
+        elif analysis.type == 'buffer':
+            buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
+            buffer_analysis = buffer_analysis_qs[0]
+            analysis_dict = get_buffer_dict(analysis, buffer_analysis)
         return Response(analysis_dict, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
-
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
     def patch(self, request, *args, **kwargs):
