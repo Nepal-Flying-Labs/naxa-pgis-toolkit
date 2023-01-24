@@ -276,6 +276,7 @@ class BufferAreasMapSerializer(serializers.ModelSerializer):
             for key, value in pois.items():
                 layer = Layer.active.get(id=key)
                 poi_json['layer_id'] = layer.id
+                poi_json['layer_name'] = layer.name
                 poi_json['feature_mirror_ids'] = value
                 poi_list.append(poi_json)
                 poi_json = {}
