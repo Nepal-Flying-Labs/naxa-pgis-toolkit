@@ -2097,6 +2097,67 @@ class BufferAnalysisAPIView(APIView):
             if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
+    def get(self, request, *args, **kwargs):
+        '''{{baseURL}}api/maps/buffer_analysis/?layer=1&field=DISTRICT&analysis_id=&view=list'''
+        try:
+            layer_id = request.query_params.get('layer', None)
+            field = request.query_params.get('field', None)
+            analysis_id = request.query_params.get('analysis_id', None)
+            view = request.query_params.get('view', None)
+            if layer_id and field:
+                if not analysis_id:
+                    return Response(data={'message': 'params analysis_id is missing.'}, status=400)
+                pois_qs = BufferAreas.active.filter(analysis_id=analysis_id).values('pois')
+                feature_ids = []
+                for pois in pois_qs:
+                    pois_json = pois['pois']
+                    if pois_json and layer_id in pois_json:
+                        feature_ids = feature_ids + pois_json[layer_id]
+                if not feature_ids:
+                    return Response(data={'message': 'No any POI features found inside the buffer for the layer'}, status=400)
+                if view=='list':
+                    feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids).order_by('id')
+                    attribute_keys = feature_qs[0].attributes.keys()
+                    result = []
+                    if 'name' in attribute_keys:
+                        for feature in feature_qs:
+                            attributes = feature.attributes
+                            feature_dict = {}
+                            feature_dict['id'] = feature.id
+                            feature_dict['name'] = attributes['name']
+                            feature_dict[field] = attributes[field]
+                            feature_dict['buffer_distance'] = 200
+                            feature_dict['origin'] = [85.6, 27.2]
+                            result.append(feature_dict)
+                    else:
+                        for feature in feature_qs:
+                            attributes = feature.attributes
+                            feature_dict = {}
+                            feature_dict['id'] = feature.id
+                            feature_dict['name'] = ''
+                            feature_dict[field] = attributes[field]
+                            feature_dict['buffer_distance'] = 200
+                            feature_dict['origin'] = [85.6, 27.2]
+                            result.append(feature_dict)
+                    return Response(data=result, status=200)
+                elif view =='chart':
+                    result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
+                    return Response(data=result, status=200)
+                else:
+                    return Response(data={'message': 'view params is missing!'}, status=400)
+
+            elif layer_id:
+                layer = Layer.active.get(id=layer_id)
+                if LayerAttribute.objects.filter(layer=layer_id).exists():
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    return Response (data=attribute_qs, status=200)
+                else:
+                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+            else:
+                return Response(data={'message': 'layer or field params is missing!'}, status=400)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
 class BufferAnalysisDataAPIView(APIView):
     def post(self, request, *args, **kwarggs):
         '''Buffer Analysis
