@@ -8,6 +8,7 @@ from pgis_toolkit.maps.api.views import (
     AnalysisViewset,
     BufferAnalysisAPIView,
     BufferAnalysisDataAPIView,
+    BufferAreasCollection,
     BufferAreaTileQuerySet,
     DataMergeUpdateAPIView,
     ErrorFeaturesVectorTileQuerySet,
@@ -106,6 +107,10 @@ router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, ba
 router.register(r'analysis', AnalysisViewset, basename='analysis')
 router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
 
+#==================
+#  BufferAreas
+#==================
+router.register(r'buffer_area_collection', BufferAreasCollection, basename='buffer_area_collection')
 app_name = "projects"
 
 data_clean_urls = [

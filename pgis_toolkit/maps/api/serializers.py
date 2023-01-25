@@ -282,3 +282,26 @@ class BufferAreasMapSerializer(serializers.ModelSerializer):
                 poi_json = {}
         representation['poi'] = poi_list
         return representation
+
+class BufferAreasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAreas
+        fields = ('id', 'area', 'origin')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        '''buffer areas'''
+        poi_list= []
+        pois = instance.pois
+        if pois:
+            poi_json = {}
+            for key, value in pois.items():
+                layer = Layer.active.get(id=key)
+                poi_json['layer_id'] = layer.id
+                # poi_json['feature_mirror_ids'] = value
+                poi_json['layer_name'] = layer.name
+                poi_json['count'] = len(value)
+                poi_list.append(poi_json)
+                poi_json = {}
+        representation['poi'] = poi_list
+        return representation

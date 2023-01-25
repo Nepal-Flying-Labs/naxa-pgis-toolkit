@@ -129,6 +129,7 @@ from pgis_toolkit.utils.vectortile import (
 from .serializers import (
     AnalysisSerializer,
     BufferAreasMapSerializer,
+    BufferAreasSerializer,
     CleaningErrorsSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
@@ -2157,6 +2158,36 @@ class BufferAnalysisAPIView(APIView):
                 return Response(data={'message': 'layer or field params is missing!'}, status=400)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+'''Buffer Areas Table'''
+class BufferAreasCollection(viewsets.ModelViewSet):
+    '''
+    Viewset for BufferAreas objects
+    '''
+    queryset = BufferAreas.active.all()
+    http_method_names = ['get']
+    serializer_class = BufferAreasSerializer
+
+    # default_serializer_class = BufferAreasSerializer
+    # serializer_classes = {
+    #     'list': BufferAreasSerializer,
+    #     'retrieve': BufferAreasSerializer,
+    # }
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            analysis_id = self.request.query_params.get('analysis', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif analysis_id:
+                queryset=self.queryset.filter(analysis_id=analysis_id)
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    # def get_serializer_class(self):
+    #     return self.serializer_classes.get(self.action,self.default_serializer_class)
 
 class BufferAnalysisDataAPIView(APIView):
     def post(self, request, *args, **kwarggs):
