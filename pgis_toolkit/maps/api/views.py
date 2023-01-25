@@ -2141,7 +2141,8 @@ class BufferAnalysisAPIView(APIView):
                             result.append(feature_dict)
                     return Response(data=result, status=200)
                 elif view =='chart':
-                    return Response(data={'message': 'Chart data coming soon.'},status=200)
+                    result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
+                    return Response(data=result, status=200)
                 else:
                     return Response(data={'message': 'view params is missing!'}, status=400)
 
