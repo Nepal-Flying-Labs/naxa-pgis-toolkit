@@ -2142,7 +2142,14 @@ class BufferAnalysisAPIView(APIView):
                             result.append(feature_dict)
                     return Response(data=result, status=200)
                 elif view =='chart':
-                    result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
+                    result = {}
+                    mod_field = 'attributes__'+ field
+                    feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
+                    field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
+                    for value in field_value_qs:
+                        result[value] = feature_qs.filter(attributes__contains={field: value}).count()
+                    result['total'] = feature_qs.count()
+                    # result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
                     return Response(data=result, status=200)
                 else:
                     return Response(data={'message': 'view params is missing!'}, status=400)
