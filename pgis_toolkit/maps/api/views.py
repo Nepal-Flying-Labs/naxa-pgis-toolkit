@@ -2099,15 +2099,15 @@ class BufferAnalysisAPIView(APIView):
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
     def get(self, request, *args, **kwargs):
-        '''{{baseURL}}api/maps/buffer_analysis/?layer=1&field=DISTRICT&analysis_id=&view=list'''
+        '''{{baseURL}}api/maps/buffer_analysis/?layer=1&field=DISTRICT&analysis=&view=list'''
         try:
             layer_id = request.query_params.get('layer', None)
             field = request.query_params.get('field', None)
-            analysis_id = request.query_params.get('analysis_id', None)
+            analysis_id = request.query_params.get('analysis', None)
             view = request.query_params.get('view', None)
             if layer_id and field:
                 if not analysis_id:
-                    return Response(data={'message': 'params analysis_id is missing.'}, status=400)
+                    return Response(data={'message': 'params analysis is missing.'}, status=400)
                 pois_qs = BufferAreas.active.filter(analysis_id=analysis_id).values('pois')
                 feature_ids = []
                 for pois in pois_qs:
