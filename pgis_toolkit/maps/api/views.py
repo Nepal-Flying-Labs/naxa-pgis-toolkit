@@ -2350,7 +2350,7 @@ def get_buffer_dict(analysis, buffer_analysis):
     analysis_dict['name'] = analysis.name
     analysis_dict['geom_type'] = analysis.geom_type
     analysis_dict['bbox'] = analysis.bbox
-    analysis_dict['origins'] = buffer_analysis.origins
+    # analysis_dict['origins'] = buffer_analysis.origins
     analysis_dict['total_area'] = buffer_analysis.total_area
     queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
     serializer = BufferAreasMapSerializer(queryset, many=True)
