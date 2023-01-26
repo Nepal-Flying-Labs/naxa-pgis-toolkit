@@ -2143,13 +2143,28 @@ class BufferAnalysisAPIView(APIView):
                     return Response(data=result, status=200)
                 elif view =='chart':
                     result = {}
-                    mod_field = 'attributes__'+ field
-                    feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
-                    field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
-                    for value in field_value_qs:
-                        result[value] = feature_qs.filter(attributes__contains={field: value}).count()
-                    result['total'] = feature_qs.count()
-                    # result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
+                    # mod_field = 'attributes__'+ field
+                    # feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
+                    # field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
+                    # for value in field_value_qs:
+                    #     result[value] = feature_qs.filter(attributes__contains={field: value}).count()
+                    # result['total'] = feature_qs.count()
+                    proj_field = '$attributes.'+field
+                    mirro_coll = MONGO_DB['featurecollectionsmirror']
+                    features = mirro_coll.aggregate([
+                        {
+                            "$match": {"id":{"$in":feature_ids}}
+                        },
+                        {
+                            "$project": {field: proj_field, "_id":1}
+                        },
+                        {
+                            "$group": {"_id": "$"+field, "count":{"$sum": 1}}
+                        }
+                    ])
+                    features_json = json.loads(dumps(features))
+                    for feat in features_json:
+                        result[feat['_id']] = feat['count']
                     return Response(data=result, status=200)
                 else:
                     return Response(data={'message': 'view params is missing!'}, status=400)
