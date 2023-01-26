@@ -1,5 +1,8 @@
 import geopandas as gpd
 import pandas as pd
+from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import Point as GeosPoint
+from django.db import connection
 from shapely.geometry import Point
 from sqlalchemy import create_engine
 
@@ -117,13 +120,6 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
             point = Point(origin[0], origin[1])
             points.append(point)
         gdf = gpd.GeoDataFrame(geometry=points, crs=4326)
-        # points = []
-        # for origin in origins:
-        #     point = f'POINT ({origin[1]}, {origin[0]})'
-        #     points.append(point)
-        # points ={'geometry': points, 'origin': origins}
-        # gdf = gpd.GeoDataFrame(points, crs="EPSG:4326")
-        # print(gdf, type(gdf), "is gdf")
         gdf = gdf.to_crs("epsg:3857")
         data = gdf.buffer(float(radius))
         data = gpd.GeoDataFrame(crs='epsg:3857', geometry=data, columns=gdf.columns.values)
@@ -142,7 +138,9 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                 iterate=False
         if pois:
             try:
-                i=0
+                geos_origins = []
+                for origin in origins:
+                    geos_origins.append(GeosPoint(origin[0], origin[1]))
                 for buff_area in buffer_areas_list:
                     buff_area_id = buff_area.id
                     pois_dict = {}
@@ -157,9 +155,38 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                         mirror= pd.read_sql_query(pois_sql, con)
                         pois_dict[poi] = list(mirror['id'])
                     buff_area.pois = pois_dict
-                    buff_area.origin = origins[i]
+                    origin_list = []
+                    for i, point in enumerate(geos_origins):
+                        if point.within(buff_area.geometry):
+                            origin_list.append(origins[i])
+                    ''''''
+                    # origin_list =[]
+                    # for id , origin in enumerate(origins):
+                    #     origin_list.append((id, f'POINT({origin[0]} {origin[1]})'))
+                    # origin_tuple = tuple(origin_list)
+                    # print(origin_tuple, "is origin tuple")
+                    # origin_sql = f'''
+                    # WITH  origin_table (id, point) AS (VALUES {origin_tuple})
+                    # SELECT origins.id
+                    # FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                    # JOIN (SELECT id, ST_PointFromText(point::text, 4326) AS geometry FROM origin_table) origins
+                    # ON ST_Contains(buffer.geometry, origins.geometry);
+                    # '''
+                    # print(origin_sql, "is origin sql")
+                    # with connection.cursor() as cursor:
+                    #     cursor.execute(origin_sql)
+                    #     result = cursor.fetchall()
+                    #     print(result, "is result")
+                    # origin_df= pd.read_sql_query(origin_sql, con)
+                    # origin_ids = list(origin_df['id'])
+                    # final_origin_list = []
+                    # for id in origin_ids:
+                    #     print(id, origins[i], "is id and origin point")
+                    #     final_origin_list.append(origins[i])
+                    # buff_area.origin = final_origin_list
+                    ''''''
+                    buff_area.origin = origin_list
                     buff_area.save()
-                    i=i+1
             except Exception as e:
                 print('eror in checking pois within buffer zones:', str(e))
                 pass
