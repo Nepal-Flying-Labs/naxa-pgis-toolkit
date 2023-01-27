@@ -13,6 +13,7 @@ from bson.json_util import dumps, loads
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.serializers import serialize
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
@@ -2108,7 +2109,8 @@ class BufferAnalysisAPIView(APIView):
             if layer_id and field:
                 if not analysis_id:
                     return Response(data={'message': 'params analysis is missing.'}, status=400)
-                pois_qs = BufferAreas.active.filter(analysis_id=analysis_id).values('pois')
+                buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+                pois_qs = buff_qs.values('pois')
                 feature_ids = []
                 for pois in pois_qs:
                     pois_json = pois['pois']
@@ -2127,8 +2129,11 @@ class BufferAnalysisAPIView(APIView):
                             feature_dict['id'] = feature.id
                             feature_dict['name'] = attributes['name']
                             feature_dict[field] = attributes[field]
-                            feature_dict['buffer_distance'] = 200
-                            feature_dict['origin'] = [85.6, 27.2]
+                            for buff in buff_qs:
+                                if feature.geometry.within(buff.geometry):
+                                    origin = buff.origin
+                                    feature_dict['origin'] = origin
+                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1]))
                             result.append(feature_dict)
                     else:
                         for feature in feature_qs:
@@ -2137,8 +2142,11 @@ class BufferAnalysisAPIView(APIView):
                             feature_dict['id'] = feature.id
                             feature_dict['name'] = ''
                             feature_dict[field] = attributes[field]
-                            feature_dict['buffer_distance'] = 200
-                            feature_dict['origin'] = [85.6, 27.2]
+                            for buff in buff_qs:
+                                if feature.geometry.within(buff.geometry):
+                                    origin = buff.origin
+                                    feature_dict['origin'] = origin
+                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
                             result.append(feature_dict)
                     return Response(data=result, status=200)
                 elif view =='chart':
@@ -2148,8 +2156,22 @@ class BufferAnalysisAPIView(APIView):
                     field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
                     for value in field_value_qs:
                         result[value] = feature_qs.filter(attributes__contains={field: value}).count()
-                    result['total'] = feature_qs.count()
-                    # result = {'hospital': 20, 'pharmacy': 10, 'healthcare': 5}
+                    # proj_field = '$attributes.'+field
+                    # mirro_coll = MONGO_DB['featurecollectionsmirror']
+                    # features = mirro_coll.aggregate([
+                    #     {
+                    #         "$match": {"id":{"$in":feature_ids}}
+                    #     },
+                    #     {
+                    #         "$project": {field: proj_field, "_id":1}
+                    #     },
+                    #     {
+                    #         "$group": {"_id": "$"+field, "count":{"$sum": 1}}
+                    #     }
+                    # ])
+                    # features_json = json.loads(dumps(features))
+                    # for feat in features_json:
+                    #     result[feat['_id']] = feat['count']
                     return Response(data=result, status=200)
                 else:
                     return Response(data={'message': 'view params is missing!'}, status=400)
@@ -2324,6 +2346,19 @@ def get_analysis_dict(analysis, optimum_route):
     analysis_dict['routes'] = serialize.data
     return analysis_dict
 
+def get_buffer_dict(analysis, buffer_analysis):
+    analysis_dict={}
+    analysis_dict['id'] = analysis.id
+    analysis_dict['name'] = analysis.name
+    analysis_dict['geom_type'] = analysis.geom_type
+    analysis_dict['bbox'] = analysis.bbox
+    # analysis_dict['origins'] = buffer_analysis.origins
+    analysis_dict['total_area'] = buffer_analysis.total_area
+    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
+    serializer = BufferAreasMapSerializer(queryset, many=True)
+    analysis_dict['buffer_areas'] = serializer.data
+    return analysis_dict
+
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layers(request, *args, **kwargs):
@@ -2344,19 +2379,6 @@ def analysis_layers(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-def get_buffer_dict(analysis, buffer_analysis):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    # analysis_dict['origins'] = buffer_analysis.origins
-    analysis_dict['total_area'] = buffer_analysis.total_area
-    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
-    serializer = BufferAreasMapSerializer(queryset, many=True)
-    analysis_dict['buffer_areas'] = serializer.data
-    return analysis_dict
-
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layer(request, *args, **kwargs):
@@ -2367,18 +2389,24 @@ def analysis_layer(request, *args, **kwargs):
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
         analys_qs = Analysis.active.filter(project=project, id=analysis_id)
-        analysis = analys_qs[0]
-        if analysis.type == 'optimum_route':
-            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
-            optimum_route = optimum_route_qs[0]
-            analysis_dict=get_analysis_dict(analysis, optimum_route)
-        elif analysis.type == 'buffer':
-            buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
-            buffer_analysis = buffer_analysis_qs[0]
-            analysis_dict = get_buffer_dict(analysis, buffer_analysis)
-        return Response(analysis_dict, status=200)
+        if analys_qs.exists():
+            analysis = analys_qs[0]
+            if analysis.type == 'optimum_route':
+                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+                if optimum_route_qs.exists():
+                    optimum_route = optimum_route_qs[0]
+                    analysis_dict=get_analysis_dict(analysis, optimum_route)
+            elif analysis.type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
+                buffer_analysis = buffer_analysis_qs[0]
+                analysis_dict = get_buffer_dict(analysis, buffer_analysis)
+            return Response(analysis_dict, status=200)
+        else:
+            return Response(data={'message': 'Analysis object not found'}, status=400)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
     def patch(self, request, *args, **kwargs):
@@ -2794,6 +2822,24 @@ def copy_features(request, *args, **kwargs):
             return Response(data={'message': 'Features were replicated successfully'}, status=200)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
+'''sync featurecollection mirror to mongodb after data cleaning and before analysis'''
+@api_view(['POST'])
+def sync_mirror_to_mongo(request, *args, **kwargs):
+    try:
+        from pgis_toolkit.maps.utils.sync_to_mongodb import (
+            sync_featurecollection_mirror,
+        )
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        if FeatureCollectionMirror.active.filter(layer=layer).exists():
+            sync_featurecollection_mirror(layer)
+            return Response(data={'message': 'FeatureMirror sync successful'}, status=200)
+        else:
+            return Response(data={'message': 'FeatureMirror objects not found for the layer'}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 

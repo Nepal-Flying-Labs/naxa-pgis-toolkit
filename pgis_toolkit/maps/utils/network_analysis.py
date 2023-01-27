@@ -93,7 +93,7 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
     gdf = gdf.explode(index_parts=True)
     gdf['length'] = None
     for i, row in gdf.iterrows():
-        gdf.at[i,'length'] = row.geometry.length * 111000 # 1 degree ~ 111km
+        gdf.at[i,'length'] = row.geometry.length * 111139 # 1 degree ~ 111km
 
     # shapefile needs to include minimal: geometry linestring and the length computed (e.g. in QGIS)
     if 'length' not in gdf.columns:

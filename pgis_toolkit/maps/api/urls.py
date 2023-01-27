@@ -69,6 +69,7 @@ from pgis_toolkit.maps.api.views import (
     project_theme_layers,
     reorder,
     sync_features,
+    sync_mirror_to_mongo,
     update_template_attributes,
 )
 
@@ -171,7 +172,6 @@ urlpatterns = [
     path('feature_mirror_geojson/', FeatureMirrorGeoJSONAPIView.as_view(), name='feature_mirror_geojson'),
     path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
 
-
     #==================
     #    Data Merge
     #==================
@@ -181,6 +181,7 @@ urlpatterns = [
     #==================
     #     Analysis
     #==================
+    path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('analysis_layer/', analysis_layer, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
