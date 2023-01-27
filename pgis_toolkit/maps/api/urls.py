@@ -69,6 +69,7 @@ from pgis_toolkit.maps.api.views import (
     project_theme_layers,
     reorder,
     sync_features,
+    sync_mirror_to_mongo,
     update_template_attributes,
 )
 
@@ -180,6 +181,7 @@ urlpatterns = [
     #==================
     #     Analysis
     #==================
+    path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
     path('analysis_layers/', analysis_layers, name='analysis_layers'),
     path('analysis_layer/', analysis_layer, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),

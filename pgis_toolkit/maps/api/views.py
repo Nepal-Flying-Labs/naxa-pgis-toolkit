@@ -2812,6 +2812,24 @@ def copy_features(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
+'''sync featurecollection mirror to mongodb after data cleaning and before analysis'''
+@api_view(['POST'])
+def sync_mirror_to_mongo(request, *args, **kwargs):
+    try:
+        from pgis_toolkit.maps.utils.sync_to_mongodb import (
+            sync_featurecollection_mirror,
+        )
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        if FeatureCollectionMirror.active.filter(layer=layer).exists():
+            sync_featurecollection_mirror(layer)
+            return Response(data={'message': 'FeatureMirror sync successful'}, status=200)
+        else:
+            return Response(data={'message': 'FeatureMirror objects not found for the layer'}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
 class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
     '''
     Viewset for FeatureCollectionMirror objects
