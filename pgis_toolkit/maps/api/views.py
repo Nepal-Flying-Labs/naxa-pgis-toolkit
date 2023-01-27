@@ -13,6 +13,7 @@ from bson.json_util import dumps, loads
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.serializers import serialize
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
@@ -2108,7 +2109,8 @@ class BufferAnalysisAPIView(APIView):
             if layer_id and field:
                 if not analysis_id:
                     return Response(data={'message': 'params analysis is missing.'}, status=400)
-                pois_qs = BufferAreas.active.filter(analysis_id=analysis_id).values('pois')
+                buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+                pois_qs = buff_qs.values('pois')
                 feature_ids = []
                 for pois in pois_qs:
                     pois_json = pois['pois']
@@ -2127,8 +2129,11 @@ class BufferAnalysisAPIView(APIView):
                             feature_dict['id'] = feature.id
                             feature_dict['name'] = attributes['name']
                             feature_dict[field] = attributes[field]
-                            feature_dict['buffer_distance'] = 200
-                            feature_dict['origin'] = [85.6, 27.2]
+                            for buff in buff_qs:
+                                if feature.geometry.within(buff.geometry):
+                                    origin = buff.origin
+                                    feature_dict['origin'] = origin
+                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1]))
                             result.append(feature_dict)
                     else:
                         for feature in feature_qs:
@@ -2137,34 +2142,36 @@ class BufferAnalysisAPIView(APIView):
                             feature_dict['id'] = feature.id
                             feature_dict['name'] = ''
                             feature_dict[field] = attributes[field]
-                            feature_dict['buffer_distance'] = 200
-                            feature_dict['origin'] = [85.6, 27.2]
+                            for buff in buff_qs:
+                                if feature.geometry.within(buff.geometry):
+                                    origin = buff.origin
+                                    feature_dict['origin'] = origin
+                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
                             result.append(feature_dict)
                     return Response(data=result, status=200)
                 elif view =='chart':
                     result = {}
-                    # mod_field = 'attributes__'+ field
-                    # feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
-                    # field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
-                    # for value in field_value_qs:
-                    #     result[value] = feature_qs.filter(attributes__contains={field: value}).count()
-                    # result['total'] = feature_qs.count()
-                    proj_field = '$attributes.'+field
-                    mirro_coll = MONGO_DB['featurecollectionsmirror']
-                    features = mirro_coll.aggregate([
-                        {
-                            "$match": {"id":{"$in":feature_ids}}
-                        },
-                        {
-                            "$project": {field: proj_field, "_id":1}
-                        },
-                        {
-                            "$group": {"_id": "$"+field, "count":{"$sum": 1}}
-                        }
-                    ])
-                    features_json = json.loads(dumps(features))
-                    for feat in features_json:
-                        result[feat['_id']] = feat['count']
+                    mod_field = 'attributes__'+ field
+                    feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
+                    field_value_qs=feature_qs.values_list(mod_field, flat=True).distinct()
+                    for value in field_value_qs:
+                        result[value] = feature_qs.filter(attributes__contains={field: value}).count()
+                    # proj_field = '$attributes.'+field
+                    # mirro_coll = MONGO_DB['featurecollectionsmirror']
+                    # features = mirro_coll.aggregate([
+                    #     {
+                    #         "$match": {"id":{"$in":feature_ids}}
+                    #     },
+                    #     {
+                    #         "$project": {field: proj_field, "_id":1}
+                    #     },
+                    #     {
+                    #         "$group": {"_id": "$"+field, "count":{"$sum": 1}}
+                    #     }
+                    # ])
+                    # features_json = json.loads(dumps(features))
+                    # for feat in features_json:
+                    #     result[feat['_id']] = feat['count']
                     return Response(data=result, status=200)
                 else:
                     return Response(data={'message': 'view params is missing!'}, status=400)
