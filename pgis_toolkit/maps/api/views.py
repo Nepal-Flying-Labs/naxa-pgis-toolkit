@@ -2346,6 +2346,19 @@ def get_analysis_dict(analysis, optimum_route):
     analysis_dict['routes'] = serialize.data
     return analysis_dict
 
+def get_buffer_dict(analysis, buffer_analysis):
+    analysis_dict={}
+    analysis_dict['id'] = analysis.id
+    analysis_dict['name'] = analysis.name
+    analysis_dict['geom_type'] = analysis.geom_type
+    analysis_dict['bbox'] = analysis.bbox
+    # analysis_dict['origins'] = buffer_analysis.origins
+    analysis_dict['total_area'] = buffer_analysis.total_area
+    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
+    serializer = BufferAreasMapSerializer(queryset, many=True)
+    analysis_dict['buffer_areas'] = serializer.data
+    return analysis_dict
+
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layers(request, *args, **kwargs):
@@ -2366,19 +2379,6 @@ def analysis_layers(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-def get_buffer_dict(analysis, buffer_analysis):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    # analysis_dict['origins'] = buffer_analysis.origins
-    analysis_dict['total_area'] = buffer_analysis.total_area
-    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
-    serializer = BufferAreasMapSerializer(queryset, many=True)
-    analysis_dict['buffer_areas'] = serializer.data
-    return analysis_dict
-
 '''Analysis layers api for map page'''
 @api_view(['GET'])
 def analysis_layer(request, *args, **kwargs):
@@ -2389,18 +2389,24 @@ def analysis_layer(request, *args, **kwargs):
             return Response(data={'message': 'project params is missing!'}, status=400)
         '''say network analysis'''
         analys_qs = Analysis.active.filter(project=project, id=analysis_id)
-        analysis = analys_qs[0]
-        if analysis.type == 'optimum_route':
-            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
-            optimum_route = optimum_route_qs[0]
-            analysis_dict=get_analysis_dict(analysis, optimum_route)
-        elif analysis.type == 'buffer':
-            buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
-            buffer_analysis = buffer_analysis_qs[0]
-            analysis_dict = get_buffer_dict(analysis, buffer_analysis)
-        return Response(analysis_dict, status=200)
+        if analys_qs.exists():
+            analysis = analys_qs[0]
+            if analysis.type == 'optimum_route':
+                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+                if optimum_route_qs.exists():
+                    optimum_route = optimum_route_qs[0]
+                    analysis_dict=get_analysis_dict(analysis, optimum_route)
+            elif analysis.type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
+                buffer_analysis = buffer_analysis_qs[0]
+                analysis_dict = get_buffer_dict(analysis, buffer_analysis)
+            return Response(analysis_dict, status=200)
+        else:
+            return Response(data={'message': 'Analysis object not found'}, status=400)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
     def patch(self, request, *args, **kwargs):
