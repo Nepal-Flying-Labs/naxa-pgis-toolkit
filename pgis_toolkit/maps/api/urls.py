@@ -17,6 +17,7 @@ from pgis_toolkit.maps.api.views import (
     FeatureGeoJSONAPIView,
     FeatureMirrorGeoJSONAPIView,
     LayerAttributeViewset,
+    LayerFromBufferAnalysis,
     LayerFromOptimumPathAnalysis,
     LayerFromQueryAPIView,
     LayerGroupViewset,
@@ -191,6 +192,7 @@ urlpatterns = [
     path('buffer_analysis/', BufferAnalysisAPIView.as_view(), name='buffer_analysis'),
     # path('buffer_analysis_data/', BufferAnalysisDataAPIView.as_view(), name='buffer_analysis_data'),
     path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('layer_from_buffer/',LayerFromBufferAnalysis.as_view(), name='layer_from_buffer'),
 
     #==================
     #   Advance Query

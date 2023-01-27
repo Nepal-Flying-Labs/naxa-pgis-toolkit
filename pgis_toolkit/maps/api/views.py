@@ -3186,3 +3186,58 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
         queryset=BufferAreas.active.filter(id=area)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
+'''Save Buffer Analysis Layer into main Layer Table'''
+class LayerFromBufferAnalysis(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            analysis = request.data.get('analysis', None)
+            theme = request.data.get('theme', None)
+            name = request.data.get('name', None)
+            if not analysis:
+                return Response(data={'message': "analysis params is missing!"}, status=400)
+            if not theme:
+                return Response(data={'message': 'theme params is missing!'}, status=400)
+            if not name:
+                return Response(data={'message': 'name params is missing!'}, status=400)
+            layer_instance,vector_layer_instance = None, None
+            anlaysis_layer_qs = Analysis.active.filter(id=analysis)
+            if anlaysis_layer_qs.exists():
+                anlaysis_layer = anlaysis_layer_qs[0]
+                theme = Theme.objects.get(id=theme)
+                if Layer.active.filter(theme=theme, name=name).exists():
+                    return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
+                buffer_areas = BufferAreas.active.filter(analysis_id=analysis)
+                if buffer_areas:
+                    try:
+                        layer_instance = Layer.active.create(theme=theme, name=name, layer_type='Vector',display_on_map=True)
+                    except Exception as e:
+                        return Response(data={'message': str(e)}, status=400)
+                    vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance)
+                    vector_layer_instance.bbox=anlaysis_layer.bbox
+                    vector_layer_instance.geom_type=anlaysis_layer.geom_type
+                    vector_layer_instance.save()
+                    '''create features'''
+                    feature_objs = []
+                    for buff_area in buffer_areas:
+                        attributes_json = {
+                            'analysis_id': buff_area.analysis_id,
+                            'orgin': buff_area.origin,
+                            'area': buff_area.area,
+                            'pois': buff_area.pois,
+                        }
+                        feature_objs.append(FeatureCollection(geometry=buff_area.geometry, layer=layer_instance, attributes=attributes_json))
+                    FeatureCollection.active.bulk_create(feature_objs)
+                    layer_instance.upload_status='successful'
+                    layer_instance.is_clean = True
+                    layer_instance.save()
+                    return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=201)
+                else:
+                    return Response(data={'message': "Buffer Areas not found for the analysis"}, status=404)
+            else:
+                return Response(data={'message': "Analysis matching queryset does not exist!"}, status=404)
+
+        except Exception as e:
+            if layer_instance: layer_instance.delete()
+            if vector_layer_instance: vector_layer_instance.delete()
+            return Response(data={'message': str(e)}, status=400)
