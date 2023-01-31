@@ -6,12 +6,18 @@ import geopandas as gpd
 import networkx as nx
 import osmnx as ox
 import pandas as pd
+from bson.json_util import dumps, loads
 from shapely.geometry import LineString
 from sqlalchemy import create_engine
 
-from config.settings.base import env
+from config.settings.base import MONGO_DB, env
 from pgis_toolkit.maps.api.serializers import NetworkRoutesSerializer
-from pgis_toolkit.maps.models import Analysis, NetworkRoutes, OptimumRoute
+from pgis_toolkit.maps.models import (
+    Analysis,
+    FeatureCollectionMirror,
+    NetworkRoutes,
+    OptimumRoute,
+)
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -159,12 +165,43 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
 def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
     errors=[]
     try:
-        sql = f'''WITH segments AS (
-            SELECT id as id, (
-            ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
-            FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
-            )
-            SELECT * FROM segments WHERE geometry IS NOT NULL'''
+        drive_osm_keys = ["primary", "secondary", "tertiary", "unclassified", "residential", "motorway"]
+        cycle_osm_keys = ['footway','service', 'path', 'track']
+        walk_osm_keys = ['footway','service', 'path', 'track']
+        if mode == 'drive':
+            mode_keys = drive_osm_keys
+        elif mode == 'cycle':
+            mode_keys = cycle_osm_keys
+        elif mode == 'walk':
+            mode_keys = walk_osm_keys
+        feature_qs = FeatureCollectionMirror.active.filter(layer=road_network)
+        if feature_qs.exists():
+            attribute_keys = feature_qs[0].attributes.keys()
+            if 'highway' in attribute_keys:
+                feature_ids = list(feature_qs.filter(attributes__highway__in=mode_keys).values_list('id', flat=True))
+                feature_ids = tuple(feature_ids)
+                # mirro_coll = MONGO_DB['featurecollectionsmirror']
+                # features = mirro_coll.find({"layer": road_network, "attributes.highway": {"$in":mode_keys}}, {"id":1, "_id":0})
+                # features_json = json.loads(dumps(features))
+                # feature_ids = ()
+                # for data in features_json:
+                #     feature_ids = feature_ids + (data['id'],)
+                sql = f'''WITH segments AS (
+                    SELECT id as id, (
+                    ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+                    FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE id IN {feature_ids}) a) as dumps
+                    )
+                    SELECT * FROM segments WHERE geometry IS NOT NULL'''
+            else:
+                sql = f'''WITH segments AS (
+                    SELECT id as id, (
+                    ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+                    FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}) a) as dumps
+                    )
+                    SELECT * FROM segments WHERE geometry IS NOT NULL'''
+        else:
+            raise Exception('No features mirror found')
+        print(sql, "is sql")
         # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)

@@ -2262,7 +2262,7 @@ def get_analysis_task_response(request):
                 if code == 200:
                     return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=code)
             except Exception as e:
                 return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(data={'analysis_id': None, 'status': "processing", 'message': ""}, status=200)
