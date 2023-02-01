@@ -52,11 +52,12 @@ def UploadVectorLayer(layer_id,request_data):
     errors=[]
     dir = MEDIA_ROOT+"/geofiles/"
     try:
-        layer_inst = Layer.objects.get(id=layer_id)
+        layer_inst = None
         layer_file_instance=None
         tries=1
         while tries<3:
             if Layer.objects.filter(id=layer_id).exists() and LayerFile.objects.filter(layer=layer_id).exists():
+                layer_inst = Layer.objects.get(id=layer_id)
                 layer_file_instance=LayerFile.objects.get(layer=layer_id)
                 break
             time.sleep(3)

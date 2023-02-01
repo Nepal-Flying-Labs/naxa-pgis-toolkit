@@ -585,7 +585,7 @@ class LayerViewSet(viewsets.ModelViewSet):
                     '''check whether celery is working or not'''
                     is_working=get_celery_worker_status()
                     if not is_working=="working":
-                        Layer.objects.get(id=created_object.id).delete()
+                        Layer.objects.filter(id=created_object.id).delete()
                         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
                     '''handle Vector layer upload'''
                     if 'file' in request.FILES and request.FILES.get('file') != "":
