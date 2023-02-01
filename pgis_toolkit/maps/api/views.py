@@ -1999,7 +1999,7 @@ class OptimumRouteAnalysisAPIView(APIView):
             project = int(request_dict['project'])
             '''create analysis_instance'''
             if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
+                return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
             analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
             analysis_id = analysis_inst.id
             optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat)
