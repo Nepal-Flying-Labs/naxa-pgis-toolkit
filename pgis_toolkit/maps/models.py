@@ -210,6 +210,7 @@ class SubLayer(IsDeleted,DateTimeStamp):
 
 
 class FeatureCollection(DateTimeStamp,IsDeleted):
+    mirror_id = models.IntegerField(db_index=True, blank=True, null=True)
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature")
     attributes=models.JSONField(blank=True, null=True)
