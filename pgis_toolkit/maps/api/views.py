@@ -564,7 +564,6 @@ class LayerViewSet(viewsets.ModelViewSet):
         try:
             request_dict = request.data
             request_dict._mutable = True
-
             serializer = LayerSerializer(data=request_dict)
             if serializer.is_valid():
                 '''verify whether layer name is unique within project or not'''
