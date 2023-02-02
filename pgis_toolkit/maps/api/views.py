@@ -751,6 +751,24 @@ class LayerViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
         return Response(status=status.HTTP_200_OK, data={'message': 'Layer Data deleted'})
 
+@api_view(['POST'])
+def cancel_layer_upload(request, *args, **kwargs):
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        task_qs = CeleryTask.objects.filter(layer_id=layer)
+        if task_qs.exists():
+            task_id = task_qs[0].task_id
+            app.control.revoke(task_id, terminate=True)
+            Layer.objects.filter(id=layer).delete()
+            return Response(data={'message': 'Layer Upload cancel successful.'}, status=200)
+        else:
+            return Response(data={'message': 'Upload task not found. Please try again after few seconds.'}, status=404)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
+
 class SubLayerViewset(viewsets.ModelViewSet):
     '''A viewset to get and update Sublayer instance'''
     queryset = SubLayer.objects.all()

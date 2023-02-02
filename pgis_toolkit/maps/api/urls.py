@@ -42,6 +42,7 @@ from pgis_toolkit.maps.api.views import (
     buffer_distance,
     bulk_del_null_geom,
     bulk_template_download,
+    cancel_layer_upload,
     category,
     check_duplicate_geometry,
     check_isolated_geometry,
@@ -212,4 +213,5 @@ urlpatterns = [
     #==================
     path('category/', category, name='category'),
     path('delete_sequence/', delete_sequence, name='delete_sequence'),
+    path('cancel_layer_upload/', cancel_layer_upload, name='cancel_layer_upload')
 ] + data_clean_urls + data_analysis_urls
