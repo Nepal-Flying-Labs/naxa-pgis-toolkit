@@ -72,6 +72,7 @@ from pgis_toolkit.maps.api.views import (
     reorder,
     sync_features,
     sync_mirror_to_mongo,
+    sync_template,
     update_template_attributes,
 )
 
@@ -206,6 +207,7 @@ urlpatterns = [
     #==================
     path('update_template_attributes/', update_template_attributes, name='update_template_attributes'),
     path('import_template/', import_template, name='import_template'),
+    path('sync_template/', sync_template, name='sync_template'),
     path('bulk_template_download/', bulk_template_download, name='bulk_template_download'),
 
     #==================

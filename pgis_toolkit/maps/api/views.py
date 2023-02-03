@@ -1815,6 +1815,28 @@ def import_template(request):
             ProjectsLayerTemplate.active.filter(id__in=project_template_instance_ids).delete()
         return Response(data={'message':str(e)}, status=400)
 
+@api_view(['POST'])
+@permission_classes([ImportTemplatePermission])
+def sync_template(request):
+    '''
+    View to sync general Template and attributes for a specific project
+    '''
+    try:
+        project = request.data.get('project', None)
+        if not project or not Project.active.filter(id=project).exists():
+            return Response(data={'message': 'Invalid project params!'}, status=status.HTTP_400_BAD_REQUEST)
+        project_instance = Project.active.get(id=project)
+        templates_qs = LayerTemplate.active.all().values('id', 'name', 'geometry_type')
+        for template in templates_qs:
+            '''creating project layer template object'''
+            project_template_instance, created = ProjectsLayerTemplate.active.get_or_create(name=template['name'], geometry_type=template['geometry_type'], project=project_instance, defaults={'name':template['name'], 'geometry_type':template['geometry_type'], 'project':project_instance})
+            template_attributes_values = LayerTemplateAttribute.objects.filter(layer_template=template['id']).values('name', 'alias', 'data_type', 'length', 'precision', 'unit')
+            for attribute in template_attributes_values:
+                ProjectsLayerTemplateAttribute.active.get_or_create(name=attribute['name'],layer_template=project_template_instance, defaults={'name':attribute['name'], 'alias':attribute['alias'], 'data_type':attribute['data_type'], 'length':attribute['length'], 'precision':attribute['precision'], 'unit':attribute['unit'], 'layer_template':project_template_instance})
+        return Response(data={'message': f'Templates synced succesfully into the {project_instance} project'}, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        return Response(data={'message':str(e)}, status=400)
+
 '''bulk download layer templates'''
 @api_view(['GET'])
 @permission_classes([AllowAny])
