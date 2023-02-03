@@ -377,7 +377,7 @@ def handleShapeFile(layer_id):
         utm_zone = geodataframe.crs.utm_zone,
         if epsg != 4326:
             if utm_zone:
-                return "Invalid Coordinate System, only WGS84 coordinate system will be accepted", None
+                return "Invalid Coordinate System, only WGS84 (EPSG: 4326) coordinate system will be accepted", None
             else:
                 # Layer.objects.filter(id=layer_id).delete()
                 return "Unknown Coordinate System", None
