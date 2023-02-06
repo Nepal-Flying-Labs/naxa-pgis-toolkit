@@ -3,6 +3,7 @@ import os
 import shutil
 import zipfile
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry

@@ -6,6 +6,8 @@ import time
 from functools import reduce
 
 import fiona
+
+os.environ['USE_PYGEOS'] = '0'
 import geopandas
 import pandas
 import pandas as pd

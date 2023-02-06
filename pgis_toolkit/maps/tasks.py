@@ -6,6 +6,7 @@ import time
 import zipfile
 from logging import exception
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas
 from celery import Celery, shared_task
 from django.db import connection, transaction

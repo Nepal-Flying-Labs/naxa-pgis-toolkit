@@ -1,17 +1,19 @@
 import collections
+import os
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
-from rest_framework.response import Response
 import momepy
 import networkx as nx
-from config.settings.base import env
-from sqlalchemy import create_engine
 import pandas as pd
 from geopandas import GeoDataFrame
+from rest_framework.response import Response
 from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint, Point
+from sqlalchemy import create_engine
 
-from pgis_toolkit.maps.models import FeatureCollectionMirror, CleaningErrors
+from config.settings.base import env
+from pgis_toolkit.maps.models import CleaningErrors, FeatureCollectionMirror
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -82,7 +84,7 @@ def check_multipart(layer):
     total_data = len(data)
     multipart_rows = []
     for i, row in data.iterrows():
-        if row.geom.type.startswith("Multi"):
+        if row.geom.geom_type.startswith("Multi"):
             multipart_rows.append(row['id'])
         else:
             data.at[i,'is_multipart'] = False
@@ -274,7 +276,7 @@ def fix_multipart(layer):
                 if len(left_multies) > 0:
                     for i, row in left_multies.iterrows():
                         try:
-                            sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom 
+                            sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom
                                         FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                             sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
                             sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
@@ -331,7 +333,7 @@ def fix_overlapping(layer):
                 try:
                     for i, row in data.iterrows():
                         sql = f'''SELECT * FROM (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-                                WHERE EXISTS (SELECT 1 FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) b 
+                                WHERE EXISTS (SELECT 1 FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) b
                                 WHERE a.id != b.id AND ST_Overlaps(a.geometry, b.geometry) = true)'''
                         result = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
                         for i, o_row in result.iterrows():
@@ -355,7 +357,7 @@ def fix_overlapping(layer):
                         if len(left_multies) > 0:
                             for i, row in left_multies.iterrows():
                                 try:
-                                    sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom 
+                                    sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom
                                                 FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                                     sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
                                     sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
@@ -459,7 +461,7 @@ def fix_snapping(layer):
                 largest_feature = gpd.read_postgis(iso, con, geom_col="geometry")
                 find_sql = f'''WITH buffered_network AS (SELECT ST_Buffer(b.st_union, 0.0000449) FROM (SELECT ST_Union(a.geometry) FROM (
                             SELECT * FROM maps_featurecollectionmirror
-                            WHERE id in {tuple(largest_feature['id'])} ) a) b), 
+                            WHERE id in {tuple(largest_feature['id'])} ) a) b),
                             isolated_network AS (SELECT * FROM maps_featurecollectionmirror WHERE id in {tuple(isolated)})
                             SELECT * FROM isolated_network WHERE ST_Within(isolated_network.geometry, (SELECT st_buffer FROM buffered_network));'''
                 selected_isolates = gpd.read_postgis(find_sql, con=con, geom_col='geometry', crs=4326)

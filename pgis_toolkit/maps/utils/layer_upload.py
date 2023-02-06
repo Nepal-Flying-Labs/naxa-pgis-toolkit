@@ -5,6 +5,7 @@ import shutil
 import zipfile
 from distutils.command.config import config
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 import kml2geojson
 import pandas as pd

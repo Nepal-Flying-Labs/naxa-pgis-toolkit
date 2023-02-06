@@ -1,6 +1,8 @@
 import json
+import os
 import uuid
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 # import matplotlib.pyplot as plt
 import networkx as nx
