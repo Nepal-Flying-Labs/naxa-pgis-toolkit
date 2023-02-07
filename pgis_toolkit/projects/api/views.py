@@ -1100,7 +1100,7 @@ def projects_centroid_geojson(request, *args, **kwargs):
                                             WHERE is_deleted = false AND project_id IN
                                                 (SELECT id
                                                 FROM projects_project
-                                                WHERE is_deleted=false AND organization_id=1
+                                                WHERE is_deleted=false AND organization_id={organization}
                                                 ORDER BY id)
                                             GROUP BY project_id
                                         ) as t;
