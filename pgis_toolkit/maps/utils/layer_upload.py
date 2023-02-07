@@ -5,12 +5,14 @@ import shutil
 import zipfile
 from distutils.command.config import config
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 import kml2geojson
+import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import transaction
-from shapely import speedups
+from shapely import force_2d, from_wkt, speedups
 from shapely.geometry import (
     LineString,
     MultiLineString,
@@ -20,7 +22,7 @@ from shapely.geometry import (
     Polygon,
 )
 
-from config.settings.base import env
+from config.settings.base import MONGO_DB, env
 from config.settings.local import geoserver
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -266,44 +268,83 @@ def get_geometry(geometry, geom_type):
     except Exception as e:
         return ("error", str(e))
 
+# def upload_feature(geodataframe, layer_instance, geom_type):
+#     '''
+#      POINT Z (85.40863804028356 27.67808677280469 0)
+#     geometry="LINESTRING Z (85.40221724500003 27.70565588100004 0, 85.40197075100008 27.69849222600004 0)"
+#     geometry="POLYGON Z ((85.41205525443682 27.7140865386036 0, 85.41194951018038 27.71405093740867 0, 85.41194333326912 27.71406546919642 0, 85.41193271732574 27.71406172988702 0, 85.41191940361558 27.71409166606115 0, 85.41193053112548 27.71409558634003 0, 85.41192908640868 27.71409898327857 0, 85.41203483070319 27.71413458449054 0, 85.41205525443682 27.7140865386036 0))"
+#     geometry="MULTILINESTRING Z ((85.40796735800006 27.68518126600003 0, 85.42683996700003 27.68700421700004 0, 85.43566465700007 27.68314605500007 0), (85.40065753100004 27.68447448200004 0, 85.40796735800006 27.68518126600003 0), (85.44492809800005 27.67909518600004 0, 85.46105563900005 27.67204051100003 0), (85.46105563900005 27.67204051100003 0, 85.47439857900008 27.66620183400005 0), (85.47439857900008 27.66620183400005 0, 85.48222060600006 27.66277815400002 0), (85.48222060600006 27.66277815400002 0, 85.49190465700008 27.65853858000003 0))"
+#     MULTIPOLYGON Z (((85.41322120794372 27.71333124815947 0, 85.41320612612407 27.71331073042746 0, 85.41316582220662 27.71333419454469 0, 85.41318090402149 27.71335471228085 0, 85.41322120794372 27.71333124815947 0)), ((85.41322120794372 27.71333124815947 0, 85.41313409423378 27.71338314806147 0, 85.41317209698458 27.71343366916552 0, 85.41325921071919 27.71338176924088 0, 85.41322120794372 27.71333124815947 0)))
+#     '''
+#     try:
+#         print("entered upload feature")
+#         layer_id = layer_instance.id
+#         for index, row in geodataframe.iterrows():
+#             try:
+#                 dropped_geometry = row.drop(["geometry"])
+#                 dropped_geometry_dict = dropped_geometry.to_dict()
+
+#                 '''replacing Nan value to None'''
+#                 for key, value in dropped_geometry_dict.items():
+#                     if str(value).lower() == 'nan':
+#                         dropped_geometry_dict[key] = None
+
+#                 '''excluding z-dimension from geometry if exist and handle for different geometry type'''
+#                 geometry = row["geometry"]
+#                 result, data = get_geometry(geometry, geom_type)
+#                 if result == "success":
+#                     geometry = data
+#                 else:
+#                     return ("error : "+data)
+
+#                 data_created = FeatureCollection.objects.create(
+#                                                              layer=layer_instance,
+#                                                              geometry=GEOSGeometry(
+#                                                                  str(geometry)),
+#                                                              attributes=dropped_geometry_dict,
+#                                                              )
+#             except Exception as e:
+#                 # Layer.objects.filter(id=layer_id).delete()
+#                 return ("error : "+str(e))
+#         try:
+#             for col_name in geodataframe.columns:
+#                 if col_name != 'geometry':
+#                     dtype = geodataframe[col_name].dtypes
+#                     data_type = get_standard_dtype(dtype)
+#                     LayerAttribute.objects.create(
+#                         layer=layer_instance, name=col_name, data_type=data_type)
+#         except Exception as e:
+#             # Layer.objects.filter(id=layer_id).delete()
+#             return ("attribute_error : "+str(e))
+
+#         # '''Geoserver layer publish'''
+#         # response = geoserver_layer_publish(layer_instance)
+#         # return response
+#         return "successful"
+
+#     except Exception as e:
+#         # Layer.objects.filter(id=layer_id).delete()
+#         return "error in feature upload: "+str(e)
+
 def upload_feature(geodataframe, layer_instance, geom_type):
-    '''
-     POINT Z (85.40863804028356 27.67808677280469 0)
-    geometry="LINESTRING Z (85.40221724500003 27.70565588100004 0, 85.40197075100008 27.69849222600004 0)"
-    geometry="POLYGON Z ((85.41205525443682 27.7140865386036 0, 85.41194951018038 27.71405093740867 0, 85.41194333326912 27.71406546919642 0, 85.41193271732574 27.71406172988702 0, 85.41191940361558 27.71409166606115 0, 85.41193053112548 27.71409558634003 0, 85.41192908640868 27.71409898327857 0, 85.41203483070319 27.71413458449054 0, 85.41205525443682 27.7140865386036 0))"
-    geometry="MULTILINESTRING Z ((85.40796735800006 27.68518126600003 0, 85.42683996700003 27.68700421700004 0, 85.43566465700007 27.68314605500007 0), (85.40065753100004 27.68447448200004 0, 85.40796735800006 27.68518126600003 0), (85.44492809800005 27.67909518600004 0, 85.46105563900005 27.67204051100003 0), (85.46105563900005 27.67204051100003 0, 85.47439857900008 27.66620183400005 0), (85.47439857900008 27.66620183400005 0, 85.48222060600006 27.66277815400002 0), (85.48222060600006 27.66277815400002 0, 85.49190465700008 27.65853858000003 0))"
-    MULTIPOLYGON Z (((85.41322120794372 27.71333124815947 0, 85.41320612612407 27.71331073042746 0, 85.41316582220662 27.71333419454469 0, 85.41318090402149 27.71335471228085 0, 85.41322120794372 27.71333124815947 0)), ((85.41322120794372 27.71333124815947 0, 85.41313409423378 27.71338314806147 0, 85.41317209698458 27.71343366916552 0, 85.41325921071919 27.71338176924088 0, 85.41322120794372 27.71333124815947 0)))
-    '''
     try:
         print("entered upload feature")
-        layer_id = layer_instance.id
-        for index, row in geodataframe.iterrows():
-            try:
+        feature_objs = []
+        try:
+            for index, row in geodataframe.iterrows():
                 dropped_geometry = row.drop(["geometry"])
                 dropped_geometry_dict = dropped_geometry.to_dict()
-
-                '''replacing Nan value to None'''
-                for key, value in dropped_geometry_dict.items():
-                    if str(value).lower() == 'nan':
-                        dropped_geometry_dict[key] = None
-
-                '''excluding z-dimension from geometry if exist and handle for different geometry type'''
-                geometry = row["geometry"]
-                result, data = get_geometry(geometry, geom_type)
-                if result == "success":
-                    geometry = data
-                else:
-                    return ("error : "+data)
-
-                data_created = FeatureCollection.objects.create(
-                                                             layer=layer_instance,
-                                                             geometry=GEOSGeometry(
-                                                                 str(geometry)),
-                                                             attributes=dropped_geometry_dict,
-                                                             )
-            except Exception as e:
-                # Layer.objects.filter(id=layer_id).delete()
-                return ("error : "+str(e))
+                feature_objs.append(FeatureCollection(layer=layer_instance, geometry=GEOSGeometry(str(row['geometry'])),                     attributes=dropped_geometry_dict))
+            FeatureCollection.active.bulk_create(feature_objs)
+        except Exception as e:
+            return ("error : "+str(e))
+        try:
+            feature_qs = FeatureCollection.active.filter(layer=layer_instance).values('id', 'feature', 'layer', 'sub_layer', 'attributes')
+            if feature_qs:
+                feature_coll = MONGO_DB['featurecollections']
+                feature_coll.insert_many(feature_qs)
+        except Exception as e:
+            return ("feature attributes sync to mongo failed")
         try:
             for col_name in geodataframe.columns:
                 if col_name != 'geometry':
@@ -324,19 +365,43 @@ def upload_feature(geodataframe, layer_instance, geom_type):
         # Layer.objects.filter(id=layer_id).delete()
         return "error in feature upload: "+str(e)
 
+# def validate_geometry_type(geodataframe):
+#     print("validate gemetry typ e entered")
+#     try:
+#         geom_types = []
+#         geom_type = None
+#         for index, row in geodataframe.iterrows():
+#             geom_type = (GEOSGeometry(
+#                 str(row["geometry"]))).geom_type
+#             if geom_type not in geom_types:
+#                 geom_types.append(geom_type)
+#         if len(geom_types) == 1:
+#             geom_type = geom_type
+#         elif len(geom_types) == 2:
+#             if "Point" and "MultiPoint" in geom_types:
+#                 geom_type = "MultiPoint"
+#             elif "LineString" and "MultiLineString" in geom_types:
+#                 geom_type = "MultiLineString"
+#             elif "Polygon" and "MultiPolygon" in geom_types:
+#                 geom_type = "MultiPolygon"
+#             else:
+#                 return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
+#         elif len(geom_types) > 2:
+#             return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
+#         else:
+#             return (f"error occured : missing geometry",None)
+#         return ("successful",geom_type)
+#     except Exception as e:
+#         return (f"error occured in validating geometry type : {str(e)}","")
 
 def validate_geometry_type(geodataframe):
-    print("validate gemetry typ e entered")
+    print("validate gemetry type entered")
     try:
-        geom_types = []
         geom_type = None
-        for index, row in geodataframe.iterrows():
-            geom_type = (GEOSGeometry(
-                str(row["geometry"]))).geom_type
-            if geom_type not in geom_types:
-                geom_types.append(geom_type)
+        geom_types = list(geodataframe.geom_type.unique())
+        if None in geom_types: geom_types.remove(None)
         if len(geom_types) == 1:
-            geom_type = geom_type
+            geom_type = geom_types[0]
         elif len(geom_types) == 2:
             if "Point" and "MultiPoint" in geom_types:
                 geom_type = "MultiPoint"
@@ -350,10 +415,10 @@ def validate_geometry_type(geodataframe):
             return (f"error occured : more than one geometry type is found i.e. {geom_types}",None)
         else:
             return (f"error occured : missing geometry",None)
+        print(geom_type, "is geom_type")
         return ("successful",geom_type)
     except Exception as e:
         return (f"error occured in validating geometry type : {str(e)}","")
-
 
 def handleShapeFile(layer_id):
     try:
@@ -385,15 +450,33 @@ def handleShapeFile(layer_id):
         response,geom_type=validate_geometry_type(geodataframe)
         if not geom_type:
             return (response)
+
+        '''remove z dimension if exists'''
+        geodataframe['geometry'] = geodataframe.geometry.apply(lambda x: force_2d(x))
+        print('completed z dimension')
+        '''set nan values to None'''
+        geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
+        print('completed removing nan values')
+
+        '''set null geometry properly'''
+        if geom_type == 'Point' or geom_type == 'MultiPoint':
+            value_to_set = 'POINT EMPTY'
+        elif geom_type == 'LineString' or geom_type == 'MultiLineString':
+            value_to_set = 'LINESTRING EMPTY'
+        elif geom_type == 'Polygon' or geom_type == 'MultiPolygon':
+            value_to_set = 'POLYGON EMPTY'
+        geodataframe['geometry']=geodataframe['geometry'].fillna(from_wkt(value_to_set))
+        print('completed setting empty geometries')
+
         '''extracting extent'''
         total_bounds = geodataframe.total_bounds
-
         vector_layer_instance.geom_type = geom_type
         vector_layer_instance.bbox = total_bounds.tolist()
         vector_layer_instance.save()
 
         response = upload_feature(
             geodataframe, layer_instance, geom_type)
+        print('completed upload feature')
         return response
     except Exception as e:
         return ("error occured in handle shapefile: " + str(e))
@@ -406,17 +489,24 @@ def handleCSV(layer_id,lat_field,lon_field):
         file_object = LayerFile.objects.get(layer=layer_id)
         my_file = file_object.file.path
         file_path = os.path.dirname(my_file)
-        df = pd.read_csv(my_file, keep_default_na=False)
-        crs = {'init': 'epsg:4326'}
+        # df = pd.read_csv(my_file, keep_default_na=False)
+        # crs = {'init': 'epsg:4326'}
 
-        geometry = gpd.points_from_xy(df[lon_field], df[lat_field])
-        crs = {'init': 'epsg:4326'}
+        # geometry = gpd.points_from_xy(df[lon_field], df[lat_field])
+        # crs = {'init': 'epsg:4326'}
 
         '''saving geometry type'''
         geom_type = "Point"
 
 
-        geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
+        # geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
+        geodataframe = gpd.read_file('Test 5.csv')
+        geodataframe = geodataframe.set_crs(4326)
+        '''replace NaN values with None'''
+        geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
+        '''replace blank values in lat long fields to ensure empty geometry is created later on'''
+        geodataframe[[lon_field, lat_field]]=geodataframe[[lon_field, lat_field]].replace('', None)
+        geodataframe['geometry'] = gpd.points_from_xy(geodataframe[lon_field], geodataframe[lat_field])
 
         '''extracting extent'''
         total_bounds = geodataframe.total_bounds
@@ -562,6 +652,23 @@ def handleGeoJSON(layer_id):
         response,geom_type=validate_geometry_type(geodataframe)
         if not geom_type:
             return (response)
+
+        '''remove z dimension if exists'''
+        geodataframe['geometry'] = geodataframe.geometry.apply(lambda x: force_2d(x))
+        print('completed z dimension')
+        '''set nan values to None'''
+        geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
+        print('completed removing nan values')
+
+        '''set null geometry properly'''
+        if geom_type == 'Point' or geom_type == 'MultiPoint':
+            value_to_set = 'POINT EMPTY'
+        elif geom_type == 'LineString' or geom_type == 'MultiLineString':
+            value_to_set = 'LINESTRING EMPTY'
+        elif geom_type == 'Polygon' or geom_type == 'MultiPolygon':
+            value_to_set = 'POLYGON EMPTY'
+        geodataframe['geometry']=geodataframe['geometry'].fillna(from_wkt(value_to_set))
+        print('completed setting empty geometries')
 
         '''extracting extent'''
         total_bounds = geodataframe.total_bounds

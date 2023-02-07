@@ -31,6 +31,7 @@ from pgis_toolkit.utils.validators import (
     validate_std_icon_extension,
 )
 
+feature_coll = MONGO_DB['featurecollections']
 
 # Create your models here.
 class Theme(IsDeleted,DateTimeStamp):
@@ -224,6 +225,7 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
         return obj.__class__._default_manager.get(pk=obj.pk)
 
     def save(self, *args, **kwargs):
+        print('reached inside save method of feature collection')
         '''Update box of vectorlayer'''
         try:
             if self.geometry:
@@ -284,17 +286,14 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
             super(FeatureCollection, self).save(*args, **kwargs)
             feature = FeatureCollection.active.filter(id=self.id).values('id', 'layer', 'sub_layer', 'attributes')[0]
             if feature:
-                feature_coll = MONGO_DB['featurecollections']
-                feature_count = feature_coll.count_documents({'id':feature['id']})
-                if feature_count == 0:
-                    feature_coll.insert_one(feature)
-                else:
-                    feature_coll.update_one({'id': feature['id']}, {'$set': feature})
-                # Print on the terminal
-                # qs = feature_coll.find({'id':feature['id']})
-                # for r in qs:
-                #     print(r["id"], r["layer"], r["sub_layer"], r["attributes"])
-
+                print(feature, "is feature")
+                # feature_coll = MONGO_DB['featurecollections']
+                # feature_count = feature_coll.count_documents({'id':feature['id']})
+                # if feature_count == 0:
+                #     feature_coll.insert_one(feature)
+                # else:
+                #     feature_coll.update_one({'id': feature['id']}, {'$set': feature})
+                feature_coll.update_one({'id': feature['id']}, {'$set': feature}, upsert=True)
 
         except Exception as e:
             print(f'error in def save of feature collection: {str(e)}')

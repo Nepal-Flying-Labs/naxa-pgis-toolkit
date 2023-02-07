@@ -1,3 +1,6 @@
+import os
+
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 import pandas as pd
 from django.contrib.gis.geos import GEOSGeometry

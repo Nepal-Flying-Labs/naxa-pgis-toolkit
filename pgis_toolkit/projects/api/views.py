@@ -8,6 +8,8 @@ from functools import reduce
 
 import environ
 import fiona
+
+os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 from django.conf import settings
 from django.contrib.auth import get_user_model
