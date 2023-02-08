@@ -305,6 +305,7 @@ class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature_mirror")
     attributes=models.JSONField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
+    synced = models.BooleanField(default=False, verbose_name='synced to feature')
 
     class Meta:
         app_label = 'maps'
