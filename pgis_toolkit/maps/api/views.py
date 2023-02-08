@@ -2846,13 +2846,14 @@ def copy_features(request, *args, **kwargs):
                         geometry = f.geometry,
                         is_deleted = f.is_deleted,
                         last_updated = f.last_updated,
-                        uploaded_date = f. uploaded_date
+                        uploaded_date = f. uploaded_date,
+                        synced = true
                     FROM maps_featurecollection f
                     WHERE f.layer_id = {layer} AND f.synced = false AND f.id=m.feature_id;
 
                     -- insert non-existing features in mirror table
-                    INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date)
-                    (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date
+                    INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, synced)
+                    (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, true AS synced
                         FROM maps_featurecollection
                         WHERE layer_id = {layer} AND synced = false AND id NOT IN (SELECT feature_id FROM maps_featurecollectionmirror WHERE layer_id = {layer} AND feature_id IS NOT NULL)
                     );
