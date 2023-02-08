@@ -1505,7 +1505,9 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(instance, data=request.data, partial=True)
             if serializer.is_valid():
                 Layer.active.filter(id=instance.layer.id).update(is_clean=False)
-                serializer.save()
+                created_object = serializer.save()
+                created_object.synced = False
+                created_object.save()
                 return Response(data=serializer.data, status=200)
             else:
                 for er in serializer._errors:
@@ -2958,7 +2960,9 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
                     cleaning_err_inst.save()
                     serializer.save()
                     return Response(data={'message': 'Feature Delete Successful'}, status=200)
-                serializer.save()
+                created_object = serializer.save()
+                created_object.synced = False
+                created_object.save()
                 return Response(data=serializer.data, status=200)
             else:
                 for er in serializer._errors:
