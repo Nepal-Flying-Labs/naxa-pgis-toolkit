@@ -226,7 +226,6 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
         return obj.__class__._default_manager.get(pk=obj.pk)
 
     def save(self, *args, **kwargs):
-        print('reached inside save method of feature collection')
         '''Update box of vectorlayer'''
         try:
             if self.geometry:
@@ -287,7 +286,6 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
             super(FeatureCollection, self).save(*args, **kwargs)
             feature = FeatureCollection.active.filter(id=self.id).values('id', 'layer', 'sub_layer', 'attributes')[0]
             if feature:
-                print(feature, "is feature")
                 # feature_coll = MONGO_DB['featurecollections']
                 # feature_count = feature_coll.count_documents({'id':feature['id']})
                 # if feature_count == 0:
