@@ -2873,7 +2873,8 @@ def copy_features(request, *args, **kwargs):
                 cursor.execute(sql)
             return Response(data={'message': 'Features were replicated successfully'}, status=200)
         except Exception as e:
-            return Response(data={'message': str(e)}, status=400)
+            print('Features replication failed. Details:', str(e))
+            return Response(data={'message': 'Features replication failed.'}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
@@ -3066,14 +3067,15 @@ def sync_features(request, *args, **kwargs):
             Layer.active.filter(id=layer).update(is_clean=True)
 
             '''update featurecollection documents in mongodb'''
-            feature_coll.delete_many({'layer': layer})
+            feature_coll.delete_many({'layer': int(layer)})
             feature_qs = FeatureCollection.active.filter(layer=layer).values('id', 'feature', 'layer', 'sub_layer', 'attributes')
             if feature_qs:
                 feature_coll.insert_many(feature_qs)
 
             return Response(data={'message': 'Sync to featurecollection successful'}, status=200)
         except Exception as e:
-            return Response(data={'message': str(e)}, status=400)
+            print('Sync to featurecollection failed. Details:', str(e))
+            return Response(data={'message': 'Sync to featurecollection failed.'}, status=400)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
