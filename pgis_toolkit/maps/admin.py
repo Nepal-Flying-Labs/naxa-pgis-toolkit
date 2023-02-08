@@ -71,8 +71,8 @@ class WMSLayerAdmin(admin.ModelAdmin):
         return False
 
 class FeatureCollectionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'layer','sub_layer')
-    list_filter = ('layer', )
+    list_display = ('id', 'layer','sub_layer', 'synced')
+    list_filter = ('layer', 'synced')
     search_fields=('layer__id',)
 
 class FeatureCollectionMirrorAdmin(admin.ModelAdmin):
