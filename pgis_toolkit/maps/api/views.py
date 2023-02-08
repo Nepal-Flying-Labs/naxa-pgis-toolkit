@@ -2832,41 +2832,71 @@ def cleaning_error_features(request, *args, **kwargs):
 def copy_features(request, *args, **kwargs):
     try:
         layer = request.data.get('layer', None)
+        reset_data = request.data.get('reset_data', False)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
         if not FeatureCollection.active.filter(layer=layer).exists():
             return Response(data={'message': 'No any features found for the layer'}, status=400)
-        # delete_sql = f'DELETE FROM maps_featurecollectionmirror WHERE layer_id={layer}'
-        # insert_sql = f'INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date) (SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date FROM maps_featurecollection WHERE layer_id = {layer})'
-        sql = f'''--update existing mirror features
-                    UPDATE maps_featurecollectionmirror m SET
-                        feature_id = f.id,
-                        layer_id = f.layer_id,
-                        sub_layer_id = f.sub_layer_id,
-                        attributes = f.attributes,
-                        geometry = f.geometry,
-                        is_deleted = f.is_deleted,
-                        last_updated = f.last_updated,
-                        uploaded_date = f. uploaded_date,
-                        synced = true
-                    FROM maps_featurecollection f
-                    WHERE f.layer_id = {layer} AND f.synced = false AND f.id=m.feature_id;
+        if reset_data == True or reset_data == 'True':
+            sql = f'''--update existing mirror features
+                        UPDATE maps_featurecollectionmirror m SET
+                            feature_id = f.id,
+                            layer_id = f.layer_id,
+                            sub_layer_id = f.sub_layer_id,
+                            attributes = f.attributes,
+                            geometry = f.geometry,
+                            is_deleted = f.is_deleted,
+                            last_updated = f.last_updated,
+                            uploaded_date = f. uploaded_date,
+                            synced = true
+                        FROM maps_featurecollection f
+                        WHERE f.layer_id = {layer} AND f.id=m.feature_id;
 
-                    -- insert non-existing features in mirror table
-                    INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, synced)
-                    (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, true AS synced
-                        FROM maps_featurecollection
-                        WHERE layer_id = {layer} AND synced = false AND id NOT IN (SELECT feature_id FROM maps_featurecollectionmirror WHERE layer_id = {layer} AND feature_id IS NOT NULL)
-                    );
+                        -- insert non-existing features in mirror table
+                        INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, synced)
+                        (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, true AS synced
+                            FROM maps_featurecollection
+                            WHERE layer_id = {layer} AND id NOT IN (SELECT feature_id FROM maps_featurecollectionmirror WHERE layer_id = {layer} AND feature_id IS NOT NULL)
+                        );
 
-                    --delete remaining features from mirror table
-                    DELETE from maps_featurecollectionmirror
-                    WHERE layer_id = {layer} AND feature_id IS NULL;
+                        --delete remaining features from mirror table
+                        DELETE from maps_featurecollectionmirror
+                        WHERE layer_id = {layer} AND feature_id IS NULL;
 
-                    --update synced field of featurecollectiont table
-                    UPDATE maps_featurecollection
-                    SET synced = true
-                    WHERE layer_id = {layer};'''
+                        --update synced field of featurecollectiont table
+                        UPDATE maps_featurecollection
+                        SET synced = true
+                        WHERE layer_id = {layer};'''
+        else:
+            sql = f'''--update existing mirror features
+                        UPDATE maps_featurecollectionmirror m SET
+                            feature_id = f.id,
+                            layer_id = f.layer_id,
+                            sub_layer_id = f.sub_layer_id,
+                            attributes = f.attributes,
+                            geometry = f.geometry,
+                            is_deleted = f.is_deleted,
+                            last_updated = f.last_updated,
+                            uploaded_date = f. uploaded_date,
+                            synced = true
+                        FROM maps_featurecollection f
+                        WHERE f.layer_id = {layer} AND f.synced = false AND f.id=m.feature_id;
+
+                        -- insert non-existing features in mirror table
+                        INSERT INTO maps_featurecollectionmirror (feature_id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, synced)
+                        (	SELECT id, layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, true AS synced
+                            FROM maps_featurecollection
+                            WHERE layer_id = {layer} AND synced = false AND id NOT IN (SELECT feature_id FROM maps_featurecollectionmirror WHERE layer_id = {layer} AND feature_id IS NOT NULL)
+                        );
+
+                        --delete remaining features from mirror table
+                        DELETE from maps_featurecollectionmirror
+                        WHERE layer_id = {layer} AND feature_id IS NULL;
+
+                        --update synced field of featurecollectiont table
+                        UPDATE maps_featurecollection
+                        SET synced = true
+                        WHERE layer_id = {layer};'''
         try:
             with connection.cursor() as cursor:
                 # cursor = connection.cursor()
@@ -2879,6 +2909,7 @@ def copy_features(request, *args, **kwargs):
         return Response(data={'message': str(e)}, status=400)
 
 '''sync featurecollection mirror to mongodb after data cleaning and before analysis'''
+'''NOT IN USE'''
 @api_view(['POST'])
 def sync_mirror_to_mongo(request, *args, **kwargs):
     try:
