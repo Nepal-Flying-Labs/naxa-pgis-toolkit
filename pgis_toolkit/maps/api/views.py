@@ -3035,27 +3035,33 @@ def sync_features(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing'}, status=400)
         if not FeatureCollectionMirror.active.filter(layer=layer).exists():
             return Response(data={'message': 'No any features found for the layer'}, status=400)
-        update_sql = f'''UPDATE maps_featurecollection f SET
-                            layer_id = m.layer_id,
-                            sub_layer_id = m.sub_layer_id,
-                            attributes = m.attributes,
-                            geometry = m.geometry,
-                            is_deleted = m.is_deleted,
-                            last_updated = m.last_updated,
-                            uploaded_date = m. uploaded_date
-                        FROM maps_featurecollectionmirror m
-                        WHERE m.layer_id = {layer} AND m.feature_id IS NOT NULL AND f.id=m.feature_id '''
+        sql = f'''--update existing features
+                    UPDATE maps_featurecollection f SET
+                        layer_id = m.layer_id,
+                        sub_layer_id = m.sub_layer_id,
+                        attributes = m.attributes,
+                        geometry = m.geometry,
+                        is_deleted = m.is_deleted,
+                        last_updated = m.last_updated,
+                        uploaded_date = m. uploaded_date,
+                        synced = true
+                    FROM maps_featurecollectionmirror m
+                    WHERE m.layer_id = {layer} AND m.synced=false AND m.feature_id IS NOT NULL AND f.id=m.feature_id;
 
-        insert_sql = f'''INSERT INTO maps_featurecollection (layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date)
-                        (	SELECT layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date
-                            FROM maps_featurecollectionmirror
-                            WHERE layer_id = {layer} AND feature_id IS NULL
-                        )'''
+                    --insert non-existing mirror features in featurecollection table
+                    INSERT INTO maps_featurecollection (layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, synced)
+                    (	SELECT layer_id, sub_layer_id, attributes, geometry, is_deleted, last_updated, uploaded_date, true AS synced
+                        FROM maps_featurecollectionmirror
+                        WHERE layer_id = {layer} AND synced=false AND feature_id IS NULL
+                    );
+
+                    --update synced field of featurecollectionmirror table
+                    UPDATE maps_featurecollectionmirror
+                    SET synced = true
+                    WHERE layer_id = {layer};'''
         try:
             with connection.cursor() as cursor:
-                # cursor = connection.cursor()
-                cursor.execute(update_sql)
-                cursor.execute(insert_sql)
+                cursor.execute(sql)
             Layer.active.filter(id=layer).update(is_clean=True)
             return Response(data={'message': 'Sync to featurecollection successful'}, status=200)
         except Exception as e:
