@@ -451,6 +451,12 @@ def handleShapeFile(layer_id):
         if not geom_type:
             return (response)
 
+        '''reomve id column if it exists'''
+        if 'id' in geodataframe.columns:
+            geodataframe.drop('id', inplace=True, axis=1)
+            # errors='ignore'
+            print('reomve id column completed')
+
         '''remove z dimension if exists'''
         geodataframe['geometry'] = geodataframe.geometry.apply(lambda x: force_2d(x))
         print('completed z dimension')
@@ -502,6 +508,12 @@ def handleCSV(layer_id,lat_field,lon_field):
         # geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
         geodataframe = gpd.read_file('Test 5.csv')
         geodataframe = geodataframe.set_crs(4326)
+
+        '''reomve id column if it exists'''
+        if 'id' in geodataframe.columns:
+            geodataframe.drop('id', inplace=True, axis=1)
+            print('reomve id column completed')
+
         '''replace NaN values with None'''
         geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
         '''replace blank values in lat long fields to ensure empty geometry is created later on'''
@@ -652,6 +664,11 @@ def handleGeoJSON(layer_id):
         response,geom_type=validate_geometry_type(geodataframe)
         if not geom_type:
             return (response)
+
+        '''reomve id column if it exists'''
+        if 'id' in geodataframe.columns:
+            geodataframe.drop('id', inplace=True, axis=1)
+            print('reomve id column completed')
 
         '''remove z dimension if exists'''
         geodataframe['geometry'] = geodataframe.geometry.apply(lambda x: force_2d(x))
