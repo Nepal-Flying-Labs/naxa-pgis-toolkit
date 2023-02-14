@@ -506,7 +506,7 @@ def handleCSV(layer_id,lat_field,lon_field):
 
 
         # geodataframe = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
-        geodataframe = gpd.read_file('Test 5.csv')
+        geodataframe = gpd.read_file(my_file)
         geodataframe = geodataframe.set_crs(4326)
 
         '''reomve id column if it exists'''
