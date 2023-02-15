@@ -51,6 +51,11 @@ class User(IsDeleted, AbstractUser):
 
     class Meta:
         app_label = 'users'
+        permissions = (
+            ('admin_user_tab', 'View Admin Level User Tab'),
+            ('organization_user_tab', 'View Organization Level User Tab'),
+            ('project_user_tab', 'View Project Level User Tab'),
+        )
 
     def save(self, *args, **kwargs):
         if self.image:
