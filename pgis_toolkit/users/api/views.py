@@ -23,6 +23,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from config.settings import base as settings
 from pgis_toolkit.maps.models import ProjectMapConfig, Theme
@@ -41,6 +42,7 @@ from pgis_toolkit.users.permissions import (
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
+    CustomTokenObtainPairSerializer,
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
     RequestingUserSerializer,
@@ -904,3 +906,10 @@ def landing_page(request, *args, **kwargs):
         return Response(data=result, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Takes a set of user credentials and returns an access and refresh JSON web
+    token pair to prove the authentication of those credentials.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
