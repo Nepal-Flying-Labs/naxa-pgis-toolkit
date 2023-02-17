@@ -317,7 +317,8 @@ class LayerAttribute(DateTimeStamp):
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     mandatory = models.BooleanField(default=True)
-    # dropdown = models.JSONField(default=list, blank=True, null=True)
+    dropdown_field = models.BooleanField(default=False)
+    dropdown_choices = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'
