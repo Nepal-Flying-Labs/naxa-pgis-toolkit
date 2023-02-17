@@ -4,6 +4,7 @@ from rest_framework_simplejwt import views as jwt_views
 
 from .views import (
     ChangePasswordView,
+    CustomTokenObtainPairView,
     EmailConfirmationAPIView,
     ForgotPasswordEmailView,
     PreliminaryUserAPIView,
@@ -29,7 +30,8 @@ app_name = "users"
 urlpatterns = [
     path('', include(router.urls)),
     # DRF SimpleJWT token
-    path('token/login/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # path('token/login/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
     path('myprofile/', RequestUserDetailAPIView.as_view(), name='requesting_user_profile'),
     path('landing_page/', landing_page, name='landing_page'),

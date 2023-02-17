@@ -1,6 +1,9 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from rest_framework import serializers
+from rest_framework import exceptions, serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 
@@ -160,3 +163,36 @@ class UserGroupListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ('id', 'name')
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    '''
+    source:https://stackoverflow.com/questions/56978424/django-rest-framework-custom-jwt-authentication
+    '''
+
+    def validate(self, attrs):
+        username_or_email = attrs.get("username", None)
+        password = attrs.get("password", None)
+        if not password or not username_or_email:
+            error_message = "username/email or password is missing."
+            error_name = "invalid_credentials"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        if User.objects.filter(username=username_or_email).exists():
+            user = User.objects.filter(username=username_or_email)[0]
+        elif User.objects.filter(email=username_or_email).exists():
+            user = User.objects.filter(email=username_or_email)[0]
+            attrs['username']= user.username
+        else:
+            error_message = "Account with this username/email does not exists."
+            error_name = "invalid_username/email"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        if not user.check_password(password):
+            error_message = "Incorrect Password"
+            error_name = "password"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        # update last_login after getting token
+        user.last_login = datetime.datetime.now(datetime.timezone.utc)
+        user.save()
+        return super().validate(attrs)

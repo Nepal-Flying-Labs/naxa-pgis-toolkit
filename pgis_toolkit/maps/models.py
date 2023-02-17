@@ -316,6 +316,7 @@ class LayerAttribute(DateTimeStamp):
     length=models.IntegerField(blank=True,null=True)
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
+    mandatory = models.BooleanField(default=True)
     class Meta:
         app_label = 'maps'
         unique_together = (("layer", "name"),)
