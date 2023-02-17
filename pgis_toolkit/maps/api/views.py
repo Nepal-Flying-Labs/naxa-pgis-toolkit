@@ -212,7 +212,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     Viewset for Layer Attribute
     '''
     queryset = LayerAttribute.objects.all()
-    http_method_names = ['get']
+    http_method_names = ['get', 'patch']
     permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
     # filter_backends = [DjangoFilterBackend]
@@ -228,18 +228,18 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         try:
             layer = request.query_params.get('layer', None)
-            check_mandatory = request.query_params.get('check_mandatory', False)
+            # check_mandatory = request.query_params.get('check_mandatory', False)
             if not layer:
                 return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type')
-            if check_mandatory == True or check_mandatory == 'True':
-                mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
-                if mandatory_fields:
-                    for data in queryset:
-                        data['mandatory'] = True if data['name'] in mandatory_fields else False
-                else:
-                    for data in queryset:
-                        data['mandatory'] = True
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory')
+            # if check_mandatory == True or check_mandatory == 'True':
+            #     mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
+            #     if mandatory_fields:
+            #         for data in queryset:
+            #             data['mandatory'] = True if data['name'] in mandatory_fields else False
+            #     else:
+            #         for data in queryset:
+            #             data['mandatory'] = True
             # serializer = self.get_serializer(self.queryset, many=True)
             return Response(data=queryset, status=status.HTTP_200_OK)
         except Exception as e:
