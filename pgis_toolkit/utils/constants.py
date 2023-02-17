@@ -15,7 +15,8 @@ DATA_TYPE_CHOICES=(
                     ("int",_("Integer")),
                     ("float",_('Decimal')),
                     ('str',_('Text')),
-                    ('date',_('Date'))
+                    ('date',_('Date')),
+                    ('image', _('Image')),
                 )
 
 UNIT_CHOICES=(
