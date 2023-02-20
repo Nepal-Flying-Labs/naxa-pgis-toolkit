@@ -318,7 +318,7 @@ class LayerAttribute(DateTimeStamp):
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     mandatory = models.BooleanField(default=True)
     dropdown_field = models.BooleanField(default=False)
-    dropdown_choices = models.JSONField(default=list, blank=True, null=True)
+    # dropdown_choices = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'
@@ -335,6 +335,13 @@ class LayerAttribute(DateTimeStamp):
             # Raise a Validation error if length or precision is empty when data_type equal is decimal/float.
             raise ValidationError('length and precision should not be null')
 
+class DropdownChoice(models.Model):
+    name = models.CharField(max_length=254)
+    attribute = models.ForeignKey(LayerAttribute, on_delete=models.CASCADE)
+
+    class Meta:
+        app_label = 'maps'
+        unique_together = (("name", "attribute"),)
 
 class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
     selected = models.BooleanField(default=False)
