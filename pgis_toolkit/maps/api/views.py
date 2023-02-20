@@ -283,7 +283,7 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
     def list (self, request, *args, **kwargs):
         try:
             attribute = request.query_params.get('attribute', None)
-            queryset = self.queryset.filter(attribute=attribute)
+            queryset = self.queryset.filter(attribute=attribute).order_by('-id')
             result = []
             if queryset.exists():
                 result = queryset.values('id', 'name')
@@ -295,8 +295,16 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
         try:
             errors =[]
             choice_inst = self.get_object()
+            attr_name = choice_inst.attribute.name
+            prev_value = choice_inst.name
             serializer = self.get_serializer(choice_inst, request.data, partial=True)
             if serializer.is_valid():
+                value = serializer.validated_data.get('name', None)
+                layer = choice_inst.attribute.layer.id
+                feature_qs = FeatureCollection.active.filter(layer=layer, attributes__contains={attr_name: prev_value})
+                for feature in feature_qs:
+                    feature.attributes[attr_name] = value
+                FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
                 serializer.save()
                 return Response(data=serializer.data, status=status.HTTP_200_OK)
             else:
