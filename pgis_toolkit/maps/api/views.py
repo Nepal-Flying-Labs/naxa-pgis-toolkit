@@ -46,6 +46,7 @@ from pgis_toolkit.maps.models import (
     Category,
     CeleryTask,
     CleaningErrors,
+    DropdownChoice,
     FeatureCollection,
     FeatureCollectionMirror,
     Layer,
@@ -134,6 +135,7 @@ from .serializers import (
     BufferAreasMapSerializer,
     BufferAreasSerializer,
     CleaningErrorsSerializer,
+    DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
     FeatureCollectionSerializer,
@@ -231,7 +233,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             # check_mandatory = request.query_params.get('check_mandatory', False)
             if not layer:
                 return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory')
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory', 'dropdown_field')
             # if check_mandatory == True or check_mandatory == 'True':
             #     mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
             #     if mandatory_fields:
@@ -244,6 +246,75 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             return Response(data=queryset, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            errors = []
+            attribute_inst = self.get_object()
+            serializer = self.get_serializer(attribute_inst, request.data, partial=True)
+            if serializer.is_valid():
+                dropdown_field = request.data.get('dropdown_field', None)
+                if dropdown_field == 'True' or dropdown_field == True:
+                    field = f'attributes.{attribute_inst.name}'
+                    layer = attribute_inst.layer.id
+                    choices_list = feature_coll.distinct(field, {"layer": layer})
+                    choice_objs = []
+                    dropdown_choices_qs= DropdownChoice.objects.filter(attribute=attribute_inst)
+                    for choice in choices_list:
+                        if not dropdown_choices_qs.filter(name=choice).exists():
+                            choice_objs.append(DropdownChoice(name=choice, attribute=attribute_inst))
+                    DropdownChoice.objects.bulk_create(choice_objs)
+                serializer.save()
+                return Response(data=serializer.data, status=status.HTTP_200_OK)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+class DropdownChoiceViewset(viewsets.ModelViewSet):
+    queryset = DropdownChoice.objects.all()
+    http_method_names = ('get', 'patch', 'post')
+    permission_classes = [IsAuthenticated]
+    serializer_class = DropdownChoiceSerializer
+
+    def list (self, request, *args, **kwargs):
+        try:
+            attribute = request.query_params.get('attribute', None)
+            queryset = self.queryset.filter(attribute=attribute).order_by('-id')
+            result = []
+            if queryset.exists():
+                result = queryset.values('id', 'name')
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            errors =[]
+            choice_inst = self.get_object()
+            attr_name = choice_inst.attribute.name
+            prev_value = choice_inst.name
+            serializer = self.get_serializer(choice_inst, request.data, partial=True)
+            if serializer.is_valid():
+                value = serializer.validated_data.get('name', None)
+                layer = choice_inst.attribute.layer.id
+                feature_qs = FeatureCollection.active.filter(layer=layer, attributes__contains={attr_name: prev_value})
+                for feature in feature_qs:
+                    feature.attributes[attr_name] = value
+                FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
+                serializer.save()
+                return Response(data=serializer.data, status=status.HTTP_200_OK)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
 '''
 #not in use
 @api_view(['GET'])

@@ -11,6 +11,7 @@ from pgis_toolkit.maps.api.views import (
     BufferAreasCollection,
     BufferAreaTileQuerySet,
     DataMergeUpdateAPIView,
+    DropdownChoiceViewset,
     ErrorFeaturesVectorTileQuerySet,
     FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
@@ -88,6 +89,7 @@ router.register(r'sub_layer', SubLayerViewset, basename='sub_layer')
 router.register(r'feature_collection', FeatureCollectionViewset, basename='feature_collection')
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
+router.register(r'dropdown_choice', DropdownChoiceViewset, basename = 'dropdown_choice')
 
 #==================
 #     Template

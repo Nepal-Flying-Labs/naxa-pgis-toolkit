@@ -31,7 +31,7 @@ class LayerFileAdmin(admin.ModelAdmin):
     list_display=('id','file','layer')
 
 class LayerAttributeAdmin(admin.ModelAdmin):
-    list_display = ('id','layer', 'name', 'alias','data_type', 'length','precision','unit')
+    list_display = ('id','layer', 'name', 'alias','data_type', 'length','precision','unit', 'dropdown_field')
     search_fields = ('id','layer__id','name','alias','data_type',)
     list_filter = ('data_type',)
     readonly_fields=['name','layer']
@@ -41,6 +41,11 @@ class LayerAttributeAdmin(admin.ModelAdmin):
 
     # def has_delete_permission(self, request, obj=None):
     #     return False
+
+class DropdownChoiceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'attribute')
+    search_fields = ('id', 'name')
+    list_filter = ('attribute',)
 
 class SubLayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted','layer', 'name', 'order','bbox')
@@ -166,3 +171,4 @@ admin.site.register(CeleryTask, CeleryTaskAdmin)
 admin.site.register(QueryLayer, QueryLayerAdmin)
 admin.site.register(QueryFeatureCollection, QueryFeatureCollectionAdmin)
 admin.site.register(CleaningErrors, CleaningErrorsAdmin)
+admin.site.register(DropdownChoice, DropdownChoiceAdmin)
