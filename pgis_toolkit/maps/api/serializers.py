@@ -167,6 +167,12 @@ class StandardIconListSerializer(serializers.ModelSerializer):
     class Meta:
         model = StandardIcon
         exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+class DropdownChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DropdownChoice
+        fields = '__all__'
+
 class LayerAttributeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerAttribute

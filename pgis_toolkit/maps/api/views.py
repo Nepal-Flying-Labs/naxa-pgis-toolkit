@@ -46,6 +46,7 @@ from pgis_toolkit.maps.models import (
     Category,
     CeleryTask,
     CleaningErrors,
+    DropdownChoice,
     FeatureCollection,
     FeatureCollectionMirror,
     Layer,
@@ -134,6 +135,7 @@ from .serializers import (
     BufferAreasMapSerializer,
     BufferAreasSerializer,
     CleaningErrorsSerializer,
+    DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
     FeatureCollectionSerializer,
@@ -247,13 +249,53 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         try:
+            errors = []
             attribute_inst = self.get_object()
             serializer = self.get_serializer(attribute_inst, request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-            return Response(data=serializer.data, status=status.HTTP_200_OK)
+                return Response(data=serializer.data, status=status.HTTP_200_OK)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+class DropdownChoiceViewset(viewsets.ModelViewSet):
+    queryset = DropdownChoice.objects.all()
+    http_method_names = ('get', 'patch', 'post')
+    permission_classes = [IsAuthenticated]
+    serializer_class = DropdownChoiceSerializer
+
+    def list (self, request, *args, **kwargs):
+        try:
+            attribute = request.query_params.get('attribute', None)
+            queryset = self.queryset.filter(attribute=attribute)
+            result = []
+            if queryset.exists():
+                result = queryset.values('id', 'name')
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            errors =[]
+            choice_inst = self.get_object()
+            serializer = self.get_serializer(choice_inst, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=status.HTTP_200_OK)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
 '''
 #not in use
 @api_view(['GET'])
