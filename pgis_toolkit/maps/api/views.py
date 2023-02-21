@@ -49,6 +49,7 @@ from pgis_toolkit.maps.models import (
     DropdownChoice,
     FeatureCollection,
     FeatureCollectionMirror,
+    FeatureImage,
     Layer,
     LayerAttribute,
     LayerFile,
@@ -1574,13 +1575,35 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         try:
             errors=[]
             instance = self.get_object()
+            image = request.data.get('image', None)
+            url = request.data.get('url', None)
+            feature_image = None
             serializer = self.get_serializer(instance, data=request.data, partial=True)
             if serializer.is_valid():
+                if image or url:
+                    layer_attribute_qs = LayerAttribute.objects.filter(layer=instance.layer, data_type='image')
+                    if layer_attribute_qs.exists():
+                        image_field = layer_attribute_qs[0].name
+                    else:
+                        return Response(data={'message': 'No image field found for this layer. Please set one from Manage Layer Attribute button.'}, status=404)
+                    feature_image_qs = FeatureImage.objects.filter(feature_id=instance.id)
+                    if feature_image_qs.exists():
+                        feature_image = feature_image_qs[0]
+                        feature_image.image = image
+                        feature_image.url = url
+                        feature_image.save()
+                    else:
+                        feature_image = FeatureImage.objects.create(feature_id=instance.id, image=image, url=url)
+                    instance.attributes[image_field] = feature_image.image.name.split('/')[-1] if image else feature_image.url
+                    instance.save()
                 Layer.active.filter(id=instance.layer.id).update(is_clean=False)
                 created_object = serializer.save()
                 created_object.synced = False
                 created_object.save()
-                return Response(data=serializer.data, status=200)
+                data = dict(serializer.data)
+                data['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image and feature_image.image else None
+                data['url'] = feature_image.url if feature_image else None
+                return Response(data=data, status=200)
             else:
                 for er in serializer._errors:
                     errors.append(
@@ -1592,12 +1615,28 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             errors=[]
-            serializer = self.get_serializer(data=request.data, context={"request": request})
+            serializer = self.get_serializer(data=request.data)
+            image = request.data.get('image', None)
+            url = request.data.get('url', None)
+            feature_image = None
             if serializer.is_valid():
-                ''
-                created_object = serializer.save()
+                if image or url:
+                    layer_attribute_qs = LayerAttribute.objects.filter(layer=serializer.validated_data.get('layer'), data_type='image')
+                    if layer_attribute_qs.exists():
+                        image_field = layer_attribute_qs[0].name
+                    else:
+                        return Response(data={'message': 'No image field found for this layer. Please set one from Manage Layer Attribute button.'}, status=404)
+                    created_object = serializer.save()
+                    feature_image = FeatureImage.objects.create(feature_id=created_object.id, image=image, url=url)
+                    created_object.attributes[image_field] = feature_image.image.name.split('/')[-1] if image else feature_image.url
+                    created_object.save()
+                else:
+                    created_object = serializer.save()
                 Layer.active.filter(id=created_object.layer.id).update(is_clean=False)
-                return Response(data=serializer.data, status=201)
+                data = dict(serializer.data)
+                data['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image and feature_image.image else None
+                data['url'] = feature_image.url if feature_image else None
+                return Response(data=data, status=201)
             else:
                 for er in serializer._errors:
                     errors.append(
