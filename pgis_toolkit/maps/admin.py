@@ -143,6 +143,10 @@ class CleaningErrorsAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer_id', 'null')
     search_fields = ('id', 'layer_id')
 
+class FeatureImageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'feature_id', 'image', 'url')
+    search_fields = ('id', 'feature_id')
+
 # Register your models here.
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(LayerGroup, LayerGroupAdmin)
@@ -172,3 +176,4 @@ admin.site.register(QueryLayer, QueryLayerAdmin)
 admin.site.register(QueryFeatureCollection, QueryFeatureCollectionAdmin)
 admin.site.register(CleaningErrors, CleaningErrorsAdmin)
 admin.site.register(DropdownChoice, DropdownChoiceAdmin)
+admin.site.register(FeatureImage, FeatureImageAdmin)

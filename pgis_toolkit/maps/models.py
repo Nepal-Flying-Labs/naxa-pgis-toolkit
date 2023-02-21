@@ -352,6 +352,17 @@ class ProjectsLayerTemplate(Template,IsDeleted,DateTimeStamp):
     def __str__(self):
         return f'{self.id} {self.name}'
 
+def image_directory_path(instance, filename):
+    # file will be uploaded to MEDIA_ROOT/feature_images/<layer_id>/<filename>
+    return 'feature_images/{0}/{1}'.format(FeatureCollection.objects.get(id=instance.feature_id).layer.id, filename)
+
+class FeatureImage(models.Model):
+    feature_id = models.PositiveIntegerField(db_index=True)
+    image = models.ImageField(
+        upload_to=image_directory_path, blank=True, null=True)
+    url = models.URLField(max_length=254, blank=True, null=True)
+    class Meta:
+        app_label = 'maps'
 
 class ProjectsLayerTemplateAttribute(IsDeleted, DateTimeStamp,TemplateAttribute):
     selected = models.BooleanField(default=True)
