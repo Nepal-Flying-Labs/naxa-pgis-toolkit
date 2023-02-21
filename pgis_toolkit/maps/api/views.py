@@ -138,6 +138,7 @@ from .serializers import (
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
     FeatureCollectionMirrorSerializer,
+    FeatureCollectionRetrieveSerializer,
     FeatureCollectionSerializer,
     LayerAttributeListSerializer,
     LayerAttributeSerializer,
@@ -1533,7 +1534,7 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
     default_serializer_class = FeatureCollectionSerializer
     serializer_classes = {
         'list': FeatureCollectionListSerializer,
-        'retrieve': FeatureCollectionSerializer
+        'retrieve': FeatureCollectionRetrieveSerializer
     }
     permission_classes=[FeatureCollectionPermission]
 
@@ -1591,8 +1592,9 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             errors=[]
-            serializer = self.get_serializer(data=request.data)
+            serializer = self.get_serializer(data=request.data, context={"request": request})
             if serializer.is_valid():
+                ''
                 created_object = serializer.save()
                 Layer.active.filter(id=created_object.layer.id).update(is_clean=False)
                 return Response(data=serializer.data, status=201)
