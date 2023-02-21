@@ -123,6 +123,22 @@ class FeatureCollectionSerializer(serializers.ModelSerializer):
         model = FeatureCollection
         fields= '__all__'
 
+class FeatureCollectionRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollection
+        fields= ('id', 'layer', 'sub_layer', 'attributes', 'geometry')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        image_qs = FeatureImage.objects.filter(feature_id=instance.id)
+        if image_qs:
+            representation['image'] = self.context['request'].build_absolute_uri(image_qs[0].image.url) if image_qs[0].image else None
+            representation['url'] = image_qs[0].url
+        else:
+            representation['image'] = None
+            representation['url'] = None
+        return representation
+
 class LayerGroupListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerGroup
