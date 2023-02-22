@@ -309,7 +309,12 @@ class LayerAttributePermission(BasePermission):
                 project_id=Layer.active.get(id=layer_id).theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
-            if action in ['retrieve', 'partial_update']:
+            elif action == "create":
+                layer_id = request.data.get('layer', None)
+                project_id=Layer.active.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve', 'partial_update', 'destroy']:
                 layer_attribute_id=request.resolver_match.kwargs.get('pk')
                 project_id=LayerAttribute.objects.get(id=layer_attribute_id).layer.theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
@@ -319,7 +324,11 @@ class LayerAttributePermission(BasePermission):
                 permission_list=get_permission_list(group_id)
                 if (action=="list" or action=="retrieve") and "view_layerattribute" in permission_list:
                     return True
+                elif action == "create" and "add_layerattribute" in permission_list:
+                    return True
                 elif action=="partial_update" and "change_layerattribute" in permission_list:
+                    return True
+                elif action=="destroy" and "delete_layerattribute" in permission_list:
                     return True
             return False
         except Exception as e:

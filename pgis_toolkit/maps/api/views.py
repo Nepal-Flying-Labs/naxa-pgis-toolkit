@@ -216,7 +216,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
     Viewset for Layer Attribute
     '''
     queryset = LayerAttribute.objects.all()
-    http_method_names = ['get', 'patch']
+    http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [LayerAttributePermission]
     default_serializer_class = LayerAttributeSerializer
     # filter_backends = [DjangoFilterBackend]
@@ -275,6 +275,15 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            '''delete layer attribute'''
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 class DropdownChoiceViewset(viewsets.ModelViewSet):
     queryset = DropdownChoice.objects.all()
