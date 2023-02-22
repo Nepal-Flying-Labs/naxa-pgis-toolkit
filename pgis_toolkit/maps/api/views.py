@@ -2479,7 +2479,29 @@ def feature_popup(request, *args, **kwargs):
                     result[field] = value
         else:
             result=attributes
-        return Response(data=result, status=200)
+        '''attribute_alias'''
+        attr_keys = result.keys()
+        popup = {}
+        attribute_qs = LayerAttribute.objects.filter(
+            layer=feature_inst.layer, name__in=attr_keys).exclude(alias=None).values_list('name', 'alias')
+        attribute_dict = {}
+        for tup in attribute_qs:
+            attribute_dict[tup[0]] = tup[1]
+        for key, value in result.items():
+            if key in attribute_dict:
+                popup[attribute_dict[key]] = value
+            else:
+                popup[key] = value
+        '''image'''
+        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id)
+        if feature_image_qs.exists():
+            feature_image = feature_image_qs[0]
+            popup['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image.image else None
+            popup['url'] = feature_image.url
+        else:
+            popup['image'] = None
+            popup['url'] = None
+        return Response(data=popup, status=200)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
