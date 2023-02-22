@@ -255,15 +255,15 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             attribute_inst = self.get_object()
             serializer = self.get_serializer(attribute_inst, request.data, partial=True)
             if serializer.is_valid():
-                dropdown_field = request.data.get('dropdown_field', None)
-                if dropdown_field == 'True' or dropdown_field == True:
+                dropdown_field = serializer.validated_data.get('dropdown_field', False)
+                if dropdown_field:
                     field = f'attributes.{attribute_inst.name}'
                     layer = attribute_inst.layer.id
                     choices_list = feature_coll.distinct(field, {"layer": layer})
                     choice_objs = []
                     dropdown_choices_qs= DropdownChoice.objects.filter(attribute=attribute_inst)
                     for choice in choices_list:
-                        if not dropdown_choices_qs.filter(name=choice).exists():
+                        if not choice in [None, ''] and not dropdown_choices_qs.filter(name=choice).exists():
                             choice_objs.append(DropdownChoice(name=choice, attribute=attribute_inst))
                     DropdownChoice.objects.bulk_create(choice_objs)
                 serializer.save()
