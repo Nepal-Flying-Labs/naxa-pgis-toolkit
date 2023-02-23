@@ -47,6 +47,11 @@ class DropdownChoiceAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name')
     list_filter = ('attribute',)
 
+class ProjectsLayerTemplateDropdownChoice(admin.ModelAdmin):
+    list_display = ('id', 'name', 'attribute')
+    search_fields = ('id', 'name')
+    list_filter = ('attribute',)
+
 class SubLayerAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted','layer', 'name', 'order','bbox')
     search_fields = ('id', 'name','layer__id')

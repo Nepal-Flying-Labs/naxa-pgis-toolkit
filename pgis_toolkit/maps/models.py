@@ -371,6 +371,14 @@ class ProjectsLayerTemplateAttribute(IsDeleted, DateTimeStamp,TemplateAttribute)
         app_label = 'maps'
         unique_together = (("layer_template", "name"),)
 
+class ProjectsLayerTemplateDropdownChoice(models.Model):
+    name = models.CharField(max_length=254)
+    attribute = models.ForeignKey(ProjectsLayerTemplateAttribute, on_delete=models.CASCADE)
+
+    class Meta:
+        app_label = 'maps'
+        unique_together = (("name", "attribute"),)
+
 class ProjectStyle(DateTimeStamp,IsDeleted):
     project=models.ForeignKey(Project,on_delete=models.CASCADE)
     name=models.CharField(max_length=50)
