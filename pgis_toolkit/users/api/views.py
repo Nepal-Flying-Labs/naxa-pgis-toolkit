@@ -905,24 +905,26 @@ def landing_page(request, *args, **kwargs):
             # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
             page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
         elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
-        elif organization_ids.exists() and project_ids.count() == 1:
-            organization = organization_ids.first()
-            page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
         elif project_ids.count() > 1:
             organization = organization_ids.first()
             page = f'/organizations/{organization}/projects' #'project_list'
         else:
-            '''inside_project'''
-            organization = organization_ids.first()
-            project = project_ids.first()
-            page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
-            if int(env('PROJECT_MANAGER')) in group_ids:
-                project_status = Project.active.get(id=project).status
-                if project_status == 'draft':
-                    page = f'/organizations/{organization}/project-setup/{project}' # 'project_edit'
-                else:
-                    '''change this if required'''
-                    page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+            '''single role case'''
+            '''if role is organization admin'''
+            if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                organization = organization_ids.first()
+                page = f'/organizations/{organization}/projects' #'project_list'
+            else:
+                organization = organization_ids.first()
+                project = project_ids.first()
+                page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+                if int(env('PROJECT_MANAGER')) in group_ids:
+                    project_status = Project.active.get(id=project).status
+                    if project_status == 'draft':
+                        page = f'/organizations/{organization}/project-setup/{project}' # 'project_edit'
+                    else:
+                        '''change this if required'''
+                        page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
         if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
         result = {'page': page, 'organization': organization, 'project': project}
         return Response(data=result, status=200)
