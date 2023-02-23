@@ -1512,7 +1512,10 @@ def layer_download(request):
             gdf.to_file(dir+layer_instance.name+".kml", driver='KML')
             file_url = dir + f'{layer_instance.name}.kml'
         elif output_format == "gpx":
-            geopandas.io.file.fiona.drvsupport.supported_drivers['GPX'] = 'rw'
+            '''gpx supports Point and LineString only.'''
+            gdf = gdf.explode(ignore_index=True)
+            # geopandas.io.file.fiona.drvsupport.supported_drivers['GPX'] = 'rw'
+            fiona.drvsupport.supported_drivers['GPX'] = 'rw'
             gdf.to_file(dir + layer_instance.name+".gpx", driver='GPX', GPX_USE_EXTENSIONS='YES')
             file_url = dir + f'{layer_instance.name}.gpx'
             '''prompt download'''
