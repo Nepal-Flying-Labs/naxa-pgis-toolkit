@@ -74,7 +74,7 @@ class Layer(IsDeleted,DateTimeStamp):
     is_osm_layer=models.BooleanField(default=False)
     display_on_map=models.BooleanField(default=True) #add to map
     status = models.CharField(max_length=20, default='unchecked', choices=LAYER_STATUS_CHOICES)
-    source = models.CharField(max_length=20, choices=LAYER_SOURCE_CHOICES, blank=True, null=True)
+    source = models.CharField(max_length=20, blank=True, null=True)
     # category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name='LayerCategory', blank=True, null=True)
     upload_status = models.CharField(max_length=20, default='uploading', choices=LAYER_UPLOAD_STATUS)
     is_clean = models.BooleanField(default=False) #data cleaned or not

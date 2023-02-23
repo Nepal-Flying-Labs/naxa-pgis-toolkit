@@ -112,7 +112,7 @@ class PreliminaryUserAPIView(APIView):
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
                 request.data['project'] = None
             elif project_name:
-                org_proj_name=project_name[0]+', USAFIRI'
+                org_proj_name=project_name[0]+' in USAFIRI'
                 # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
@@ -137,13 +137,13 @@ class PreliminaryUserAPIView(APIView):
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
                     org_proj_name = Organization.active.get(id=int(organization)).name
-                    org_proj_name = org_proj_name+', USAFIRI'
+                    org_proj_name = org_proj_name+' in USAFIRI'
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
-                    org_proj_name=project_inst.name+', USAFIRI'
+                    org_proj_name=project_inst.name+' in USAFIRI'
             '''create multiple or single preliminary user instances'''
 
             # created_object_list = []
