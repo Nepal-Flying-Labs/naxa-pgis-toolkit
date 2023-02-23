@@ -189,6 +189,11 @@ class DropdownChoiceSerializer(serializers.ModelSerializer):
         model = DropdownChoice
         fields = '__all__'
 
+class ProjectsLayerTemplateDropdownChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateDropdownChoice
+        fields = '__all__'
+
 class LayerAttributeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerAttribute

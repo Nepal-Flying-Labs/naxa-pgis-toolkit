@@ -60,6 +60,7 @@ from pgis_toolkit.maps.models import (
     ProjectMapConfig,
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
+    ProjectsLayerTemplateDropdownChoice,
     ProjectStyle,
     QueryFeatureCollection,
     QueryLayer,
@@ -155,6 +156,7 @@ from .serializers import (
     ProjectLayerTemplateSerializer,
     ProjectsLayerTemplateAttributeListSerializer,
     ProjectsLayerTemplateAttributeSerializer,
+    ProjectsLayerTemplateDropdownChoiceSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
     QueryFeatureCollectionListSerializer,
@@ -294,7 +296,7 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
     def list (self, request, *args, **kwargs):
         try:
             attribute = request.query_params.get('attribute', None)
-            queryset = self.queryset.filter(attribute=attribute).order_by('-id')
+            queryset = self.queryset.filter(attribute=attribute).order_by('name')
             result = []
             if queryset.exists():
                 result = queryset.values('id', 'name')
@@ -1882,6 +1884,32 @@ class ProjectLayerTemplateAttributeViewset(viewsets.ModelViewSet):
                 errors.append(
                     {'errorName': er, 'details': serializer._errors[er][0]})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+
+class ProjectsLayerTemplateDropdownChoiceViewset(viewsets.ModelViewSet):
+    queryset = ProjectsLayerTemplateDropdownChoice.objects.all()
+    http_method_names = ('get', 'patch', 'post', 'delete')
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProjectsLayerTemplateDropdownChoiceSerializer
+
+    def list (self, request, *args, **kwargs):
+        try:
+            attribute = request.query_params.get('attribute', None)
+            queryset = self.queryset.filter(attribute=attribute).order_by('id')
+            result = []
+            if queryset.exists():
+                result = queryset.values('id', 'name')
+            return Response(data=result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            '''delete projects layer template attribute dropdownchoice'''
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_200_OK, data={'message': 'Template  Attribute Dropdown Choice delete successful'})
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 '''Bulk Update ProjectsTemplateAttribute Selection for Download'''
 @api_view(['POST'])

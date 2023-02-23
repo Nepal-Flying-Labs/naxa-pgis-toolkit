@@ -31,6 +31,7 @@ from pgis_toolkit.maps.api.views import (
     ProjectLayerTemplateAttributeViewset,
     ProjectLayerTemplateViewset,
     ProjectMapConfigAPIView,
+    ProjectsLayerTemplateDropdownChoiceViewset,
     ProjectStyleViewset,
     QueryFeatureCollectionViewset,
     ServiceAreaAnalysisAPIView,
@@ -96,6 +97,7 @@ router.register(r'dropdown_choice', DropdownChoiceViewset, basename = 'dropdown_
 #==================
 router.register(r'project_layer_template', ProjectLayerTemplateViewset, basename='project_layer_template')
 router.register(r'project_layer_template_attribute', ProjectLayerTemplateAttributeViewset, basename = 'project_layer_template_attribute')
+router.register(r'project_layer_template_attribute_dropdown_choice', ProjectsLayerTemplateDropdownChoiceViewset, basename = 'project_template_attribute_dropdown_choice')
 
 #==================
 #   Advance Query
