@@ -126,26 +126,49 @@ class PreliminaryUserAPIView(APIView):
                 request.data['project'] = project_instance.id
                 request.data['group'] = int(env('PROJECT_MANAGER'))
             else:
-                '''checking for already existing organization and projects'''
+                '''checking for already existing organization and projects and user roles'''
                 if not group or not Group.objects.filter(id=group).exists():
                     return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                 if int(group) == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
                     request.data['organization'] = None
                     request.data['project'] = None
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, group=int(group))
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name}. All invitations are discarded."})
+
                 elif int(group) == int(env('ORGANIZATION_ADMIN')):
                     request.data['project'] = None
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
                     org_proj_name = Organization.active.get(id=int(organization)).name
                     org_proj_name = org_proj_name+' in USAFIRI'
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, organization=organization,project=None)
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name} within the organization {org_proj_name}. All invitations are discarded."})
+
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
                     org_proj_name=project_inst.name+' in USAFIRI'
-            '''create multiple or single preliminary user instances'''
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, project=project)
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name} within the project {project_inst.name}. All invitations are discarded."})
 
+            '''create multiple or single preliminary user instances'''
             # created_object_list = []
             for email in email_list:
                 if PreliminaryUser.active.filter(status='Pending', email=email, organization=request.data['organization'], project=request.data['project'], group=request.data['group']).exists():
@@ -163,14 +186,10 @@ class PreliminaryUserAPIView(APIView):
                     'proj_org': org_proj_name,
                     'link': f'{verify_url}{created_object.email_verification_token}',
                     'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
-                    # 'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
                     }
                     template = 'email/email_invitation.html'
-                    # template = 'email/email_request_demo.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    # subject = 'Email Invitation, USAFIRI'
-                    # name = data['proj_org']
                     subject = f"You're invited to join {org_proj_name}."
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
@@ -270,26 +289,26 @@ class PreliminaryUserVerificationAPIView(APIView):
                 data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
                 data_dict['user_created'] = True
 
-                '''Restrict if any role of user within project or organization already exists'''
-                if data_dict['project']:
-                    user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
-                    if user_role.exists():
-                        project_name=Project.objects.get(id=data_dict['project']).name
-                        group_id=user_role.first().group.id
-                        group_name=Group.objects.get(id=group_id).name
-                        '''delete PreliminaryUserInstance once the job is done'''
-                        preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
+                # '''Restrict if any role of user within project or organization already exists'''
+                # if data_dict['project']:
+                #     user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
+                #     if user_role.exists():
+                #         project_name=Project.objects.get(id=data_dict['project']).name
+                #         group_id=user_role.first().group.id
+                #         group_name=Group.objects.get(id=group_id).name
+                #         '''delete PreliminaryUserInstance once the job is done'''
+                #         preliminary_user_instance.delete()
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
-                elif data_dict['organization']:
-                    user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
-                    if user_role.exists():
-                        org_name=Organization.objects.get(id=data_dict['organization']).name
-                        group_id=user_role.first().group.id
-                        group_name=Group.objects.get(id=group_id).name
-                        '''delete PreliminaryUserInstance once the job is done'''
-                        preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
+                # elif data_dict['organization']:
+                #     user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
+                #     if user_role.exists():
+                #         org_name=Organization.objects.get(id=data_dict['organization']).name
+                #         group_id=user_role.first().group.id
+                #         group_name=Group.objects.get(id=group_id).name
+                #         '''delete PreliminaryUserInstance once the job is done'''
+                #         preliminary_user_instance.delete()
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
