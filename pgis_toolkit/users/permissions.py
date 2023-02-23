@@ -58,7 +58,6 @@ class IsAuthorizedInviter(BasePermission):
             if 'project_name' in request_keys and request.data['project_name'] != "":
                 project_name = request.data['project_name']
             group_id=get_user_group(user_id, organization_id, project_id)
-            print(group_id, "is group id")
             permission_list=get_permission_list(group_id)
             if project_name:
                 '''user who can add a project can invite other users in that particular project in any role.'''
