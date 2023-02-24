@@ -361,6 +361,7 @@ class FeatureImage(models.Model):
     image = models.ImageField(
         upload_to=image_directory_path, blank=True, null=True)
     url = models.URLField(max_length=254, blank=True, null=True)
+    is_cover_image = models.BooleanField(default=False)
     class Meta:
         app_label = 'maps'
 
