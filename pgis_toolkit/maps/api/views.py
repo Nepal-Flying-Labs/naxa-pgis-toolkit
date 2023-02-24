@@ -2005,32 +2005,43 @@ def bulk_template_download(request):
     file_url=None
     try:
         project = request.query_params.get('project', None)
+        format = request.query_params.get('output_format', 'shapefile')
         if not project:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "params project is missing"})
+        if format not in ['shapefile', 'csv']:
+            return Response(data={'message': 'Only shapefile and csv formats are available.'}, status=400)
         layer_template_qs=ProjectsLayerTemplate.active.filter(project=project, selected=True)
         if not layer_template_qs:
             return Response(data={'message': 'No any selected layer templated found!'}, status=400)
-        for layer_template in layer_template_qs:
-            attributes=ProjectsLayerTemplateAttribute.active.filter(layer_template=layer_template, selected=True)
-            properties={}
-            for attribute in attributes:
-                if attribute.data_type=="str":
-                    properties[attribute.name]='str'
-                elif attribute.data_type=="int":
-                    properties[attribute.name]=f'int:{attribute.length}'
-                elif attribute.data_type=="float":
-                    properties[attribute.name]=f'float:{attribute.length}.{attribute.precision}'
-                elif attribute.data_type=="date":
-                    properties[attribute.name]='date'
-            schema={
-                'geometry':layer_template.geometry_type,
-                'properties':properties
-            }
-            shapefile_path = MEDIA_ROOT + \
-                                f'/template_download/templates/{layer_template.name}.shp'
-            shapefile = fiona.open(shapefile_path, mode='w', driver='ESRI Shapefile',
-            schema = schema, crs = "EPSG:4326")
-            shapefile.close()
+        if format == 'shapefile':
+            for layer_template in layer_template_qs:
+                attributes=ProjectsLayerTemplateAttribute.active.filter(layer_template=layer_template, selected=True)
+                properties={}
+                for attribute in attributes:
+                    if attribute.data_type=="str":
+                        properties[attribute.name]='str'
+                    elif attribute.data_type=="int":
+                        properties[attribute.name]=f'int:{attribute.length}'
+                    elif attribute.data_type=="float":
+                        properties[attribute.name]=f'float:{attribute.length}.{attribute.precision}'
+                    elif attribute.data_type=="date":
+                        properties[attribute.name]='date'
+                schema={
+                    'geometry':layer_template.geometry_type,
+                    'properties':properties
+                }
+                shapefile_path = MEDIA_ROOT + \
+                                    f'/template_download/templates/{layer_template.name}.shp'
+                shapefile = fiona.open(shapefile_path, mode='w', driver='ESRI Shapefile',
+                schema = schema, crs = "EPSG:4326")
+                shapefile.close()
+
+        elif format == 'csv':
+            for layer_template in layer_template_qs:
+                attributes=list(ProjectsLayerTemplateAttribute.active.filter(layer_template=layer_template, selected=True).values_list('name', flat=True))
+                df = pd.DataFrame(columns=attributes)
+                file_path = f'{dir}{layer_template.name}.csv'
+                df.to_csv(file_path)
 
         # create a ZipFile
         templates_zip_name = 'templates.zip'
@@ -2042,7 +2053,6 @@ def bulk_template_download(request):
         # defining zip file path
         file_url = MEDIA_ROOT + \
             f'/template_download/{templates_zip_name}'
-
         # downloading zip file
         zip_file = open(file_url, 'rb')
         response = HttpResponse(
