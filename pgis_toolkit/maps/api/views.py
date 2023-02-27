@@ -142,6 +142,7 @@ from .serializers import (
     FeatureCollectionMirrorSerializer,
     FeatureCollectionRetrieveSerializer,
     FeatureCollectionSerializer,
+    FeatureImageSerializer,
     LayerAttributeListSerializer,
     LayerAttributeSerializer,
     LayerGroupListSerializer,
@@ -1660,6 +1661,44 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
+class FeatureImageViewset(viewsets.ModelViewSet):
+    queryset = FeatureImage.objects.all()
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    serializer_class = FeatureImageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            feature_id = self.request.query_params.get('feature_id', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif feature_id:
+                queryset=self.queryset.filter(feature_id=feature_id)
+            else:
+                queryset=[]
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            '''before removing image, update in feature attribute as well'''
+            # feature_inst = FeatureCollection.objects.get(id=instance.feature_id)
+            # image_field = LayerAttribute.objects.filter(layer=feature_inst.layer,data_type='image')
+            # if image_field.exists():
+            #     image_field = image_field[0].name
+            #     image_value = feature_inst.attributes[image_field]
+            #     if instance.image
+            # else:
+            #     return Response(data={'message': 'Image field not set for the layer. Image field can be set from Manage Layer Attribute button.'}, status=400)
+            '''delete feature image object'''
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+
 class LayerGroupViewset(viewsets.ModelViewSet):
     '''
     Viewset for LayerGroup objects.
@@ -2544,7 +2583,7 @@ def feature_popup(request, *args, **kwargs):
             else:
                 popup[key] = value
         '''image'''
-        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id)
+        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id, is_cover_image=True)
         if feature_image_qs.exists():
             feature_image = feature_image_qs[0]
             popup['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image.image else None
