@@ -1177,11 +1177,11 @@ class AdvanceQueryAPIView(APIView):
             if layer_id and field:
                 feature_qs = FeatureCollection.active.filter(layer=int(layer_id))
                 values = []
-                attrbue_keys = feature_qs[0].attributes.keys()
+                # attrbue_keys = feature_qs[0].attributes.keys()
                 for feature in feature_qs:
-                    value=feature.attributes[field]
-                    if field in attrbue_keys and value not in values:
-                        values.append(value)
+                    attributes = feature.attributes
+                    if field in attributes and attributes[field] not in values:
+                        values.append(attributes[field])
                 return Response (data=values, status=200)
             elif layer_id:
                 layer = Layer.active.get(id=layer_id)
