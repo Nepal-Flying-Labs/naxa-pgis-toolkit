@@ -105,8 +105,11 @@ class Layer(IsDeleted,DateTimeStamp):
             return WMSLayer.objects.select_related('layer').get(layer=self.id)
         return WMSLayer.objects.none()
 
+def geofiles_directory_path(instance, filename):
+    # file will be uploaded to MEDIA_ROOT/geofiles/<layer_id>/<filename>
+    return 'geofiles/{0}/{1}'.format(instance.layer.id, filename)
 class LayerFile(DateTimeStamp):
-    file = models.FileField(upload_to='geofiles/%Y/%m/%d')
+    file = models.FileField(upload_to=geofiles_directory_path)
     layer=models.OneToOneField(Layer,on_delete=models.SET_NULL,null=True,blank=True,related_name='layer_file')
 
     def __str__(self):
