@@ -16,6 +16,7 @@ from pgis_toolkit.maps.api.views import (
     FeatureCollectionMirrorViewset,
     FeatureCollectionViewset,
     FeatureGeoJSONAPIView,
+    FeatureImageViewset,
     FeatureMirrorGeoJSONAPIView,
     LayerAttributeViewset,
     LayerFromBufferAnalysis,
@@ -91,6 +92,7 @@ router.register(r'feature_collection', FeatureCollectionViewset, basename='featu
 router.register(r'layer_group', LayerGroupViewset, basename='layer_group')
 router.register(r'layer_attribute', LayerAttributeViewset, basename = 'layer attributes')
 router.register(r'dropdown_choice', DropdownChoiceViewset, basename = 'dropdown_choice')
+router.register(r'feature_image', FeatureImageViewset, basename = 'feature_image')
 
 #==================
 #     Template

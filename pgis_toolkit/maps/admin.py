@@ -149,7 +149,7 @@ class CleaningErrorsAdmin(admin.ModelAdmin):
     search_fields = ('id', 'layer_id')
 
 class FeatureImageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'feature_id', 'image', 'url')
+    list_display = ('id', 'is_cover_image', 'feature_id', 'image', 'url')
     search_fields = ('id', 'feature_id')
 
 # Register your models here.

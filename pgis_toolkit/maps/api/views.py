@@ -142,6 +142,7 @@ from .serializers import (
     FeatureCollectionMirrorSerializer,
     FeatureCollectionRetrieveSerializer,
     FeatureCollectionSerializer,
+    FeatureImageSerializer,
     LayerAttributeListSerializer,
     LayerAttributeSerializer,
     LayerGroupListSerializer,
@@ -1176,11 +1177,11 @@ class AdvanceQueryAPIView(APIView):
             if layer_id and field:
                 feature_qs = FeatureCollection.active.filter(layer=int(layer_id))
                 values = []
-                attrbue_keys = feature_qs[0].attributes.keys()
+                # attrbue_keys = feature_qs[0].attributes.keys()
                 for feature in feature_qs:
-                    value=feature.attributes[field]
-                    if field in attrbue_keys and value not in values:
-                        values.append(value)
+                    attributes = feature.attributes
+                    if field in attributes and attributes[field] not in values:
+                        values.append(attributes[field])
                 return Response (data=values, status=200)
             elif layer_id:
                 layer = Layer.active.get(id=layer_id)
@@ -1413,7 +1414,7 @@ class LayerFromQueryAPIView(APIView):
                     try:
                         with connection.cursor() as cursor:
                             # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
-                            raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
+                            raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry, synced) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry, false AS synced FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
                             # cursor = connection.cursor()
                             cursor.execute(raw_query)
                     except Exception as e:
@@ -1429,6 +1430,11 @@ class LayerFromQueryAPIView(APIView):
                     LayerAttribute.objects.bulk_create(attribute_objs)
                     layer_instance.upload_status = 'successful'
                     layer_instance.save()
+
+                    '''save features to mongo as well'''
+                    feature_qs = FeatureCollection.active.filter(layer=layer_instance).values('id', 'layer', 'sub_layer', 'attributes')
+                    if feature_qs:
+                        feature_coll.insert_many(feature_qs)
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
 
                 else:
@@ -1659,6 +1665,44 @@ class FeatureCollectionViewset(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+class FeatureImageViewset(viewsets.ModelViewSet):
+    queryset = FeatureImage.objects.all()
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    serializer_class = FeatureImageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            feature_id = self.request.query_params.get('feature_id', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif feature_id:
+                queryset=self.queryset.filter(feature_id=feature_id)
+            else:
+                queryset=[]
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            '''before removing image, update in feature attribute as well'''
+            # feature_inst = FeatureCollection.objects.get(id=instance.feature_id)
+            # image_field = LayerAttribute.objects.filter(layer=feature_inst.layer,data_type='image')
+            # if image_field.exists():
+            #     image_field = image_field[0].name
+            #     image_value = feature_inst.attributes[image_field]
+            #     if instance.image
+            # else:
+            #     return Response(data={'message': 'Image field not set for the layer. Image field can be set from Manage Layer Attribute button.'}, status=400)
+            '''delete feature image object'''
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
+        except Http404:
+            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 class LayerGroupViewset(viewsets.ModelViewSet):
     '''
@@ -2544,7 +2588,7 @@ def feature_popup(request, *args, **kwargs):
             else:
                 popup[key] = value
         '''image'''
-        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id)
+        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id, is_cover_image=True)
         if feature_image_qs.exists():
             feature_image = feature_image_qs[0]
             popup['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image.image else None
@@ -3288,7 +3332,7 @@ def sync_features(request, *args, **kwargs):
 
             '''update featurecollection documents in mongodb'''
             feature_coll.delete_many({'layer': int(layer)})
-            feature_qs = FeatureCollection.active.filter(layer=layer).values('id', 'feature', 'layer', 'sub_layer', 'attributes')
+            feature_qs = FeatureCollection.active.filter(layer=layer).values('id', 'layer', 'sub_layer', 'attributes')
             if feature_qs:
                 feature_coll.insert_many(feature_qs)
 

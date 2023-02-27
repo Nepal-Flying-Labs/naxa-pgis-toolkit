@@ -108,6 +108,11 @@ class SubLayerUpdateSerializer(serializers.ModelSerializer):
         model = SubLayer
         fields = ('id','order','icon','icon_size','style','std_icon')
 
+class FeatureImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureImage
+        fields= '__all__'
+
 class FeatureCollectionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollection
@@ -131,12 +136,16 @@ class FeatureCollectionRetrieveSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         image_qs = FeatureImage.objects.filter(feature_id=instance.id)
+        # if image_qs:
+        #     representation['image'] = self.context['request'].build_absolute_uri(image_qs[0].image.url) if image_qs[0].image else None
+        #     representation['url'] = image_qs[0].url
+        # else:
+        #     representation['image'] = None
+        #     representation['url'] = None
         if image_qs:
-            representation['image'] = self.context['request'].build_absolute_uri(image_qs[0].image.url) if image_qs[0].image else None
-            representation['url'] = image_qs[0].url
+            representation['images'] = FeatureImageSerializer(image_qs, many=True, context=self.context).data
         else:
-            representation['image'] = None
-            representation['url'] = None
+            representation['images'] = []
         return representation
 
 class LayerGroupListSerializer(serializers.ModelSerializer):
