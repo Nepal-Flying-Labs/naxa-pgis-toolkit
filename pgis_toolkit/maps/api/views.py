@@ -1414,7 +1414,7 @@ class LayerFromQueryAPIView(APIView):
                     try:
                         with connection.cursor() as cursor:
                             # raw_query=f"SELECT {layer_instance.id} AS id_value, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id}"
-                            raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
+                            raw_query=f"INSERT INTO maps_featurecollection (layer_id, is_deleted, attributes, geometry, synced) (SELECT {layer_instance.id} AS layer_id, is_deleted, attributes, geometry, false AS synced FROM maps_queryfeaturecollection WHERE layer_id = {query_layer.id})"
                             # cursor = connection.cursor()
                             cursor.execute(raw_query)
                     except Exception as e:
@@ -1430,6 +1430,11 @@ class LayerFromQueryAPIView(APIView):
                     LayerAttribute.objects.bulk_create(attribute_objs)
                     layer_instance.upload_status = 'successful'
                     layer_instance.save()
+
+                    '''save features to mongo as well'''
+                    feature_qs = FeatureCollection.active.filter(layer=layer_instance).values('id', 'layer', 'sub_layer', 'attributes')
+                    if feature_qs:
+                        feature_coll.insert_many(feature_qs)
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=200)
 
                 else:
@@ -3327,7 +3332,7 @@ def sync_features(request, *args, **kwargs):
 
             '''update featurecollection documents in mongodb'''
             feature_coll.delete_many({'layer': int(layer)})
-            feature_qs = FeatureCollection.active.filter(layer=layer).values('id', 'feature', 'layer', 'sub_layer', 'attributes')
+            feature_qs = FeatureCollection.active.filter(layer=layer).values('id', 'layer', 'sub_layer', 'attributes')
             if feature_qs:
                 feature_coll.insert_many(feature_qs)
 
