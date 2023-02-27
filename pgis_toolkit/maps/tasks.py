@@ -51,7 +51,7 @@ from pgis_toolkit.maps.utils.layer_upload import (
 def UploadVectorLayer(layer_id,request_data):
     print("entered UploadVectorLayer",layer_id)
     errors=[]
-    dir = MEDIA_ROOT+"/geofiles/"
+    dir = f'{MEDIA_ROOT}/geofiles/{layer_id}/'
     try:
         layer_inst = None
         layer_file_instance=None
@@ -271,7 +271,7 @@ def UploadRasterLayer(layer_id, request_dict):
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
             '''clearing the uploaded file directory'''
-        dir = MEDIA_ROOT + '/geofiles'
+        dir = f'{MEDIA_ROOT}/geofiles/{layer_id}/'
         clear_dir(dir)
         layer_instance.upload_status='successful'
         layer_instance.save()
