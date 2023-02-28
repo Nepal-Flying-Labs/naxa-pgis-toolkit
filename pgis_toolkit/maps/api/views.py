@@ -314,7 +314,7 @@ def bulk_create_image_from_urls(request, *args, **kwargs):
             attribute_inst = layer_attribute_qs[0]
             mod_field = f'attributes__{image_attribute_qs[0].name}'
             feature_qs = FeatureCollection.active.filter(layer=attribute_inst.layer).values('id', mod_field)
-            no_of_threads = 5
+            no_of_threads = 3
             no_of_query = int((feature_qs.count())/no_of_threads)
             from multiprocessing.pool import ThreadPool
             pool = ThreadPool(no_of_threads)
