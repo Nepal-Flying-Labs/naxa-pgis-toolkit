@@ -532,3 +532,29 @@ def delete_query_layers(self):
         QueryLayer.active.filter(uploaded_date__lt=threshold).delete()
     except Exception as e:
         return("Query Layer Delete Task fail, error: " + str(e))
+
+def FeatureImageFromURL(feature_qs, mod_field):
+    # try:
+    from django.core.exceptions import ValidationError
+    from django.core.validators import URLValidator
+
+    from pgis_toolkit.maps.models import FeatureCollection, FeatureImage
+    '''create FeatureImage objects'''
+    # print(feature_qs.count(), "is features count insdie FeatureFromURL")
+    feature_image_objs = []
+    url_validator = URLValidator()
+    for feature in feature_qs:
+        if feature[mod_field]:
+            possible_urls = feature[mod_field].split(',')
+            for url in possible_urls:
+                try:
+                    url_validator(url)
+                    # print(url, "passed")
+                    feature_image_objs.append(FeatureImage(feature_id=feature['id'], url=url))
+                except ValidationError:
+                    # print(url, "failed")
+                    continue
+    # print(len(feature_image_objs), "is length")
+    FeatureImage.objects.bulk_create(feature_image_objs)
+    # except Exception as e:
+    #     return str(e)

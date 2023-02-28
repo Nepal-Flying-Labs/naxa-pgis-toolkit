@@ -43,6 +43,7 @@ from pgis_toolkit.maps.api.views import (
     analysis_layers,
     buffer_column,
     buffer_distance,
+    bulk_create_image_from_urls,
     bulk_del_null_geom,
     bulk_template_download,
     cancel_layer_upload,
@@ -180,7 +181,7 @@ urlpatterns = [
     path('error_features_vectortile/<int:z>/<int:x>/<int:y>/', ErrorFeaturesVectorTileQuerySet.as_view(), name='error_features_vectortile'),
     path('feature_mirror_geojson/', FeatureMirrorGeoJSONAPIView.as_view(), name='feature_mirror_geojson'),
     path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
-
+    path('bulk_create_image_from_urls/', bulk_create_image_from_urls, name ='bulk_create_image_from_urls'),
     #==================
     #    Data Merge
     #==================
