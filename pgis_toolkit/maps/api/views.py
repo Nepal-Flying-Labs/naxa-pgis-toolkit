@@ -17,6 +17,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.serializers import serialize
+from django.core.validators import URLValidator
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
 from django.http import Http404, HttpResponse
@@ -94,6 +95,7 @@ from pgis_toolkit.maps.tasks import (
     CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
+    FeatureImageFromURL,
     UpdateRasterLayer,
     UpdateVectorLayer,
     UploadRasterLayer,
@@ -259,6 +261,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             serializer = self.get_serializer(attribute_inst, request.data, partial=True)
             if serializer.is_valid():
                 dropdown_field = serializer.validated_data.get('dropdown_field', False)
+                data_type = serializer.validated_data.get('data_type', None)
                 if dropdown_field:
                     field = f'attributes.{attribute_inst.name}'
                     layer = attribute_inst.layer.id
@@ -269,6 +272,10 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
                         if not choice in [None, ''] and not dropdown_choices_qs.filter(name=choice).exists():
                             choice_objs.append(DropdownChoice(name=choice, attribute=attribute_inst))
                     DropdownChoice.objects.bulk_create(choice_objs)
+                if data_type and data_type == 'image':
+                    image_attribute_qs = LayerAttribute.objects.filter(layer=attribute_inst.layer, data_type=data_type).exclude(id=attribute_inst.id)
+                    if image_attribute_qs.exists():
+                        return Response(data={'message': f'{image_attribute_qs[0].name} is already set as image field.'}, status=400)
                 serializer.save()
                 return Response(data=serializer.data, status=status.HTTP_200_OK)
             else:
@@ -287,6 +294,43 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
         except Http404:
             return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+
+'''Bulk create FeatureImage from feature attributes when a image field is set.'''
+@api_view(['POST'])
+def bulk_create_image_from_urls(request, *args, **kwargs):
+    try:
+        attribute = request.data.get('attribute', None)
+        # data_type = request.data.get('data_type', None)
+        if not attribute:
+            return Response(data={'message': 'attribute params is missing.'}, status=400)
+        layer_attribute_qs = LayerAttribute.objects.filter(id=attribute)
+        if not layer_attribute_qs.exists():
+            return Response(data={'message': 'Layer Attribute not found.'}, status=404)
+        image_attribute_qs = LayerAttribute.objects.filter(layer=layer_attribute_qs[0].layer, data_type='image')
+        if image_attribute_qs.exclude(id=int(attribute)).exists():
+            return Response(data={'message': f'{image_attribute_qs[0].name} is already set as image field.'}, status=400)
+        '''multithread the feature image creating task'''
+        try:
+            attribute_inst = layer_attribute_qs[0]
+            mod_field = f'attributes__{image_attribute_qs[0].name}'
+            feature_qs = FeatureCollection.active.filter(layer=attribute_inst.layer).values('id', mod_field)
+            no_of_threads = 3
+            no_of_query = int((feature_qs.count())/no_of_threads)
+            from multiprocessing.pool import ThreadPool
+            pool = ThreadPool(no_of_threads)
+            for i in range(no_of_threads):
+                start = i * no_of_query
+                end = None if i + 1 == no_of_threads else (i+1) * no_of_query
+                pool.apply_async(FeatureImageFromURL, (feature_qs[start:end], mod_field))
+            pool.close()
+            pool.join()
+            return Response(data={'message': 'Bulk Feature Image create successful'}, status=200)
+        except Exception as e:
+            print('pool error')
+            return Response(data={'message': str(e)}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
 
 class DropdownChoiceViewset(viewsets.ModelViewSet):
     queryset = DropdownChoice.objects.all()

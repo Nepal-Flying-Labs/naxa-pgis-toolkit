@@ -31,3 +31,10 @@ class CustomURLValidator(URLValidator):
 #         value = 'http://' + value
 #     print(value, "is value after")
 #     return value
+
+def validate_url(value):
+    validator = URLValidator()
+    try:
+        validator(value)
+    except ValidationError:
+        raise ValidationError('Invalid URL')
