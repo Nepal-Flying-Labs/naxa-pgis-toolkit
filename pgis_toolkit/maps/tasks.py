@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from config.settings.base import MEDIA_ROOT, env
+from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from config.settings.local import geoserver
 from pgis_toolkit.maps.api.serializers import (
     VectorLayerSerializer,
@@ -558,3 +558,39 @@ def FeatureImageFromURL(feature_qs, mod_field):
     FeatureImage.objects.bulk_create(feature_image_objs)
     # except Exception as e:
     #     return str(e)
+
+@shared_task(bind=True, max_retries=3, soft_time_limit=800)
+def BulkUploadImage(self, layer, file_bytes_base64_str, image_field):
+    try:
+        import base64
+        import os
+
+        from config.settings.base import MEDIA_ROOT, MONGO_DB
+        from pgis_toolkit.maps.models import FeatureImage
+        file_path = f'{MEDIA_ROOT}/feature_images/{layer}/image_file.zip'
+        feature_coll = MONGO_DB['featurecollections']
+        image_path = f'{MEDIA_ROOT}/feature_images/{layer}/'
+        '''encode from string'''
+        file_bytes_base64 = file_bytes_base64_str.encode('utf-8')
+        '''decode back into file'''
+        file_bytes = base64.b64decode(file_bytes_base64)
+        '''write the zip file'''
+        with open(file_path, 'wb') as f:
+            f.write(file_bytes)
+        '''open and extract the zip file'''
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            files = zip_ref.namelist()
+            zip_ref.extractall(image_path)
+        '''delete the zip file now'''
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        feature_image_objs = []
+        for filename in files:
+        # for filename in os.listdir(image_path):
+            feature = feature_coll.find_one({"layer":int(layer), f"attributes.{image_field}": {"$regex": filename}}, {"id":1, "_id":0})
+            if feature and not FeatureImage.objects.filter(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}').exists():
+                feature_image_objs.append(FeatureImage(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}'))
+        FeatureImage.objects.bulk_create(feature_image_objs)
+        return 'successful'
+    except Exception as e:
+        return str(e)

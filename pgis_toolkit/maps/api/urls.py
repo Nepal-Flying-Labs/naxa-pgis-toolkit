@@ -46,6 +46,7 @@ from pgis_toolkit.maps.api.views import (
     bulk_create_image_from_urls,
     bulk_del_null_geom,
     bulk_template_download,
+    bulk_upload_image,
     cancel_layer_upload,
     category,
     check_duplicate_geometry,
@@ -68,6 +69,7 @@ from pgis_toolkit.maps.api.views import (
     fix_overlay_geometry,
     fix_self_intersecting_geometry,
     get_analysis_task_response,
+    get_bulk_upload_image_response,
     get_data_merge_update_task_response,
     get_layer_upload_task_response,
     import_template,
@@ -182,6 +184,9 @@ urlpatterns = [
     path('feature_mirror_geojson/', FeatureMirrorGeoJSONAPIView.as_view(), name='feature_mirror_geojson'),
     path('feature_mirror_vectortile/<int:z>/<int:x>/<int:y>/', MirrorFeatureVectorTileQuerySet.as_view(), name='feature_mirror_vectortile'),
     path('bulk_create_image_from_urls/', bulk_create_image_from_urls, name ='bulk_create_image_from_urls'),
+    path('bulk_upload_image/', bulk_upload_image, name='bulk_upload_image'),
+    path('get_bulk_upload_image_response/', get_bulk_upload_image_response),
+
     #==================
     #    Data Merge
     #==================
