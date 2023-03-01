@@ -1793,19 +1793,38 @@ class FeatureImageViewset(viewsets.ModelViewSet):
         try:
             instance = self.get_object()
             '''before removing image, update in feature attribute as well'''
-            # feature_inst = FeatureCollection.objects.get(id=instance.feature_id)
-            # image_field = LayerAttribute.objects.filter(layer=feature_inst.layer,data_type='image')
-            # if image_field.exists():
-            #     image_field = image_field[0].name
-            #     image_value = feature_inst.attributes[image_field]
-            #     if instance.image
-            # else:
-            #     return Response(data={'message': 'Image field not set for the layer. Image field can be set from Manage Layer Attribute button.'}, status=400)
+            feature_inst = FeatureCollection.objects.get(id=instance.feature_id)
+            image_field = LayerAttribute.objects.filter(layer=feature_inst.layer,data_type='image')
+            if image_field.exists():
+                image_field = image_field[0].name
+                image_value = feature_inst.attributes[image_field]
+                if instance.image:
+                    image_name = instance.image.name.split('/')[-1]
+                elif instance.url:
+                    image_name = instance.url
+                else:
+                    image_name = None
+                if image_name in image_value:
+                    new_image_value = ''
+                    image_value_list = image_value.split(',')
+                    image_value_list.remove(image_name)
+                    if not image_value_list:
+                        feature_inst.attributes[image_field] = ""
+                    elif len(image_value_list)==1:
+                        feature_inst.attributes[image_field] = image_value_list[0]
+                    else:
+                        for value in image_value_list:
+                            new_image_value = new_image_value + ',' + value
+                        feature_inst.attributes[image_field] = new_image_value
+                    feature_inst.save()
             '''delete feature image object'''
-            self.perform_destroy(instance)
-            return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
-        except Http404:
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+            try:
+                self.perform_destroy(instance)
+                return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
+            except Http404:
+                return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+        except Exception as e:
+            return Response(status=400, data={'message': str(e)})
 
 class LayerGroupViewset(viewsets.ModelViewSet):
     '''
