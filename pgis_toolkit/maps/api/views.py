@@ -1,3 +1,4 @@
+import base64
 import json
 import operator
 import os
@@ -16,7 +17,9 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.gis.geos import GEOSGeometry, Point
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.serializers import serialize
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import URLValidator
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
@@ -92,6 +95,7 @@ from pgis_toolkit.maps.permissions import (
 )
 from pgis_toolkit.maps.tasks import (
     BufferData,
+    BulkUploadImage,
     CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
@@ -331,6 +335,61 @@ def bulk_create_image_from_urls(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
+'''Bulk upload images for a layer'''
+@api_view(['POST'])
+def bulk_upload_image(request, *args, **kwargs):
+    try:
+        layer = request.data.get('layer', None)
+        file = request.data.get('file', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing.'}, status=400)
+        if not file:
+            return Response(data={'message': 'file is missing'}, status=400)
+        if not Layer.active.filter(id=layer).exists():
+            return Response(data={'message': 'Layer not found.'}, status=404)
+        image_attribute_qs = LayerAttribute.objects.filter(layer=layer, data_type='image')
+        if not image_attribute_qs.exists():
+            return Response(data={'message': 'No field is set as image field for the layer.'}, status=400)
+        '''Knowing file extension'''
+        path_split = os.path.splitext(file.name)
+        if not path_split[1] == ".zip":
+            return Response(data={'message': 'Invalid file extensioin. Only a single zipped file containing images is supported.'}, status=400)
+        is_working=get_celery_worker_status()
+        if not is_working=="working":
+            return Response(data={'message': "server error: celery is not working"}, status=503)
+        '''encode zip file to send in celery'''
+        file_bytes = file.read()
+        '''encode file_bytes'''
+        file_bytes_base64 = base64.b64encode(file_bytes)
+        '''decode the encoded file_bytes in string'''
+        file_bytes_base64_str = file_bytes_base64.decode('utf-8')
+        response = BulkUploadImage.delay(layer, file_bytes_base64_str, image_attribute_qs[0].name)
+        return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
+        # if response == 'successful':
+        #     return Response(data={'message': 'Bulk Image Upload successful'}, status=200)
+        # else:
+        #     return Response(data={'message': response}, status=400)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
+
+@api_view(['GET'])
+def get_bulk_upload_image_response(request):
+    '''
+    View to get the response of aynchronous task run for bulk upload image
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result =  AsyncResult(task_id, app=app)
+        if result.ready():
+            response = result.get()
+            if response == 'successful':
+                return Response(data={'message': 'Bulk Image Upload successful'}, status=200)
+            else:
+                return Response(data={'message': response}, status=400)
+        else:
+            return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
 
 class DropdownChoiceViewset(viewsets.ModelViewSet):
     queryset = DropdownChoice.objects.all()
