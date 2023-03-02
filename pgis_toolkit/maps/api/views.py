@@ -1789,6 +1789,39 @@ class FeatureImageViewset(viewsets.ModelViewSet):
         except Exception as e:
             return str(e)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            errors = []
+            created_object = None
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                created_object = serializer.save()
+                image = created_object.image
+                url = created_object.url
+                if not image and not url:
+                    return Response(data={'message': 'image or url is requred.'}, status=400)
+                feature = FeatureCollection.active.get(id=serializer.validated_data.get('feature_id'))
+                image_attribute_qs = LayerAttribute.objects.filter(layer=feature.layer, data_type='image')
+                if image_attribute_qs.exists():
+                    image_field = image_attribute_qs[0].name
+                    if image_field in feature.attributes and feature.attributes[image_field]:
+                        feature.attributes[image_field] = feature.attributes[image_field] + ',' + image.name.split('/')[-1] if image else feature.attributes[image_field] + ',' + url
+                    else:
+                        feature.attributes[image_field] = image.name.split('/')[-1] if image else url
+                    feature.save()
+                    return Response(data=serializer.data, status=201)
+                else:
+                    return Response(data={'message': 'No layer attribute set as image data type.'}, status=400)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            if created_object:
+                created_object.delete()
+            return Response(status=400, data={'message': str(e)})
+
     def destroy(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
