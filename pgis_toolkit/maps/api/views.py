@@ -1817,8 +1817,10 @@ class FeatureImageViewset(viewsets.ModelViewSet):
                             new_image_value = new_image_value + ',' + value
                         feature_inst.attributes[image_field] = new_image_value
                     feature_inst.save()
-            '''delete feature image object'''
+            '''delete feature image  and image object'''
             try:
+                if instance.image:
+                    instance.image.delete(save=False)
                 self.perform_destroy(instance)
                 return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
             except Http404:
