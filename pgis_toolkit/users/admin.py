@@ -36,7 +36,7 @@ from .models import PreliminaryUser, UserRole
 class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("is_deleted",)}),
-        (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
+        (_("Credentials"), {"fields": ("username", "password", "email_verification_token", "show_login_message")}),
         (_("Personal info"), {"fields": ("full_name", "email", "contact", "image")}),
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser", "user_permissions")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
