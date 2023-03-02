@@ -550,7 +550,8 @@ def FeatureImageFromURL(feature_qs, mod_field):
                 try:
                     url_validator(url)
                     # print(url, "passed")
-                    feature_image_objs.append(FeatureImage(feature_id=feature['id'], url=url))
+                    if not FeatureImage.objects.filter(feature_id=feature['id'], url=url).exists():
+                        feature_image_objs.append(FeatureImage(feature_id=feature['id'], url=url))
                 except ValidationError:
                     # print(url, "failed")
                     continue
