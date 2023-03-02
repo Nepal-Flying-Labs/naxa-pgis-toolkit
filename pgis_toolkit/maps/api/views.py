@@ -2745,9 +2745,9 @@ def feature_popup(request, *args, **kwargs):
             else:
                 popup[key] = value
         '''image'''
-        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id, is_cover_image=True)
+        feature_image_qs = FeatureImage.objects.filter(feature_id=feature_id)
         if feature_image_qs.exists():
-            feature_image = feature_image_qs[0]
+            feature_image = feature_image_qs.filter(is_cover_image=True)[0] if feature_image_qs.filter(is_cover_image=True).exists() else feature_image_qs[0]
             popup['image'] = request.build_absolute_uri(feature_image.image.url) if feature_image.image else None
             popup['url'] = feature_image.url
         else:
