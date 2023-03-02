@@ -47,6 +47,7 @@ class User(IsDeleted, AbstractUser):
     image_thumbnail = models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
     contact = models.CharField(max_length=13, blank=True, null=True)
     email_verification_token = models.UUIDField(blank=True, null=True)
+    show_login_message = models.BooleanField(default=True)
     objects = UserManager()
 
     class Meta:
