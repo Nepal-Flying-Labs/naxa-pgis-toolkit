@@ -926,7 +926,7 @@ def landing_page(request, *args, **kwargs):
                         '''change this if required'''
                         page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
         if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
-        result = {'page': page, 'organization': organization, 'project': project}
+        result = {'page': page, 'organization': organization, 'project': project , 'show_login_message': request.user.show_login_message}
         return Response(data=result, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
