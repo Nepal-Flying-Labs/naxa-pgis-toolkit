@@ -578,6 +578,7 @@ def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_fie
         file_path = f'{MEDIA_ROOT}/feature_images/{layer}/{zip_file_name}'
         feature_coll = MONGO_DB['featurecollections']
         image_path = f'{MEDIA_ROOT}/feature_images/{layer}/'
+        os.makedirs(image_path, exist_ok=True)
         '''encode from string'''
         file_bytes_base64 = file_bytes_base64_str.encode('utf-8')
         '''decode back into file'''
