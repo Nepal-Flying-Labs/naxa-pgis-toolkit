@@ -1854,7 +1854,9 @@ class FeatureImageViewset(viewsets.ModelViewSet):
             '''delete feature image  and image object'''
             try:
                 if instance.image:
-                    instance.image.delete(save=False)
+                    feature_ids = FeatureCollection.active.filter(layer=feature_inst.layer).values_list('id', flat=True)
+                    if not FeatureImage.objects.filter(feature_id__in=feature_ids, image=instance.image.name).exclude(id=instance.id).exists():
+                        instance.image.delete(save=False)
                 self.perform_destroy(instance)
                 return Response(status=status.HTTP_200_OK, data={'message': 'Feature Image delete successful'})
             except Http404:
