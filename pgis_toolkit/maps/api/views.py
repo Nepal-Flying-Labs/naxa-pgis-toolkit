@@ -4,6 +4,7 @@ import operator
 import os
 import shutil
 import time
+import zipfile
 from functools import reduce
 
 import fiona

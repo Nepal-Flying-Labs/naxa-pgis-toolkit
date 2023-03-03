@@ -560,6 +560,10 @@ def FeatureImageFromURL(feature_qs, mod_field):
     # except Exception as e:
     #     return str(e)
 
+def remove(file):
+    if os.path.exists(file):
+        os.remove(file)
+
 @shared_task(bind=True, max_retries=3, soft_time_limit=800)
 def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_field):
     try:
@@ -584,12 +588,16 @@ def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_fie
         '''open and extract the zip file'''
         with zipfile.ZipFile(file_path, 'r') as zip_ref:
             files = zip_ref.namelist()
+            for filename in files:
+                if '/' in filename:
+                    name = filename.split('/')[0]
+                    '''delete the zip file now'''
+                    remove(file_path)
+                    return f'The zipfile contains a directory {name}. Please try again with a zipfile containing image files only.'
             zip_ref.extractall(image_path)
         '''delete the zip file now'''
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        remove(file_path)
         feature_image_objs = []
-        feature_images_to_remove = []
         for filename in files:
             feature = feature_coll.find({"layer":int(layer), f"attributes.{image_field}": {"$regex": filename}}, {"id":1, "_id":0})
             feature_json = json.loads(dumps(feature))
@@ -599,12 +607,11 @@ def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_fie
                         feature_image_objs.append(FeatureImage(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}'))
             else:
                 '''remove only those file with no match. duplicate file replaces original. so cannot remove duplicates.'''
-                feature_images_to_remove.append(filename)
-        '''delete the images which did not match with feature attributes'''
-        for image_file in feature_images_to_remove:
-            os.remove(image_path+image_file)
+                print(image_path+filename, "is image path + filename")
+                os.remove(image_path+filename)
         '''create feature images at last'''
         FeatureImage.objects.bulk_create(feature_image_objs)
         return 'successful'
     except Exception as e:
+        remove(file_path)
         return str(e)
