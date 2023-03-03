@@ -363,7 +363,7 @@ def bulk_upload_image(request, *args, **kwargs):
         file_bytes_base64 = base64.b64encode(file_bytes)
         '''decode the encoded file_bytes in string'''
         file_bytes_base64_str = file_bytes_base64.decode('utf-8')
-        response = BulkUploadImage.delay(layer, file_bytes_base64_str, image_attribute_qs[0].name)
+        response = BulkUploadImage.delay(layer, file_bytes_base64_str, file.name, image_attribute_qs[0].name)
         return Response(status=200, data={'message': 'Uploading Data', 'task_id': response.task_id})
         # if response == 'successful':
         #     return Response(data={'message': 'Bulk Image Upload successful'}, status=200)

@@ -561,14 +561,17 @@ def FeatureImageFromURL(feature_qs, mod_field):
     #     return str(e)
 
 @shared_task(bind=True, max_retries=3, soft_time_limit=800)
-def BulkUploadImage(self, layer, file_bytes_base64_str, image_field):
+def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_field):
     try:
         import base64
+        import json
         import os
+
+        from bson.json_util import dumps, loads
 
         from config.settings.base import MEDIA_ROOT, MONGO_DB
         from pgis_toolkit.maps.models import FeatureImage
-        file_path = f'{MEDIA_ROOT}/feature_images/{layer}/image_file.zip'
+        file_path = f'{MEDIA_ROOT}/feature_images/{layer}/{zip_file_name}'
         feature_coll = MONGO_DB['featurecollections']
         image_path = f'{MEDIA_ROOT}/feature_images/{layer}/'
         '''encode from string'''
@@ -586,11 +589,21 @@ def BulkUploadImage(self, layer, file_bytes_base64_str, image_field):
         if os.path.exists(file_path):
             os.remove(file_path)
         feature_image_objs = []
+        feature_images_to_remove = []
         for filename in files:
-        # for filename in os.listdir(image_path):
-            feature = feature_coll.find_one({"layer":int(layer), f"attributes.{image_field}": {"$regex": filename}}, {"id":1, "_id":0})
-            if feature and not FeatureImage.objects.filter(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}').exists():
-                feature_image_objs.append(FeatureImage(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}'))
+            feature = feature_coll.find({"layer":int(layer), f"attributes.{image_field}": {"$regex": filename}}, {"id":1, "_id":0})
+            feature_json = json.loads(dumps(feature))
+            if feature_json:
+                for feature in feature_json:
+                    if not FeatureImage.objects.filter(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}').exists():
+                        feature_image_objs.append(FeatureImage(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}'))
+            else:
+                '''remove only those file with no match. duplicate file replaces original. so cannot remove duplicates.'''
+                feature_images_to_remove.append(filename)
+        '''delete the images which did not match with feature attributes'''
+        for image_file in feature_images_to_remove:
+            os.remove(image_path+image_file)
+        '''create feature images at last'''
         FeatureImage.objects.bulk_create(feature_image_objs)
         return 'successful'
     except Exception as e:
