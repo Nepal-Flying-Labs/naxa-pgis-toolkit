@@ -1,11 +1,17 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from rest_framework import serializers
+from rest_framework import exceptions, serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
 
 User = get_user_model()
 
+import environ
+
+env = environ.Env()
 
 # class UserSerializer(serializers.ModelSerializer):
 #     class Meta:
@@ -24,7 +30,52 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        exclude = ('password',)
+        exclude = ('password', 'user_permissions', 'groups', 'email_verification_token', 'is_staff', 'is_superuser')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        role_list = list(UserRole.active.filter(user=instance, active=True).distinct().values_list('group', flat=True))
+        if instance.is_superuser:
+            role = 'Super Admin'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in role_list:
+            role= 'PGIS Web App Administrator'
+        elif int(env('ORGANIZATION_ADMIN')) in role_list:
+            role = 'Organization Admin'
+        elif int(env('PROJECT_MANAGER')) in role_list:
+            role = 'Project Manager'
+        elif int(env('DATA_COLLECTOR')) in role_list:
+            role = 'Data Collector'
+        else:
+            role = ''
+        representation['role'] = role
+        return representation
+
+class RequestingUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ('password', 'user_permissions', 'groups', 'email_verification_token', 'is_staff', 'is_superuser')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        role_qs = UserRole.active.filter(user=instance, active=True).exclude(group=None).distinct()
+        role_ids= role_qs.values_list('group', flat=True)
+        role_names = role_qs.values_list('group__name', flat=True)
+
+        if instance.is_superuser:
+            role = 'Super Admin'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in role_ids:
+            role= 'PGIS Web App Administrator'
+        elif int(env('ORGANIZATION_ADMIN')) in role_ids:
+            role = 'Organization Admin'
+        elif int(env('PROJECT_MANAGER')) in role_ids:
+            role = 'Project Manager'
+        elif int(env('DATA_COLLECTOR')) in role_ids:
+            role = 'Data Collector'
+        else:
+            role = ''
+        representation['role'] = role
+        representation['roles'] = role_names
+        return representation
 
 class UserListSerializer(serializers.ModelSerializer):
     # image_thumbnail = serializers.SerializerMethodField()
@@ -36,6 +87,7 @@ class UserListSerializer(serializers.ModelSerializer):
     #     return User.active.get(id=instance.user.id).image_thumbnail
     def to_representation(self, instance):
         representation = super().to_representation(instance)
+        representation['user_id'] = instance.user.id
         representation['full_name'] = instance.user.full_name
         representation['image_thumbnail'] = self.context['request'].build_absolute_uri(instance.user.image_thumbnail.url) if instance.user.image_thumbnail else None
         # representation['image_thumbnail'] = instance.user.get_image_thumbnail
@@ -44,6 +96,8 @@ class UserListSerializer(serializers.ModelSerializer):
         representation['organization'] = instance.organization.name if instance.organization else None
         representation['project'] = instance.project.name if instance.project else None
         representation['group'] = instance.group.name if instance.group else None
+        representation['active'] = instance.active
+        representation['status'] = None
         return representation
 
 class PreliminaryUserSerializer(serializers.ModelSerializer):
@@ -52,21 +106,36 @@ class PreliminaryUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PreliminaryUserListSerializer(serializers.ModelSerializer):
-    organization = serializers.SerializerMethodField()
-    project = serializers.SerializerMethodField()
-    group = serializers.SerializerMethodField()
+    # organization = serializers.SerializerMethodField()
+    # project = serializers.SerializerMethodField()
+    # group = serializers.SerializerMethodField()
     class Meta:
         model = PreliminaryUser
-        fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        # fields = ('id', 'email', 'organization', 'project', 'group', 'status', 'last_updated')
+        fields = ('id',)
 
-    def get_organization(self, instance):
-        return instance.organization.name if instance.organization else None
 
-    def get_project(self, instance):
-        return instance.project.name if instance.project else None
+    # def get_organization(self, instance):
+    #     return instance.organization.name if instance.organization else None
 
-    def get_group(self, instance):
-        return instance.group.name if instance.group else None
+    # def get_project(self, instance):
+    #     return instance.project.name if instance.project else None
+
+    # def get_group(self, instance):
+    #     return instance.group.name if instance.group else None
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['user_id'] = None
+        representation['full_name'] = None
+        representation['image_thumbnail'] = None
+        representation['contact'] = None
+        representation['email'] = instance.email
+        representation['organization'] = instance.organization.name if instance.organization else None
+        representation['project'] = instance.project.name if instance.project else None
+        representation['group'] = instance.group.name if instance.group else None
+        representation['active'] = None
+        representation['status'] = instance.status
+        return representation
 
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -94,3 +163,36 @@ class UserGroupListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ('id', 'name')
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    '''
+    source:https://stackoverflow.com/questions/56978424/django-rest-framework-custom-jwt-authentication
+    '''
+
+    def validate(self, attrs):
+        username_or_email = attrs.get("username", None)
+        password = attrs.get("password", None)
+        if not password or not username_or_email:
+            error_message = "username/email or password is missing."
+            error_name = "invalid_credentials"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        if User.objects.filter(username=username_or_email).exists():
+            user = User.objects.filter(username=username_or_email)[0]
+        elif User.objects.filter(email=username_or_email).exists():
+            user = User.objects.filter(email=username_or_email)[0]
+            attrs['username']= user.username
+        else:
+            error_message = "Account with this username/email does not exists."
+            error_name = "invalid_username/email"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        if not user.check_password(password):
+            error_message = "Incorrect Password"
+            error_name = "password"
+            raise exceptions.AuthenticationFailed(
+                error_message, error_name)
+        # update last_login after getting token
+        user.last_login = datetime.datetime.now(datetime.timezone.utc)
+        user.save()
+        return super().validate(attrs)

@@ -1,8 +1,11 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from pgis_toolkit.projects.models import (
+    ContactPerson,
     DefaultTheme,
     Document,
+    Image,
     LayerTemplate,
     LayerTemplateAttribute,
     Organization,
@@ -10,6 +13,8 @@ from pgis_toolkit.projects.models import (
     Project,
     RequestDemo,
 )
+from pgis_toolkit.users.models import UserRole
+from pgis_toolkit.utils.validators import CustomURLValidator
 
 
 class OrganizationCategoryListSerializer(serializers.ModelSerializer):
@@ -41,6 +46,23 @@ class OrganizationListSerializer(serializers.ModelSerializer):
     def get_projects(self, instance):
         return Project.active.select_related('organization').filter(organization__id=instance.id).count()
 
+class OrganizationRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        project_qs = Project.active.select_related('organization').filter(organization__id=instance.id)
+        representation['projects'] = project_qs.count()
+        representation['draft'] = project_qs.filter(status='draft').count()
+        representation['ongoing'] = project_qs.filter(status='ongoing').count()
+        representation['completed'] = project_qs.filter(status='completed').count()
+        contact_person_qs = ContactPerson.active.filter(organization=instance).values('id', 'name', 'email')
+        representation['contact_person'] = contact_person_qs if contact_person_qs else []
+        representation['users_count'] = UserRole.active.filter(organization=instance).count()
+        return representation
+
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
@@ -62,7 +84,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'state', 'country')
+        fields = ('id', 'name', 'state', 'country', 'status', 'start_date', 'end_date', 'thematic_areas' , 'cover_image', 'bbox')
         # fields = ('id', 'name', 'description', 'start_date', 'end_date', 'geometry_type', 'bbox', 'organization', 'state', 'country')
         # exclude = ('uploaded_date', 'last_updated', 'is_deleted')
 
@@ -101,10 +123,10 @@ class DefaultThemeSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.partial:
-            if 'name' in data.keys() and DefaultTheme.active.exclude(id=self.instance.id).filter(name=data['name']).exists():
+            if 'name' in data.keys() and DefaultTheme.objects.exclude(id=self.instance.id).filter(name=data['name']).exists():
                 raise serializers.ValidationError('Default Theme name must be unique')
             return data
-        elif DefaultTheme.active.filter(name=data['name']).exists():
+        elif DefaultTheme.objects.filter(name=data['name']).exists():
             raise serializers.ValidationError('Default Theme name must be unique')
         return data
 
@@ -167,14 +189,32 @@ class LayerTemplateAttributeSerializer(serializers.ModelSerializer):
 class DocumentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        exclude=('uploaded_date','last_updated', 'project')
+        exclude=('last_updated', 'project')
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = '__all__'
 
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = '__all__'
+
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Image.objects.all(),
+                fields=['title', 'project'],
+                message='Image Title must be unique',
+            )
+        ]
+
 class RequestDemoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequestDemo
+        fields = '__all__'
+
+class ContactPersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactPerson
         fields = '__all__'

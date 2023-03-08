@@ -3,7 +3,9 @@
 USE_DOCKER=no
 IPYTHONDIR=/app/.ipython
 #URL=http://0.0.0.0:8000
-URL=https://pgis.naxa.com.np
+URL=https://usafiri-beta.naxa.com.np
+BACKEND_URL=https://pgis.naxa.com.np
+
 CELERY_BROKER_URL=redis://redis//
 DJANGO_SECRET_KEY="4kB9ZhkXY3FNuQfd4kNEAX5AeF6sCzg9nFfWmwIu9oBAepjQrBEt3VpDBjJQh60k"
 
@@ -14,11 +16,15 @@ GEOSERVER_PASSWORD=geoserver
 CONNECTION_DB=postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit
 
 #email
-DJANGO_EMAIL_HOST_USER=naxatestsmtp@gmail.com
-DJANGO_EMAIL_HOST_PASSWORD=adorysqnwyucfkom
+DJANGO_EMAIL_HOST_USER=usafiritest@gmail.com
+DJANGO_EMAIL_HOST_PASSWORD=pyjsghsnbyzqffgu
+
+
 
 #UserGroup
 ORGANIZATION_ADMIN=2
 PROJECT_MANAGER=3
 PGIS_WEB_APP_ADMINISTRATOR=1
 DATA_COLLECTOR=4
+
+SENTRY_DSN=https://8be3ffe93f3244baa4e36c5fed547920@o4504377076154368.ingest.sentry.io/4504377095159808

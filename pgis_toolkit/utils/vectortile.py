@@ -28,7 +28,8 @@ class BaseVectorTileMixin:
     vector_tile_fields = None
     vector_tile_generation = None
     vector_tile_extent = 4096
-    vector_tile_buffer = 256
+    # vector_tile_buffer = 256
+    vector_tile_buffer = 524
     vector_tile_clip_geom = True
 
     @ classmethod
@@ -46,6 +47,18 @@ class BaseVectorTileMixin:
         """
         return mercantile.xy_bounds(x, y, z)
 
+    def get_zres(self, z):
+        if z > 15:
+            return 40
+        elif z > 12:
+            return 60
+        elif z > 10:
+            return 80
+        elif z > 5:
+            return 100
+        elif z > 0:
+            return 120
+
     def get_vector_tile_queryset(self):
         """
         Get feature queryset in tile dynamically
@@ -56,7 +69,7 @@ class BaseVectorTileMixin:
         """
         Get feature limit by tile dynamically
         """
-        return self.vector_tile_layer_name
+        return self.vector_tile_queryset_limit
 
     def get_vector_tile_layer_name(self):
         """
@@ -209,6 +222,12 @@ class MakeEnvelope(Func):
         super().__init__(*expressions, output_field=None, **extra)
         self.output_field = GeometryField(srid=expressions[4])
 
+class STExpand(Func):
+    function = "ST_EXPAND"
+
+    def __init__(self, *expressions, output_field=None, **extra):
+        super().__init__(*expressions, output_field=None, **extra)
+        self.output_field = GeometryField(srid=3857)
 
 class AsMVTGeom(GeoFunc):
     function = "ST_ASMVTGEOM"
@@ -226,7 +245,9 @@ class PostgisBaseVectorTile(BaseVectorTileMixin):
         # keep features intersecting tile
         filters = {
             # GeoFuncMixin implicitly transfroms to SRID of geom
-            f"{self.vector_tile_geom_name}__intersects": MakeEnvelope(xmin, ymin, xmax, ymax, 3857)
+            # f"{self.vector_tile_geom_name}__intersects": STExpand(MakeEnvelope(xmin, ymin, xmax, ymax, 3857), self.get_zres(z))
+            f"{self.vector_tile_geom_name}__intersects": STExpand(MakeEnvelope(xmin, ymin, xmax, ymax, 3857), 500)
+            # f"{self.vector_tile_geom_name}__intersects": MakeEnvelope(xmin, ymin, xmax, ymax, 3857)
         }
         features = features.filter(**filters)
         # annotate prepared geometry for MVT
@@ -273,3 +294,7 @@ class LayerMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
 class PostGISFeatureView(LayerMVTView, ListView):
     model = FeatureCollection
     vector_tile_fields = ("layer", "attributes")
+
+#Network Routes MVT View
+class NetworkRoutesMVTView(BaseVectorTileView, PostgisBaseVectorTile, View):
+    pass

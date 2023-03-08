@@ -5,6 +5,7 @@ import environ
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from rest_framework import status
+from rest_framework.response import Response
 
 from pgis_toolkit.projects.models import Organization, Project
 from pgis_toolkit.users.models import UserRole
@@ -15,14 +16,14 @@ env = environ.Env()
 def get_project_queryset(request, user):
     try:
         if not request.GET.keys():
-            return HttpResponse('No request params is given!', status=status.HTTP_400_BAD_REQUEST)
+            return 'No request params is given!', 400
         request_keys = request.GET.keys()
         '''filter by organization'''
         if 'organization' not in request_keys or request.GET['organization'] == "":
-            return HttpResponse('Params organization is missing', status=status.HTTP_400_BAD_REQUEST)
+            return 'Params organization is missing', 400
         organization_id = request.GET['organization']
         if not Organization.active.filter(id=organization_id).exists():
-            return HttpResponse('Organization matching queryset does not exist!', status=status.HTTP_400_BAD_REQUEST)
+            return 'Organization matching queryset does not exist!', 400
         organization_project_qs = Project.active.select_related("organization").filter(organization__id=organization_id)
         '''superuser gets to see all project sites'''
         if user.is_superuser == True:
@@ -45,7 +46,18 @@ def get_project_queryset(request, user):
                     user_org_proj_list = userrole_qs.values_list('project__id', flat=True)
                     organization_project_qs = organization_project_qs.filter(id__in=user_org_proj_list)
         else:
-            return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            return 'No any user role of the requesting user found!', 400
+        '''filter by state'''
+        if 'state' in request_keys and request.GET['state'] != "":
+            state = request.GET['state']
+            organization_project_qs = organization_project_qs.filter(state__id=state)
+            '''filter by state'''
+        elif 'country' in request_keys and request.GET['country'] != "":
+            country = request.GET['country']
+            organization_project_qs = organization_project_qs.filter(country__id=country)
+        if 'status' in request_keys and request.GET['status'] != "":
+            status = request.GET['status']
+            organization_project_qs = organization_project_qs.filter(status=status)
         '''search_key'''
         if 'search' in request_keys and request.GET['search'] != "":
             search_key = request.GET['search']
@@ -57,16 +69,8 @@ def get_project_queryset(request, user):
                             for key, val in filter_kwargs.items()]
             organization_project_qs = organization_project_qs.filter(
                 reduce(operator.or_, list_of_Q)) if search_fields else organization_project_qs
-        '''filter by state'''
-        if 'state' in request_keys and request.GET['state'] != "":
-            state = request.GET['state']
-            organization_project_qs = organization_project_qs.filter(state__id=state)
-            '''filter by state'''
-        elif 'country' in request_keys and request.GET['country'] != "":
-            country = request.GET['country']
-            organization_project_qs = organization_project_qs.filter(country__id=country)
-        return organization_project_qs
+        return organization_project_qs, 200
     except Exception as e:
         error = 'Error occured in get_project_queryset method. Details: '+ str(e)
         print(error)
-        return str(e)
+        return str(e), 400

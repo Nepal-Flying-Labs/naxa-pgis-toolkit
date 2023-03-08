@@ -13,6 +13,8 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplate,
     ProjectsLayerTemplateAttribute,
     ProjectStyle,
+    QueryFeatureCollection,
+    QueryLayer,
     SubLayer,
     Theme,
 )
@@ -53,12 +55,16 @@ class LayerPermission(BasePermission):
             user_id=request.user.id
             if request.user.is_superuser:
                 return True
-            if action in ['retrieve','partial_update']:
+            if action =="list":
+                project_id = request.query_params.get('project', None)
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update', 'destroy']:
                 layer_id=request.resolver_match.kwargs.get('pk')
                 project_id=Layer.objects.get(id=layer_id).theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
-            if action=="create":
+            elif action=="create":
                 theme_id=request.data.get("theme",None)
                 project_id=Theme.active.get(id=theme_id).project.id
                 organization_id=Project.active.get(id=project_id).organization.id
@@ -67,11 +73,15 @@ class LayerPermission(BasePermission):
 
             if group_id:
                 permission_list=get_permission_list(group_id)
-                if action=="create" and "add_layer" in permission_list:
+                if action=="list" and "view_layer" in permission_list:
+                    return True
+                elif action=="create" and "add_layer" in permission_list:
                     return True
                 elif action=="partial_update" and "change_layer" in permission_list:
                     return True
                 elif action=="retrieve" and "view_layer" in permission_list:
+                    return True
+                elif action=="destroy" and "delete_layer" in permission_list:
                     return True
             return False
         except Exception as e:
@@ -299,16 +309,26 @@ class LayerAttributePermission(BasePermission):
                 project_id=Layer.active.get(id=layer_id).theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
-            if action == 'retrieve':
-                layer_attribute_id=request.resolver_match.kwargs.get('pk')
-                project_id=LayerAttribute.objects.get(id=layer_attribute_id).project.id
+            elif action == "create":
+                layer_id = request.data.get('layer', None)
+                project_id=Layer.active.get(id=layer_id).theme.project.id
                 organization_id=Project.active.get(id=project_id).organization.id
 
+            elif action in ['retrieve', 'partial_update', 'destroy']:
+                layer_attribute_id=request.resolver_match.kwargs.get('pk')
+                project_id=LayerAttribute.objects.get(id=layer_attribute_id).layer.theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
             group_id=get_user_group(user_id,organization_id,project_id)
 
             if group_id:
                 permission_list=get_permission_list(group_id)
                 if (action=="list" or action=="retrieve") and "view_layerattribute" in permission_list:
+                    return True
+                elif action == "create" and "add_layerattribute" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_layerattribute" in permission_list:
+                    return True
+                elif action=="destroy" and "delete_layerattribute" in permission_list:
                     return True
             return False
         except Exception as e:
@@ -481,4 +501,68 @@ class FeatureGeoJSONPermission(BasePermission):
             return False
         except Exception as e:
             print("Error occured in FeatureGeoJSONPermission Check. Error Details: ", str(e))
+            return False
+
+class ProjectMapConfigPermission(BasePermission):
+    """
+    Permission check for Template Import.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            project_id=request.query_params.get('project', None)
+            organization_id=Project.active.get(id=project_id).organization.id
+            group_id=get_user_group(user_id,organization_id,project_id)
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if "change_projectmapconfig" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in ProjectMapConfigPermission Check. Error Details: ", str(e))
+            return False
+
+class QueryFeatureCollectionPermission(BasePermission):
+    """
+    Permission check for QueryFeatureCollection model
+    """
+    def has_permission(self, request, view):
+        try:
+            action = view.action
+            user_id=request.user.id
+            if request.user.is_superuser:
+                return True
+            if action =="list":
+                layer_id=request.query_params.get("layer")
+                project_id=QueryLayer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action=="create":
+                layer_id=request.data.get("layer",None)
+                project_id=QueryLayer.objects.get(id=layer_id).theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            elif action in ['retrieve','partial_update']:
+                feature_id=request.resolver_match.kwargs.get('pk')
+                project_id= QueryFeatureCollection.objects.get(id=feature_id).layer.theme.project.id
+                organization_id=Project.active.get(id=project_id).organization.id
+
+            group_id=get_user_group(user_id,organization_id,project_id)
+
+            if group_id:
+                permission_list=get_permission_list(group_id)
+                if action=="list" and "view_featurecollection" in permission_list:
+                    return True
+                elif action=="create" and "add_featurecollection" in permission_list:
+                    return True
+                elif action=="partial_update" and "change_featurecollection" in permission_list:
+                    return True
+                elif action=="retrieve" and "view_featurecollection" in permission_list:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in FeatureCollectionPermission Check. Error Details: ", str(e))
             return False

@@ -8,14 +8,18 @@ from django.utils.translation import ugettext_lazy as _
 from pgis_toolkit.utils.constants import (
     CURRENT_YEAR,
     DATA_TYPE_CHOICES,
+    DOCUMENT_FILE_TYPE,
     FILE_TYPE_CHOICES,
     GEOMETRY_TYPE_CHOICES,
     LAYER_TYPE_CHOICES,
     LOCATION_TYPE_CHOICES,
+    PROJECT_STATUS_CHOICES,
     PUBLISHED_MONTH_CHOICES,
+    THEMATIC_AREA_CHOICES,
     UNIT_CHOICES,
 )
 from pgis_toolkit.utils.make_thumbnail import make_thumbnail
+from pgis_toolkit.utils.validators import CustomURLValidator
 
 from .utils.managers import ActiveManager
 
@@ -76,6 +80,11 @@ class Organization(IsDeleted,DateTimeStamp):
     address=models.CharField(max_length=254,blank=True,null=True)
     contact=models.CharField(max_length=20,blank=True,null=True)
     link=models.URLField(blank=True,null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
+    description=models.TextField(blank=True,null=True)
+    size = models.CharField(max_length=10,blank=True, null=True)
+    bbox = models.JSONField(blank=True, null=True)
+    cover_image = models.ImageField(upload_to='organization_cover_image/', blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -89,6 +98,7 @@ class Organization(IsDeleted,DateTimeStamp):
         """
         if Organization.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Organization with name {self.name} already exists.')
+
 
 class Country(models.Model):
     name = models.CharField(max_length=100, blank=True, null=True)
@@ -129,16 +139,21 @@ class Project(IsDeleted,DateTimeStamp):
 
     organization=models.ForeignKey(Organization, related_name='ProjectOrganization', on_delete=models.CASCADE,null=True)
     name=models.CharField(max_length=254)
+    status = models.CharField(max_length=20, choices=PROJECT_STATUS_CHOICES, default='draft')
     description=models.TextField(blank=True,null=True)
+    thematic_areas=models.JSONField(default=list, blank=True, null=True)
     start_date=models.DateField(blank=True,null=True)
     end_date=models.DateField(blank=True,null=True)
     country = models.ManyToManyField(Country, blank=True)
     state = models.ManyToManyField(State, blank=True)
+    geographical_region = models.CharField(max_length=254, blank=True, null=True)
     location_type = models.CharField(max_length=50, choices=LOCATION_TYPE_CHOICES, blank=True, null=True)
     file = models.FileField(upload_to='site/',blank=True, null=True)
     geometry_type = models.CharField(max_length=50, blank=True, null=True)
     file_type = models.CharField(max_length=50, choices=FILE_TYPE_CHOICES, blank=True, null=True)
     bbox = models.JSONField(blank=True, null=True)
+    partners = models.JSONField(default=list, blank=True, null=True)
+    cover_image = models.ImageField(upload_to='project_cover_image/', blank=True, null=True)
 
     class Meta:
         app_label = 'projects'
@@ -153,6 +168,36 @@ class Project(IsDeleted,DateTimeStamp):
         if Project.active.exclude(id=self.id).filter(name=self.name).exists():
             raise ValidationError(f'Project with name {self.name} already exists.')
 
+    def save(self, *args, **kwargs):
+        '''Update bbox of Organization'''
+        try:
+            if self.bbox:
+                project_bbox=self.bbox
+                project_qs = Project.active.filter(id=self.id)
+                if project_qs.exists():
+                    organization_instance = project_qs[0].organization
+                    org_bbox=organization_instance.bbox
+
+                    if org_bbox and project_bbox:
+                        if project_bbox[0]<org_bbox[0]:
+                            org_bbox[0]=project_bbox[0]
+
+                        if project_bbox[1]<org_bbox[1]:
+                            org_bbox[1]=project_bbox[1]
+
+                        if project_bbox[2]>org_bbox[2]:
+                            org_bbox[2]=project_bbox[2]
+
+                        if project_bbox[3]>org_bbox[3]:
+                            org_bbox[3]=project_bbox[3]
+
+                    elif project_bbox:
+                        organization_instance.bbox=list(project_bbox)
+                    organization_instance.save()
+        except Exception as e:
+            print(f'error in def save of Project: {str(e)}')
+        super(Project, self).save(*args, **kwargs)
+
 class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     project = models.ForeignKey(
         Project, on_delete=models.SET_NULL, null=True, related_name='ProjectLocation')
@@ -162,6 +207,16 @@ class ProjectLocationFeatureCollection(DateTimeStamp, IsDeleted):
     def __str__(self):
         return str(self.id)
 
+    class Meta:
+        app_label = 'projects'
+
+class ContactPerson(IsDeleted):
+    name = models.CharField(max_length=100)
+    position = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    contact = models.CharField(max_length=20, blank=True, null=True)
+    organization = models.ForeignKey(Organization, blank=True, null=True, on_delete=models.SET_NULL)
+    project = models.ForeignKey(Project, blank=True, null=True, on_delete=models.SET_NULL)
     class Meta:
         app_label = 'projects'
 
@@ -176,13 +231,13 @@ class Template(models.Model):
         # app_label = 'projects'
         abstract=True
 
-    def clean(self):
-        """
-        Make sure template name are unique
-        """
-        if LayerTemplate.active.exclude(id=self.id).filter(name=self.name).exists():
-            raise ValidationError(
-                f'Layer template with name {self.name} already exists')
+    # def clean(self):
+    #     """
+    #     Make sure template name are unique
+    #     """
+    #     if LayerTemplate.active.exclude(id=self.id).filter(name=self.name).exists():
+    #         raise ValidationError(
+    #             f'Layer template with name {self.name} already exists')
 
 
 class TemplateAttribute(models.Model):
@@ -193,7 +248,8 @@ class TemplateAttribute(models.Model):
     length=models.IntegerField(blank=True,null=True)
     precision=models.IntegerField(blank=True,null=True)
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
-    # choices=ArrayField(models.CharField(max_length=100, blank=True),size=20,blank=True, null=True)
+    mandatory = models.BooleanField(default=True)
+    dropdown_field = models.BooleanField(default=False)
     class Meta:
         # app_label = 'projects'
         abstract=True
@@ -223,8 +279,9 @@ class LayerTemplateAttribute(DateTimeStamp,TemplateAttribute):
         app_label = 'projects'
         unique_together = (("layer_template", "name"),)
 
-class Document(DateTimeStamp):
+class Document(IsDeleted, DateTimeStamp):
     name=models.CharField(max_length=254)
+    description = models.CharField(max_length=254, blank=True, null=True)
     project=models.ForeignKey(Project, on_delete=models.CASCADE)
     cover_image=models.ImageField(upload_to='documents/cover_images/', blank=True, null=True)
     cover_image_thumbnail=models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
@@ -232,6 +289,7 @@ class Document(DateTimeStamp):
     published_month = models.CharField(max_length=3, choices=PUBLISHED_MONTH_CHOICES, blank=True, null=True)
     published_day = models.IntegerField(validators=[MaxValueValidator(31), MinValueValidator(1)], blank=True, null=True)
     file = models.FileField(upload_to='documents/files/', blank=True, null=True)
+    type = models.CharField(max_length=20, choices=DOCUMENT_FILE_TYPE, blank=True, null=True)
     url = models.URLField(blank=True, null=True)
 
     class Meta:
@@ -239,6 +297,18 @@ class Document(DateTimeStamp):
         unique_together = (("project", "name"),)
         permissions = (
             ('download_document', 'Can download the document'),
+        )
+
+class Image(DateTimeStamp):
+    project=models.ForeignKey(Project, on_delete=models.CASCADE)
+    title = models.CharField(max_length=254, blank=True, null=True)
+    caption = models.CharField(max_length=254, blank=True, null=True)
+    image = models.ImageField(upload_to='project/images/')
+
+    class Meta:
+        app_label='projects'
+        permissions = (
+            ('download_image', 'Can download the image'),
         )
 
 class RequestDemo(DateTimeStamp):

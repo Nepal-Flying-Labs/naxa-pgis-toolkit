@@ -4,15 +4,20 @@ from rest_framework_simplejwt import views as jwt_views
 
 from .views import (
     ChangePasswordView,
+    CustomTokenObtainPairView,
     EmailConfirmationAPIView,
     ForgotPasswordEmailView,
     PreliminaryUserAPIView,
     PreliminaryUserListView,
+    PreliminaryUserUpdateAPIView,
     PreliminaryUserVerificationAPIView,
+    RequestUserDetailAPIView,
     ResetPasswordView,
+    UserInvitationAPIView,
     UserPermissionViewSet,
     UserRoleUpdateView,
     UserViewSet,
+    landing_page,
     set_csrf_token,
     user_group_list,
 )
@@ -24,19 +29,24 @@ router.register(r'permissions', UserPermissionViewSet, basename="permissions")
 app_name = "users"
 urlpatterns = [
     path('', include(router.urls)),
-        # DRF SimpleJWT token
-    path('token/login/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # DRF SimpleJWT token
+    # path('token/login/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
+    path('myprofile/', RequestUserDetailAPIView.as_view(), name='requesting_user_profile'),
+    path('landing_page/', landing_page, name='landing_page'),
     path('preliminary_user_create/', PreliminaryUserAPIView.as_view(), name='preliminary_user_create'),
+    path('preliminary_user/<int:pk>/', PreliminaryUserUpdateAPIView.as_view(), name='preliminary_user'),
     path('preliminary_user_verify/', PreliminaryUserVerificationAPIView.as_view(), name='preliminary_user_verify'),
     path('email_verify/', EmailConfirmationAPIView.as_view(), name='email_verify'),
-    path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),
-    path('user_group/', user_group_list, name='user_group'),
     path('forgot_password_email/', ForgotPasswordEmailView.as_view(), name='password_reset_email'),
     path('reset_password/', ResetPasswordView.as_view(), name='password_reset'),
     path('change_password/', ChangePasswordView.as_view(), name='password_change'),
     path('userrole_update/<int:pk>/', UserRoleUpdateView.as_view(), name='update_userrole'),
+    path('user_group/', user_group_list, name='user_group'),
     # path('deactivate/', DeactivateUserRoleView.as_view(), name='deactivate_userrole'),
     path('set_csrf/', set_csrf_token, name='Set-CSRF'),
-
+    #NOT IN USE#
+    path('preliminary_user/', PreliminaryUserListView.as_view(), name='preliminary_user'),
+    path('user_invitation/', UserInvitationAPIView.as_view(), name='user_invitation'),
 ]

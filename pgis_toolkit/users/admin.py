@@ -36,12 +36,12 @@ from .models import PreliminaryUser, UserRole
 class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("is_deleted",)}),
-        (_("Credentials"), {"fields": ("username", "password", "email_verification_token")}),
+        (_("Credentials"), {"fields": ("username", "password", "email_verification_token", "show_login_message")}),
         (_("Personal info"), {"fields": ("full_name", "email", "contact", "image")}),
         (_("Permissions"), {"fields": ("is_active", "is_staff", "is_superuser", "user_permissions")}),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
     )
-    list_display = ("is_deleted","id", "full_name", "email", "is_active")
+    list_display = ("is_deleted","id", "username", "full_name", "email", "is_active")
     search_fields = ("full_name",)
 
 class UserRoleAdmin(admin.ModelAdmin):

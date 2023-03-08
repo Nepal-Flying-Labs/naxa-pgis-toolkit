@@ -1,3 +1,5 @@
+import json
+
 from attr import fields
 from rest_framework import serializers
 
@@ -9,6 +11,21 @@ class LayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Layer
         fields = '__all__'
+class LayerListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Layer
+        fields = ('id', 'name', 'source', 'status', 'display')
+
+    def to_representation(self, instance):
+        representation = super(LayerListSerializer,self).to_representation(instance)
+        if instance.layer_type=='Vector':
+            vector_layer = Vectorlayer.objects.filter(layer=instance).values('geom_type')
+            if vector_layer.exists():
+                representation['geom_type'] = vector_layer[0]['geom_type']
+            feature_count = FeatureCollection.active.filter(layer=instance).count()
+            representation['features'] = feature_count
+        return representation
+
 
 class LayerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -68,10 +85,10 @@ class SubLayerRetrieveSerializer(serializers.ModelSerializer):
         representation = super(SubLayerRetrieveSerializer,self).to_representation(instance)
         layer_id=self.context.get('layer_id')
         project_style=self.context.get('project_style')
-        icon,icon_size,style,std_icon=get_style_detail(layer_id,instance.id,project_style)
+        icon,style,std_icon=get_style_detail(layer_id,instance.id,project_style)
         representation['icon']=icon
         representation['std_icon']=std_icon
-        representation['icon_size']=icon_size
+        # representation['icon_size']=icon_size
         representation['style']=style
         return representation
 
@@ -91,6 +108,11 @@ class SubLayerUpdateSerializer(serializers.ModelSerializer):
         model = SubLayer
         fields = ('id','order','icon','icon_size','style','std_icon')
 
+class FeatureImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureImage
+        fields= '__all__'
+
 class FeatureCollectionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollection
@@ -105,6 +127,26 @@ class FeatureCollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCollection
         fields= '__all__'
+
+class FeatureCollectionRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollection
+        fields= ('id', 'layer', 'sub_layer', 'attributes', 'geometry')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        image_qs = FeatureImage.objects.filter(feature_id=instance.id)
+        # if image_qs:
+        #     representation['image'] = self.context['request'].build_absolute_uri(image_qs[0].image.url) if image_qs[0].image else None
+        #     representation['url'] = image_qs[0].url
+        # else:
+        #     representation['image'] = None
+        #     representation['url'] = None
+        if image_qs:
+            representation['images'] = FeatureImageSerializer(image_qs, many=True, context=self.context).data
+        else:
+            representation['images'] = []
+        return representation
 
 class LayerGroupListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -150,6 +192,17 @@ class StandardIconListSerializer(serializers.ModelSerializer):
     class Meta:
         model = StandardIcon
         exclude = ('uploaded_date', 'last_updated', 'is_deleted')
+
+class DropdownChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DropdownChoice
+        fields = '__all__'
+
+class ProjectsLayerTemplateDropdownChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectsLayerTemplateDropdownChoice
+        fields = '__all__'
+
 class LayerAttributeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerAttribute
@@ -159,3 +212,132 @@ class LayerAttributeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = LayerAttribute
         fields=['id','name','alias']
+
+class NetworkRoutesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields = '__all__'
+
+class QueryFeatureCollectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QueryFeatureCollection
+        fields = '__all__'
+
+class QueryFeatureCollectionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QueryFeatureCollection
+        fields = ('id',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation |= instance.attributes
+        return representation
+
+class CleaningErrorsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CleaningErrors
+        fields = '__all__'
+
+class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollectionMirror
+        fields= '__all__'
+
+class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields= ('id', 'route_no', 'length', 'travel_time', 'is_optimum')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        optimum_route_instance = OptimumRoute.active.get(analysis_id=instance.analysis_id)
+        representation['origin'] = f'({optimum_route_instance.origin_long}, {optimum_route_instance.origin_lat})'
+        representation['destination'] = f'({optimum_route_instance.destination_long}, {optimum_route_instance.destination_lat})'
+        '''obstacles'''
+        obstacles_list= []
+        obstacles = instance.obstacles
+        if obstacles:
+            # obstacles = json.loads(obstacles)
+            obstacles_json = {}
+            for key, value in obstacles.items():
+                layer = Layer.active.get(id=key)
+                obstacles_json['layer_id'] = layer.id
+                obstacles_json['feature_mirror_ids'] = value
+                obstacles_json['layer_name'] = layer.name
+                obstacles_json['count'] = len(value)
+                obstacles_list.append(obstacles_json)
+                obstacles_json = {}
+        representation['obstacles'] = obstacles_list
+        return representation
+
+class NetworkRoutesObstaclesMapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NetworkRoutes
+        fields= ('id', 'route_no', 'is_optimum')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        '''obstacles'''
+        obstacles_list= []
+        obstacles = instance.obstacles
+        if obstacles:
+            # obstacles = json.loads(obstacles)
+            obstacles_json = {}
+            for key, value in obstacles.items():
+                layer = Layer.active.get(id=key)
+                obstacles_json['layer_id'] = layer.id
+                obstacles_json['feature_mirror_ids'] = value
+                obstacles_list.append(obstacles_json)
+                obstacles_json = {}
+        representation['obstacles'] = obstacles_list
+        return representation
+
+class AnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Analysis
+        fields = '__all__'
+
+class BufferAreasMapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAreas
+        fields = ('id', 'area', 'bbox', 'origin')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        '''buffer areas'''
+        poi_list= []
+        pois = instance.pois
+        if pois:
+            poi_json = {}
+            for key, value in pois.items():
+                layer = Layer.active.get(id=key)
+                poi_json['layer_id'] = layer.id
+                poi_json['layer_name'] = layer.name
+                poi_json['feature_mirror_ids'] = value
+                poi_list.append(poi_json)
+                poi_json = {}
+        representation['poi'] = poi_list
+        return representation
+
+class BufferAreasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAreas
+        fields = ('id', 'area', 'origin')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        '''buffer areas'''
+        poi_list= []
+        pois = instance.pois
+        if pois:
+            poi_json = {}
+            for key, value in pois.items():
+                layer = Layer.active.get(id=key)
+                poi_json['layer_id'] = layer.id
+                # poi_json['feature_mirror_ids'] = value
+                poi_json['layer_name'] = layer.name
+                poi_json['count'] = len(value)
+                poi_list.append(poi_json)
+                poi_json = {}
+        representation['poi'] = poi_list
+        return representation

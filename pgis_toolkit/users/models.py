@@ -42,15 +42,21 @@ class User(IsDeleted, AbstractUser):
     # user_permissions = None
     #overriding email field by making it unique field
     email = models.EmailField(unique=True)
-    address = models.CharField(max_length=254)
+    address = models.CharField(max_length=254, blank=True, null=True)
     image = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     image_thumbnail = models.ImageField(upload_to='thumbnails/', editable=False, blank=True, null=True)
     contact = models.CharField(max_length=13, blank=True, null=True)
     email_verification_token = models.UUIDField(blank=True, null=True)
+    show_login_message = models.BooleanField(default=True)
     objects = UserManager()
 
     class Meta:
         app_label = 'users'
+        permissions = (
+            ('admin_user_tab', 'View Admin Level User Tab'),
+            ('organization_user_tab', 'View Organization Level User Tab'),
+            ('project_user_tab', 'View Project Level User Tab'),
+        )
 
     def save(self, *args, **kwargs):
         if self.image:
@@ -82,7 +88,7 @@ class UserRole(IsDeleted):
 
 '''Model to store required information to verify and identify user for registration using the email invite approach'''
 class PreliminaryUser(IsDeleted, DateTimeStamp):
-    email = models.EmailField(max_length=254, unique=True)
+    email = models.EmailField(max_length=254)
     organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, blank=True, null=True)
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)

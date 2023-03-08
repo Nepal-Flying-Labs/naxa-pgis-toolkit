@@ -2,8 +2,10 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from pgis_toolkit.projects.api.views import (
+    ContactPersonViewset,
     DefaultThemeViewset,
     DocumentViewset,
+    ImageViewset,
     LayerTemplateAttributeViewset,
     LayerTemplateUploadAPIView,
     LayerTemplateViewset,
@@ -16,17 +18,22 @@ from pgis_toolkit.projects.api.views import (
     get_country_choices,
     get_project_detail,
     get_state_choices,
+    image_download,
     layer_template_download,
+    project_location_geojson,
+    projects_centroid_geojson,
 )
 
 router = DefaultRouter()
 router.register(r'organization_category', OrganizationCategoryViewset, basename='organization_category')
 router.register(r'organization', OrganizationViewset, basename='organization')
 router.register(r'project', ProjectViewset, basename='project')
+router.register(r'contact_person', ContactPersonViewset, basename='contact_person')
 router.register(r'default_theme', DefaultThemeViewset, basename='default_theme')
 router.register(r'layer_template', LayerTemplateViewset, basename='later_template')
 router.register(r'layer_template_attribute', LayerTemplateAttributeViewset, basename='layer_template_attribute')
 router.register(r'document', DocumentViewset, basename='document')
+router.register(r'image', ImageViewset, basename='image')
 router.register(r'request_demo', RequestDemoViewset, basename='request_demo')
 
 app_name = "projects"
@@ -35,11 +42,12 @@ urlpatterns = [
     path('layer_template_download/', layer_template_download,
          name='layer_template_download'),
     path('layer_template_upload/', LayerTemplateUploadAPIView.as_view(), name='layer_template_upload'),
+    path('project_location_geojson/', project_location_geojson, name='project_location_geojson'),
     path('project_location_vectortile/<int:z>/<int:x>/<int:y>/', ProjectLocationVectorTileQuerySet.as_view(), name='project_location_vectortile'),
+    path('projects_centroid_geojson/', projects_centroid_geojson, name='projects_centroid_geojson'),
     path('document_download/', document_download, name='document_download'),
+    path('image_download/', image_download, name='image_download'),
     path('project_detail/', get_project_detail, name='project_detail'),
     path('country/', get_country_choices, name='country_choices'),
     path('state/', get_state_choices, name='state_choices'),
-
-
 ]

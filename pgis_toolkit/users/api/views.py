@@ -1,5 +1,6 @@
 import json
 import operator
+import time
 import uuid
 from functools import reduce
 from itertools import groupby
@@ -7,7 +8,7 @@ from itertools import groupby
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import F, Q
 from django.db.models.query import QuerySet
 from django.http import JsonResponse
 from django.template.loader import render_to_string
@@ -22,16 +23,29 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from config.settings import base as settings
-from pgis_toolkit.projects.models import DateTimeStamp, IsDeleted, Organization, Project
+from pgis_toolkit.maps.models import ProjectMapConfig, Theme
+from pgis_toolkit.projects.models import (
+    DateTimeStamp,
+    DefaultTheme,
+    IsDeleted,
+    Organization,
+    Project,
+)
 from pgis_toolkit.users.models import PreliminaryUser, UserRole
-from pgis_toolkit.users.permissions import IsAuthorizedInviter
+from pgis_toolkit.users.permissions import (
+    IsAuthorizedInviter,
+    UpdatePreliminaryUserPermission,
+)
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 
 from .serializers import (
+    CustomTokenObtainPairSerializer,
     PreliminaryUserListSerializer,
     PreliminaryUserSerializer,
+    RequestingUserSerializer,
     UserDetailSerializer,
     UserGroupListSerializer,
     UserGroupPermissionsSerializer,
@@ -74,7 +88,7 @@ class PreliminaryUserAPIView(APIView):
         errors=[]
         project_instance, organization_instance = None, None
         try:
-            verify_url = settings.URL + '/api/users/preliminary_user_verify/?token='
+            verify_url = settings.URL + '/verify-user/?token='
             request.data._mutable = True
             email_list = request.data.get('email', None)
             if not email_list:
@@ -86,22 +100,19 @@ class PreliminaryUserAPIView(APIView):
             organization = request.data.get('organization', None)
             project = request.data.get('project', None)
             created_object_list = []
+            org_proj_name = 'USAFIRI'
             if organization_name:
+                org_proj_name=organization_name[0]+', USAFIRI'
                 '''checking if organization exists'''
                 if Organization.active.filter(name=organization_name[0]).exists():
                     return Response(data={'message': 'Your organization is already registered!'}, status=status.HTTP_400_BAD_REQUEST)
                 '''creating organization object'''
                 organization_instance = Organization.active.create(name=organization_name[0])
                 request.data['organization'] = organization_instance.id
-                # '''checking if group exists already'''
-                # if Group.objects.filter(name='Organization Admin').exists():
-                #     request.data['group'] = Group.objects.get(name='Organization Admin').id
-                # else:
-                #     '''creating new group object'''
-                #     group_instance = Group.objects.create(name='Organization Admin')
-                #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('ORGANIZATION_ADMIN'))
+                request.data['project'] = None
             elif project_name:
+                org_proj_name=project_name[0]+' in USAFIRI'
                 # project_name = request.data.pop('project_name', None)
                 '''organization id is compulsory for sending project invitation'''
                 if not project_name and not 'organization' in request.data:
@@ -109,37 +120,60 @@ class PreliminaryUserAPIView(APIView):
                 if not organization or not Organization.active.filter(id=organization).exists():
                     return Response(data={'message': 'Valid Organization params is compulsory for a project related role!'}, status=status.HTTP_400_BAD_REQUEST)
                 organization_inst = Organization.active.get(id=organization)
-                if Project.active.filter(Q(name=project_name[0]) & Q(organization=organization_inst)).exists():
+                if Project.active.filter(name=project_name[0],organization=organization_inst).exists():
                     return Response(data={'message': 'A project with the same name is already registered in your organization!'}, status=status.HTTP_400_BAD_REQUEST)
                 project_instance = Project.active.create(name=project_name[0], organization=organization_inst)
                 request.data['project'] = project_instance.id
-                # '''checking if group exists already'''
-                # if Group.objects.filter(name='Project Manager').exists():
-                #     request.data['group'] = Group.objects.get(name='Project Manager').id
-                # else:
-                #     '''creating new group object'''
-                #     group_instance = Group.objects.create(name='Project Manager')
-                #     request.data['group'] = group_instance.id
                 request.data['group'] = int(env('PROJECT_MANAGER'))
             else:
-                '''checking for already existing organization and projects'''
+                '''checking for already existing organization and projects and user roles'''
                 if not group or not Group.objects.filter(id=group).exists():
                     return Response(data={'message': 'params group is missing or group matching query does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                 if int(group) == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-                    request.data.pop('organization', None)
-                    request.data.pop('project', None)
+                    request.data['organization'] = None
+                    request.data['project'] = None
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, group=int(group))
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name}. All invitations are discarded."})
+
                 elif int(group) == int(env('ORGANIZATION_ADMIN')):
-                    request.data.pop('project', None)
+                    request.data['project'] = None
                     if not organization or not Organization.active.filter(id=organization).exists():
                         return Response(data={'message': 'Organization params is invalid!'}, status=status.HTTP_400_BAD_REQUEST)
+                    org_proj_name = Organization.active.get(id=int(organization)).name
+                    org_proj_name = org_proj_name+' in USAFIRI'
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, organization=organization,project=None)
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name} within the organization {org_proj_name}. All invitations are discarded."})
+
                 elif int(group) == int(env('PROJECT_MANAGER')) or int(group) == int(env('DATA_COLLECTOR')):
                     if not project or not Project.active.filter(id=project).exists():
                         return Response(data={'message': 'Invalid project params or Project matching queryset does not exist!'}, status=status.HTTP_400_BAD_REQUEST)
                     project_inst = Project.active.get(id=project)
                     request.data['organization'] = project_inst.organization.id
+                    org_proj_name=project_inst.name+' in USAFIRI'
+                    '''Restrict if any role of user within project exists'''
+                    for email in email_list:
+                        user_role=UserRole.active.filter(user__email=email, project=project)
+                        if user_role.exists():
+                            group_id=user_role.first().group.id
+                            group_name=Group.objects.get(id=group_id).name
+                            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"The user {email} has already been assigned a role of {group_name} within the project {project_inst.name}. All invitations are discarded."})
+
             '''create multiple or single preliminary user instances'''
             # created_object_list = []
             for email in email_list:
+                if PreliminaryUser.active.filter(status='Pending', email=email, organization=request.data['organization'], project=request.data['project'], group=request.data['group']).exists():
+                    role = Group.objects.get(id=request.data['group']).name
+                    raise Exception(f'Invitation as {role} for the email: {email} already exists.')
                 request.data['email'] = email
                 request.data['email_verification_token'] = uuid.uuid4()
                 serializer = PreliminaryUserSerializer(data=request.data)
@@ -148,12 +182,15 @@ class PreliminaryUserAPIView(APIView):
                     created_object_list.append(created_object)
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link to verfiy and continue further steps: {verify_url}{created_object.email_verification_token}',
+                    'role': created_object.group.name,
+                    'proj_org': org_proj_name,
+                    'link': f'{verify_url}{created_object.email_verification_token}',
+                    'paragraph_1': f'You have been invited as {created_object.group.name} in USAFIRI platform. Please click on the link. {verify_url}{created_object.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/email_invitation.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Email Verification, USAFIRI'
+                    subject = f"You're invited to join {org_proj_name}."
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [created_object.email]
                     send_mail(subject, message, from_email, recipient_list,
@@ -168,7 +205,7 @@ class PreliminaryUserAPIView(APIView):
                         project_instance.delete()
                     for obj in created_object_list:
                         obj.delete()
-                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'error': errors})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
             if organization_instance:
                 return Response(data={'message': 'Email Invitation Successful!', 'organization': organization_instance.id}, status=status.HTTP_200_OK)
             elif project_instance:
@@ -180,8 +217,57 @@ class PreliminaryUserAPIView(APIView):
                 organization_instance.delete()
             if project_instance:
                 project_instance.delete()
-            errors.append({'details': str(e)})
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={'Message': 'Dataset not created', 'Error': errors})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+class PreliminaryUserUpdateAPIView(APIView):
+    permission_classes = [UpdatePreliminaryUserPermission]
+    '''resend, expire/delete user invitation'''
+    def patch(self, request, pk, *args, **kwargs):
+        try:
+            errors=[]
+            resend = request.data.get('resend', False)
+            if not PreliminaryUser.objects.filter(pk=pk).exists():
+                return Response(data={'message': 'Preliminary instance not found!'}, status=status.HTTP_400_BAD_REQUEST)
+            instance = PreliminaryUser.objects.get(pk=pk)
+            if resend:
+                instance.status = 'Pending'
+                instance.save()
+                '''email invitation resend'''
+                verify_url = settings.URL + '/verify-user/?token='
+                if instance.organization:
+                    email_org_name = instance.organization.name
+                elif instance.project:
+                    email_org_name = instance.project.name
+                else:
+                    email_org_name = 'USAFIRI'
+                data = {
+                'role': instance.group.name,
+                'proj_org': email_org_name,
+                'link': f'{verify_url}{instance.email_verification_token}',
+                }
+                template = 'email/email_invitation.html'
+                html_message = render_to_string(template, data)
+                message = strip_tags(html_message)
+                name = data['proj_org']
+                subject = f"You're invited! to join {name}, USAFIRI."
+                from_email = settings.EMAIL_HOST_USER
+                recipient_list = [instance.email]
+                send_mail(subject, message, from_email, recipient_list,
+                        html_message=html_message, fail_silently=False)
+                return Response(data={'message': 'Resend email invitation successful.'}, status=200)
+            else:
+                '''expire/delete invitation'''
+                serializer = PreliminaryUserSerializer(instance, data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+                else:
+                    for er in serializer._errors:
+                        errors.append(
+                            {"errorName": er, "details": serializer._errors[er][0]})
+                    return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''email verification, create user role for already registered users and send details of the preliminary user object in resposne'''
 class PreliminaryUserVerificationAPIView(APIView):
@@ -194,7 +280,7 @@ class PreliminaryUserVerificationAPIView(APIView):
             if not token:
                 return Response(data={'message': 'Query Params token is required!'}, status=status.HTTP_400_BAD_REQUEST)
             if not PreliminaryUser.objects.filter(Q(email_verification_token=token) & Q(status='Pending')).exists():
-                return Response(data={'message': 'PreliminaryUser matching queryset does not exists or your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(data={'message': 'Your token has expired!'}, status=status.HTTP_400_BAD_REQUEST)
             preliminary_user_instance = PreliminaryUser.objects.get(Q(email_verification_token=token) & Q(status='Pending'))
             serializer = PreliminaryUserSerializer(preliminary_user_instance)
             data_dict = dict(serializer.data)
@@ -203,26 +289,26 @@ class PreliminaryUserVerificationAPIView(APIView):
                 data_dict['user'] = User.active.get(email=preliminary_user_instance.email).id
                 data_dict['user_created'] = True
 
-                '''Restrict if any role of user within project or organization already exists'''
-                if data_dict['project']:
-                    user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
-                    if user_role.exists():
-                        project_name=Project.objects.get(id=data_dict['project']).name
-                        group_id=user_role.first().group.id
-                        group_name=Group.objects.get(id=group_id).name
-                        '''delete PreliminaryUserInstance once the job is done'''
-                        preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in project '{project_name}' as a {group_name} already exists"})
+                # '''Restrict if any role of user within project or organization already exists'''
+                # if data_dict['project']:
+                #     user_role=UserRole.active.filter(user=data_dict['user'],project=data_dict['project'])
+                #     if user_role.exists():
+                #         project_name=Project.objects.get(id=data_dict['project']).name
+                #         group_id=user_role.first().group.id
+                #         group_name=Group.objects.get(id=group_id).name
+                #         '''delete PreliminaryUserInstance once the job is done'''
+                #         preliminary_user_instance.delete()
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in project '{project_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
-                elif data_dict['organization']:
-                    user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
-                    if user_role.exists():
-                        org_name=Organization.objects.get(id=data_dict['organization']).name
-                        group_id=user_role.first().group.id
-                        group_name=Group.objects.get(id=group_id).name
-                        '''delete PreliminaryUserInstance once the job is done'''
-                        preliminary_user_instance.delete()
-                        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': f"Your role in Organization '{org_name}' as a {group_name} already exists"})
+                # elif data_dict['organization']:
+                #     user_role=UserRole.active.filter(user=data_dict['user'],organization=data_dict['organization'],project=None)
+                #     if user_role.exists():
+                #         org_name=Organization.objects.get(id=data_dict['organization']).name
+                #         group_id=user_role.first().group.id
+                #         group_name=Group.objects.get(id=group_id).name
+                #         '''delete PreliminaryUserInstance once the job is done'''
+                #         preliminary_user_instance.delete()
+                #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': f"Your role in Organization '{org_name}' as a {group_name} already exists. This invitation is disregarded as of now."})
 
                 '''creating new user role for already registered user'''
                 user_role_serializer = UserRoleSerializer(data=data_dict)
@@ -230,7 +316,8 @@ class PreliminaryUserVerificationAPIView(APIView):
                     user_role_serializer.save()
                     '''delete PreliminaryUserInstance once the job is done'''
                     preliminary_user_instance.delete()
-                    return Response(data={'message': 'Successully created new user role.', 'data': data_dict}, status=status.HTTP_200_OK)
+                    return Response(data=data_dict, status=status.HTTP_200_OK)
+                    # return Response(data={'message': 'Successully created new user role.', 'data': data_dict}, status=status.HTTP_200_OK)
                 else:
                     for er in user_role_serializer._errors:
                         errors.append({"errorName": er, "details": serializer._errors[er][0]})
@@ -239,7 +326,67 @@ class PreliminaryUserVerificationAPIView(APIView):
                 data_dict['user_created'] = False
                 return Response(data=data_dict, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response('Error: ' + str(e))
+            return Response(data={'message': str(e)}, status=400)
+
+'''NOT IN USE'''
+'''User Invitation Table'''
+class UserInvitationAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    # filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    # filterset_fields = ['status', 'project', 'organization', 'group']
+    # search_fields = ['id', 'email']
+    # ordering_fields = ['id', 'status', 'email', 'organization', 'project', 'group', 'uploaded_date']
+
+    def get(self, request, *args, **kwargs):
+        try:
+            user_qs = PreliminaryUser.active.all()
+            group_ids = UserRole.active.filter(active=True, user=request.user).values_list('group', flat=True)
+            organization = request.query_params.get('organization', None)
+            project = request.query_params.get('project', None)
+            if project:
+                '''only project level roles'''
+                user_qs=user_qs.filter(project=project)
+            elif organization:
+                '''only organization and project level roles'''
+                user_qs=user_qs.filter(organization=organization)
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                user_qs=user_qs.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
+            else:
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+
+            'ordering'
+            ordering = request.query_params.get('ordering', None)
+            if ordering:
+                user_qs = user_qs.order_by(ordering)
+            else:
+                user_qs = user_qs.order_by('-id')
+
+            '''filtering'''
+            filter_dict={}
+            status=request.query_params.get('status', None)
+            group=request.query_params.get('group', None)
+            if status:
+                filter_dict['status'] = status
+            if group:
+                filter_dict['group'] = group
+            if filter_dict:
+                user_qs=user_qs.filter(**filter_dict)
+
+            '''search'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                filter_kwargs = {}
+                search_fields = ['id', 'email']
+                for field in search_fields:
+                    filter_kwargs[field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                user_qs = user_qs.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else user_qs
+            user_qs=user_qs.values('id', 'email','organization__name', 'project__name', 'group__name', 'status', 'uploaded_date')
+            return Response(data=user_qs, status=200)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 '''Viewset to CRUD operations of user model'''
 class UserViewSet(viewsets.ModelViewSet):
@@ -288,6 +435,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     created_object.save()
                     '''send email for verification'''
                     data = {
+                    'user': created_object.full_name,
                     'paragraph_1': f'Click in the link to verify and activate your account: {verify_url}{uuid_code}',
                     }
                     template = 'email/email_request_demo.html'
@@ -334,103 +482,26 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "User Not Registered", "Error": errors})
 
     def partial_update(self, request, pk=None):
-        user = User.active.get(pk=pk)
-        if isinstance(request.data.get('image'), str):
-            request.data._mutable = True
-            request.data.pop('image', None)
-            user.image = None
-            user.image_thumbnail = None
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            serializer = UserSerializer(user, context={'request': request})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
+        try:
+            errors = []
+            user = User.active.get(pk=pk)
+            if isinstance(request.data.get('image'), str):
+                request.data._mutable = True
+                request.data.pop('image', None)
+                user.image = None
+                user.image_thumbnail = None
+            serializer = UserSerializer(user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                serializer = UserSerializer(user, context={'request': request})
+                return Response(serializer.data, status=200)
+            # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            for er in serializer._errors:
+                errors.append({"errorName": er, "details": serializer._errors[er][0]})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Update not successful', 'Error': errors})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-    # def list(self, request, *args, **kwargs):
-    #     '''
-    #     Web App Administrator: User with this role can't have any other role since this role is similar to super admin.
-    #     For other roles, User can have multiple roles with different organizations but must have single role within each organization.
-    #     http://localhost:8000/api/users/user/?organization=&project=&page=1&limit=10
-    #     '''
-    #     try:
-    #         paginator = CustomPageNumberPagination()
-    #         if not request.user.is_authenticated:
-    #             return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-    #         request_dict = request.query_params
-    #         request_keys = request_dict.keys()
-    #         '''removing the request user from user queryset'''
-    #         queryset = self.queryset.exclude(id=request.user.id)
-    #         '''checking if the requesting user has a role assigned'''
-    #         if not UserRole.active.filter(user__id=request.user.id).exists():
-    #             return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-    #         user_role_instance = UserRole.active.filter(user__id=request.user.id).first()
-    #         organization = None
-    #         '''filtering queryset for web app administrator'''
-    #         if user_role_instance.group.id == int(env('PGIS_WEB_APP_ADMINISTRATOR')):
-    #             queryset = queryset
-    #         elif 'organization' in request_keys and request_dict['organization'] != "":
-    #             organization = request_dict['organization']
-    #             '''making organization compulsory and checking if any role of the request exists for the given organization'''
-    #             if UserRole.active.filter(Q(user__id=request.user.id) & Q(organization__id=organization)).exists():
-    #                 user_role_instance = UserRole.active.get(Q(user__id=request.user.id) & Q(organization__id=organization))
-    #             else:
-    #                 return Response(data={'message': 'No any user role of the requesting user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-    #             '''filtering queryset according to the role of the user in the organization'''
-    #             if user_role_instance.group.id == int(env('ORGANIZATION_ADMIN')):
-    #                 org_user_ids = UserRole.active.filter(organization__id=organization).values_list('user__id', flat=True)
-    #                 queryset = queryset.filter(id__in=org_user_ids)
-    #                 '''filtering queryset according to users in a project'''
-    #             elif 'project' in request_keys and request_dict['project'] != "":
-    #                 project = request_dict['project']
-    #                 if user_role_instance.group.id == int(env('PROJECT_MANAGER')):
-    #                     project_user_ids = UserRole.active.filter(project__id=project).values_list('user__id', flat=True)
-    #                     queryset = queryset.filter(id__in=project_user_ids)
-    #                     '''filtering queryset in a project of the same role i.e. data collector'''
-    #                 elif user_role_instance.group.id == int(env('DATA_COLLECTOR')):
-    #                     group_user_ids = UserRole.active.filter(Q(project__id=project) & Q(group__id=user_role_instance.group.id)).values_list('user__id', flat=True)
-    #                     queryset = queryset.filter(id__in=group_user_ids)
-    #                 else:
-    #                     '''return empty queryset when no any role is validated '''
-    #                     queryset = None
-    #             else:
-    #                 return Response(data={'message': 'Params project is required!'}, status=status.HTTP_400_BAD_REQUEST)
-    #         else:
-    #             return Response(data={'message': 'Params organization is required!'}, status=status.HTTP_400_BAD_REQUEST)
-
-    #         '''Search'''
-    #         if 'search_key' in request_keys and request_dict['search_key'] != '':
-    #             searched_queryset = None
-    #             search_fields = ['full_name', 'contact', 'email']
-    #             filter_kwargs = {}
-    #             for field in search_fields:
-    #                 filter_kwargs[field+'__icontains'] = request_dict['search_key']
-    #             list_of_Q = [Q(**{key: val}) for key, val in filter_kwargs.items()]
-    #             queryset = queryset.filter(reduce(operator.or_, list_of_Q)) if search_fields else queryset
-
-    #         '''Sorting'''
-    #         if 'order_by' in request_keys and request_dict['order_by'] != '':
-    #             queryset = queryset.order_by(request_dict['order_by'] )
-
-    #         '''Group by'''
-    #         if 'group_by' in request_keys and request_dict['group_by'] != '':
-    #             group_by = request_dict['group_by']
-    #             if group_by == "project":
-    #                 user_ids = list(queryset.values_list('id', flat=True))
-    #                 user_role_qs = UserRole.active.filter(user__id__in=user_ids)
-    #                 project_list = list(user_role_qs.values_list('project', flat=True).distinct())
-    #                 data_dict = {}
-    #                 for project in project_list:
-    #                     project_name = Project.active.get(id=project).name
-    #                     data_dict[project_name] = user_role_qs.filter(project__id=project).values('user__image_thumbnail', 'user__full_name', 'project__name', 'group__name')
-    #                 return Response(data_dict, status=status.HTTP_200_OK)
-    #         '''Paginate Queryset'''
-    #         paginated_queryset = paginator.paginate_queryset(queryset, request)
-    #         serializer = UserListSerializer(
-    #             paginated_queryset, many=True, context={"request": request})
-    #         return paginator.get_paginated_response(data=serializer.data)
-    #     except Exception as e:
-    #         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def list(self, request, *args, **kwargs):
         '''
@@ -442,64 +513,111 @@ class UserViewSet(viewsets.ModelViewSet):
         http://localhost:8000/api/users/user/?organization=&project=&group=&ordering=&search=
         '''
         try:
-            # if not request.user.is_authenticated:
-            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-            request_dict = request.query_params
-            request_keys = request_dict.keys()
+            ''''''
+            # request_dict = request.query_params
+            # request_keys = request_dict.keys()
+            # '''removing the requesting user roles from userrole queryset'''
+            # queryset = UserRole.active.exclude(user__id=request.user.id)
+            # '''checking if the requesting user has a role assigned'''
+            # if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
+            #     return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            # userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
+            # user_role_list = userrole_qs.values_list('group__id', flat=True)
+            # '''filtering queryset for web app administrator'''
+            # if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
+            #     queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
+            # elif 'organization' in request_keys and request_dict['organization'] != "":
+            #     organization = request_dict['organization']
+            #     '''exclude all the pgis web administrator user roles'''
+            #     queryset = queryset.exclude(group__id=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+            #     if not userrole_qs.filter(organization__id=organization).exists():
+            #         return Response(data={'message': 'No any role of the user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     userrole_qs = userrole_qs.filter(organization__id=organization)
+            #     user_org_role_list = userrole_qs.values_list('group__id', flat=True)
+            #     if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
+            #         queryset = queryset.filter(organization__id=organization)
+            #     elif 'project' in request_keys and request_dict['project'] != "":
+            #         project = request_dict['project']
+            #         '''exclude all the organization admin user roles'''
+            #         queryset = queryset.exclude(group__id=int(env('ORGANIZATION_ADMIN')))
+            #         if not userrole_qs.filter(project__id=project).exists():
+            #             return Response(data={'message': 'No any role of the user found for the project in the organization!'}, status=status.HTTP_400_BAD_REQUEST)
+            #         userrole_qs = userrole_qs.filter(project__id=project)
+            #         user_org_proj_role_list = userrole_qs.values_list('group__id', flat=True)
+            #         if int(env('PROJECT_MANAGER')) in user_org_proj_role_list:
+            #             '''all users involved in the project excpet web administrator and organization admin'''
+            #             queryset = queryset.filter(project_id=project)
+            #         elif int(env('DATA_COLLECTOR')) in user_org_proj_role_list:
+            #             '''exclude all the project manager user roles'''
+            #             queryset = queryset.exclude(group__id=int(env('PROJECT_MANAGER')))
+            #             '''user with roles data collector only'''
+            #             queryset = queryset.filter(project__id=project)
+            #         else:
+            #             # queryset = queryset.none()
+            #             return Response(data={'message': 'Your role does not allow you to view other user details!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     else:
+            #         return Response(data={'message': 'Params project is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            # else:
+            #     return Response(data={'message': 'Params organization is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            #     '''filter, search and order queryset'''
+            # queryset = self.filter_queryset(queryset)
+            # serializer = UserListSerializer(queryset, many=True, context={"request": request})
+            ''''''
+            '''checking if the requesting user has a role assigned'''
+            role_qs=UserRole.active.filter(user__id=request.user.id, active=True)
+            pre_user_qs = PreliminaryUser.active.all()
+            if not role_qs.exists():
+                return Response(data={'message': 'No any active role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
             '''removing the requesting user roles from userrole queryset'''
             queryset = UserRole.active.exclude(user__id=request.user.id)
-            '''checking if the requesting user has a role assigned'''
-            if not UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True)).exists():
-                return Response(data={'message': 'No any user role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
-            userrole_qs = UserRole.active.filter(Q(user__id=request.user.id) & Q(active=True))
-            user_role_list = userrole_qs.values_list('group__id', flat=True)
-            '''filtering queryset for web app administrator'''
-            if int(env('PGIS_WEB_APP_ADMINISTRATOR')) in user_role_list:
-                queryset = queryset.filter(group__id=int(env('ORGANIZATION_ADMIN')))
-            elif 'organization' in request_keys and request_dict['organization'] != "":
-                organization = request_dict['organization']
-                '''exclude all the pgis web administrator user roles'''
-                queryset = queryset.exclude(group__id=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
-                if not userrole_qs.filter(organization__id=organization).exists():
-                    return Response(data={'message': 'No any role of the user found for the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-                userrole_qs = userrole_qs.filter(organization__id=organization)
-                user_org_role_list = userrole_qs.values_list('group__id', flat=True)
-                if int(env('ORGANIZATION_ADMIN')) in user_org_role_list:
-                    queryset = queryset.filter(organization__id=organization)
-                elif 'project' in request_keys and request_dict['project'] != "":
-                    project = request_dict['project']
-                    '''exclude all the organization admin user roles'''
-                    queryset = queryset.exclude(group__id=int(env('ORGANIZATION_ADMIN')))
-                    if not userrole_qs.filter(project__id=project).exists():
-                        return Response(data={'message': 'No any role of the user found for the project in the organization!'}, status=status.HTTP_400_BAD_REQUEST)
-                    userrole_qs = userrole_qs.filter(project__id=project)
-                    user_org_proj_role_list = userrole_qs.values_list('group__id', flat=True)
-                    if int(env('PROJECT_MANAGER')) in user_org_proj_role_list:
-                        '''all users involved in the project excpet web administrator and organization admin'''
-                        queryset = queryset.filter(project_id=project)
-                    elif int(env('DATA_COLLECTOR')) in user_org_proj_role_list:
-                        '''exclude all the project manager user roles'''
-                        queryset = queryset.exclude(group__id=int(env('PROJECT_MANAGER')))
-                        '''user with roles data collector only'''
-                        queryset = queryset.filter(project__id=project)
-                    else:
-                        # queryset = queryset.none()
-                        return Response(data={'message': 'Your role does not allow you to view other user details!'}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response(data={'message': 'Params project is missing!'}, status=status.HTTP_400_BAD_REQUEST)
+            group_ids = role_qs.values_list('group', flat=True)
+            project=request.query_params.get('project', None)
+            organization = request.query_params.get('organization', None)
+            if project and Project.active.filter(id=project).exists():
+                '''only project level roles'''
+                queryset=queryset.filter(project=project)
+                pre_user_qs=pre_user_qs.filter(project=project)
+            elif organization and Organization.active.filter(id=organization).exists():
+                '''organization and project level roles'''
+                queryset=queryset.filter(organization=organization)
+                pre_user_qs=pre_user_qs.filter(organization=organization)
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                queryset=queryset.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
+                pre_user_qs=pre_user_qs.filter(Q(group=int(env('PGIS_WEB_APP_ADMINISTRATOR')))|Q(group=int(env('ORGANIZATION_ADMIN'))))
             else:
-                return Response(data={'message': 'Params organization is missing!'}, status=status.HTTP_400_BAD_REQUEST)
-                '''filter, search and order queryset'''
-            queryset = self.filter_queryset(queryset)
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+            '''filter, search and order queryset'''
+            # queryset = self.filter_queryset(queryset)
+            '''serialize'''
             serializer = UserListSerializer(queryset, many=True, context={"request": request})
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            pre_user_serializer = PreliminaryUserListSerializer(pre_user_qs, many=True)
+
+            data=serializer.data + pre_user_serializer.data
+            return Response(data=data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
     def retrieve(self, request, pk, *args, **kwargs):
-        user_instance = User.active.get(pk=pk)
-        serializer = UserDetailSerializer(user_instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            user_instance = User.active.get(pk=pk)
+            serializer = UserDetailSerializer(user_instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+'''Requesting user detail'''
+''''''
+class RequestUserDetailAPIView(APIView):
+    permission_classes=[IsAuthenticated]
+    def get(self, request, *args, **kwargs):
+        try:
+            user_instance = request.user
+            if not user_instance:
+                return Response(data={'message': 'Not logged in!'}, status=400)
+            serializer = RequestingUserSerializer(user_instance)
+            return Response(data=serializer.data, status=200)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Verify self registered user using token sent to their mail and activate their account.'''
 class EmailConfirmationAPIView(APIView):
@@ -515,9 +633,9 @@ class EmailConfirmationAPIView(APIView):
             user_instance.save()
             return Response(status=status.HTTP_200_OK, data={"message": "Account verified and activated! You can now log in to the system."})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
-'''Email Invited User Status Table'''
+'''Email Invited User Status Table  >> NOT IN USE'''
 class PreliminaryUserListView(generics.ListAPIView):
     queryset = PreliminaryUser.active.all()
     serializer_class = PreliminaryUserListSerializer
@@ -598,16 +716,64 @@ class UserPermissionViewSet(viewsets.ReadOnlyModelViewSet):
             # result = map(modify, permissions_list)
             return Response(status=status.HTTP_200_OK, data={"permissions": permissions_list})
         except Exception as error:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"Error Message": str(error)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(error)})
 
 '''users group list'''
 @api_view(['GET'])
 def user_group_list(request):
-    if not request.user.is_authenticated:
-        return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
-    group_qs = Group.objects.all()
-    serializer = UserGroupListSerializer(group_qs, many=True)
-    return Response(data=serializer.data, status=status.HTTP_200_OK)
+    try:
+        # if not request.user.is_authenticated:
+        #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You are not logged in."})
+        # userrole_qs = UserRole.active.filter(user__id=request.user.id)
+        # group_ids = userrole_qs.values_list('group__id', flat=True)
+        # group_qs = Group.objects.all()
+        # if request.user.is_superuser:
+        #     group_qs = group_qs
+        # elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+        #     group_qs = group_qs
+        # elif 'organization' in request.query_params and request.query_params['organization'] != "":
+        #     userrole_qs = userrole_qs.filter(organization__id=request.query_params['organization'])
+        #     if not userrole_qs.exists():
+        #         return Response(data={'message': 'No any user role found in the organization!'}, status=400)
+        #     group_ids = userrole_qs.values_list('group__id', flat=True)
+        #     if int(env('ORGANIZATION_ADMIN')) in group_ids:
+        #         group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+        # elif 'project' in request.query_params and request.query_params['project'] != "":
+        #     project_id=request.query_params['project']
+        #     userrole_qs = userrole_qs.filter(project__id=project_id)
+        #     if not userrole_qs.exists():
+        #         return Response(data={'message': 'No any user role found in the project!'}, status=400)
+        #     group_id = userrole_qs[0].group.id
+        #     if group_id == int(env('PROJECT_MANAGER')):
+        #         group_qs = group_qs.filter(pk__in=[int(env('PROJECT_MANAGER')), int(env('DATA_COLLECTOR'))])
+        #     elif group_id == int(env('DATA_COLLECTOR')):
+        #         group_qs = group_qs.filter(pk=int(env('DATA_COLLECTOR')))
+        # else:
+        #     group_qs = None
+        # serializer = UserGroupListSerializer(group_qs, many=True)
+            '''checking if the requesting user has a role assigned'''
+            role_qs=UserRole.active.filter(user__id=request.user.id, active=True)
+            if not role_qs.exists():
+                return Response(data={'message': 'No any active role of the requesting user found!'}, status=status.HTTP_400_BAD_REQUEST)
+            group_ids = role_qs.values_list('group', flat=True)
+            group_qs = Group.objects.all()
+
+            project=request.query_params.get('project', None)
+            organization = request.query_params.get('organization', None)
+            if project and Project.active.filter(id=project).exists():
+                '''only project level roles'''
+                group_qs = group_qs.exclude(pk__in=[int(env('PGIS_WEB_APP_ADMINISTRATOR')), int(env('ORGANIZATION_ADMIN'))])
+            elif organization and Organization.active.filter(id=organization).exists():
+                '''organization and project level roles'''
+                group_qs = group_qs.exclude(pk=int(env('PGIS_WEB_APP_ADMINISTRATOR')))
+            elif request.user.is_superuser or int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+                group_qs = group_qs
+            else:
+                return Response (data={'message': 'organization or project params is missing!'}, status=400)
+            data = group_qs.values('id', 'name').order_by('-id')
+            return Response(data=data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Send email to the user when forgot password button is clicked.'''
 class ForgotPasswordEmailView(APIView):
@@ -615,7 +781,7 @@ class ForgotPasswordEmailView(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            reset_url = settings.URL + '/api/users/reset_password/?token='
+            reset_url = settings.URL + '/reset-password/?token='
             username_or_email = request.data.get('username_or_email')
             if User.active.filter(Q(username=username_or_email) | Q(email=username_or_email)).exists():
                 profile = User.active.filter(Q(username=username_or_email) | Q(email=username_or_email))
@@ -625,12 +791,13 @@ class ForgotPasswordEmailView(APIView):
                     user.save()
                     '''email invitation'''
                     data = {
-                    'paragraph_1': f'Click in the link to reset your password: {reset_url}{user.email_verification_token}',
+                    'username': user.username,
+                    'link': f'{reset_url}{user.email_verification_token}',
                     }
-                    template = 'email/email_request_demo.html'
+                    template = 'email/reset_password.html'
                     html_message = render_to_string(template, data)
                     message = strip_tags(html_message)
-                    subject = 'Password Reset Verification, USAFIRI'
+                    subject = 'Reset Password, USAFIRI'
                     from_email = settings.EMAIL_HOST_USER
                     recipient_list = [user.email]
                     send_mail(subject, message, from_email, recipient_list,
@@ -638,7 +805,7 @@ class ForgotPasswordEmailView(APIView):
                     return Response(status=status.HTTP_200_OK, data={"message": "A reset password link is sent to your email. Please check it."})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Incorrect Email or no email found!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''Reset password from the reset link sent to email'''
 class ResetPasswordView(APIView):
@@ -661,30 +828,32 @@ class ResetPasswordView(APIView):
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Invalid token!"})
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "New Passwords did not match!"})
         except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "Error!", "Details": str(e)})
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''change password'''
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        old_password = request.data["old_password"]
-        new_password1 = request.data["new_password1"]
-        new_password2 = request.data["new_password2"]
-        '''validating old password'''
-        user = User.active.get(id=request.user.id)
-        check_old_password = user.check_password(old_password)
-        if check_old_password:
-            if new_password1 == new_password2:
-                user.set_password(new_password1)
-                # user.is_password_changed = True
-                user.save()
-                return Response({'message': 'Password Change Succesful!'})
+        try:
+            old_password = request.data["old_password"]
+            new_password1 = request.data["new_password1"]
+            new_password2 = request.data["new_password2"]
+            '''validating old password'''
+            user = User.active.get(id=request.user.id)
+            check_old_password = user.check_password(old_password)
+            if check_old_password:
+                if new_password1 == new_password2:
+                    user.set_password(new_password1)
+                    # user.is_password_changed = True
+                    user.save()
+                    return Response({'message': 'Password Change Succesful!'})
+                else:
+                    return Response({"message": "New passwords don't match!"})
             else:
-                return Response({"message": "New passwords don't match!"})
-        else:
-            return Response({"message": "Your old password is wrong!"})
-
+                return Response({"message": "Your old password is wrong!"})
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": str(e)})
 
 '''activate/deactivate/delete user role'''
 class UserRoleUpdateView(APIView):
@@ -714,3 +883,57 @@ def set_csrf_token(request):
     This will be `/api/set-csrf-cookie/` on `urls.py`
     """
     return JsonResponse({"details": "CSRF cookie set"})
+
+'''Landing page'''
+@api_view(['GET'])
+def landing_page(request, *args, **kwargs):
+    try:
+        userrole_qs = UserRole.active.filter(user__id=request.user.id, active=True)
+        organization_ids = userrole_qs.exclude(organization=None).values_list('organization__id', flat=True).distinct()
+        project_ids = userrole_qs.exclude(project=None).values_list('project__id', flat=True).distinct()
+        group_ids = userrole_qs.values_list('group__id', flat=True).distinct()
+        page, organization, project = '', None, None
+        if request.user.is_superuser:
+            page = '/organizations' #'organization_list'
+        elif int(env('PGIS_WEB_APP_ADMINISTRATOR')) in group_ids:
+            page = '/organizations' #'organization_list'
+        elif not organization_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the organization!'}, status=400)
+        elif organization_ids.count() > 1:
+            page = '/organizations' #'organization_list'
+        elif organization_ids.exists() and not project_ids.exists():
+            organization = organization_ids.first()
+            # page =  f'/organizations/{organization}/home' #'organization_home' #implement this once home page is made.
+            page = f'/organizations/{organization}/projects' #'project_list' # delete this once home page is made.
+        elif not project_ids.exists(): return Response(data={'message': 'No any active user role found for the user inside the project!'}, status=400)
+        elif project_ids.count() > 1:
+            organization = organization_ids.first()
+            page = f'/organizations/{organization}/projects' #'project_list'
+        else:
+            '''single role case'''
+            '''if role is organization admin'''
+            if int(env('ORGANIZATION_ADMIN')) in group_ids:
+                organization = organization_ids.first()
+                page = f'/organizations/{organization}/projects' #'project_list'
+            else:
+                organization = organization_ids.first()
+                project = project_ids.first()
+                page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+                if int(env('PROJECT_MANAGER')) in group_ids:
+                    project_status = Project.active.get(id=project).status
+                    if project_status == 'draft':
+                        page = f'/organizations/{organization}/project-setup/{project}' # 'project_edit'
+                    else:
+                        '''change this if required'''
+                        page = f'/organizations/{organization}/projects/{project}/map' #'map_layers'
+        if page == '': return Response(data={'message': 'No any active user role found for the user!'}, status=400)
+        result = {'page': page, 'organization': organization, 'project': project , 'show_login_message': request.user.show_login_message}
+        return Response(data=result, status=200)
+    except Exception as e:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Takes a set of user credentials and returns an access and refresh JSON web
+    token pair to prove the authentication of those credentials.
+    """
+    serializer_class = CustomTokenObtainPairSerializer

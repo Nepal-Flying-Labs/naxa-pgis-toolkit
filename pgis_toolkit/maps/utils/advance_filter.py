@@ -1,40 +1,75 @@
+# '''function to filer dataset'''
+# def advance_filter_data(field, operator, value, dataset):
+#     result_dataset = []
+#     if operator == 1:
+#         key = "attributes__"+field
+#     elif operator == 2:
+#         key = "attributes__"+field+"__lt"
+#     elif operator == 3:
+#         key = "attributes__"+field+"__gt"
+#     elif operator == 4:
+#         key = "attributes__"+field
+#     elif operator == 5:
+#         key = "attributes__"+field+"__lte"
+#     elif operator == 6:
+#         key = "attributes__"+field+"__gte"
+#     elif operator == 7:
+#         if "%" in value:
+#             if value.startswith("%") and value.endswith("%"):
+#                 value = value.strip("%")
+#                 key = "attributes__"+field+"__icontains"
+#             elif value.startswith("%"):
+#                 value = value.strip("%")
+#                 key = "attributes__"+field+"__endswith"
+#             elif value.endswith("%"):
+#                 value = value.strip("%")
+#                 key = "attributes__"+field+"__startswith"
+#             elif not value.startswith("%") and not value.endswith("%"):
+#                 value = value.split("%")
+#                 key1 = "attributes__"+field+"__startswith"
+#                 key2 = "attributes__"+field+"__endswith"
+#                 filter_dict = {}
+#                 filter_dict[key1] = value[0]
+#                 filter_dict[key2] = value[1]
+#                 result_dataset = dataset.filter(**filter_dict)
+#                 return result_dataset
+#     filter_dict = {}
+#     filter_dict[key] = value
+#     result_dataset = dataset.filter(**filter_dict)
+#     return result_dataset
 
-'''function to filer dataset'''
-def advance_filter_data(field, operator, value, dataset):
-    result_dataset = []
+def advance_filter_data(layer_id, field, operator, value):
+    attribute= f"attributes.{field}"
     if operator == 1:
-        key = "attributes__"+field
+        query={"layer" : layer_id, attribute : { "$eq" : value}}
     elif operator == 2:
-        key = "attributes__"+field+"__lt"
+        query={"layer" : layer_id, attribute : { "$lt" : value}}
     elif operator == 3:
-        key = "attributes__"+field+"__gt"
+        query={"layer" : layer_id, attribute : { "$gt" : value}}
     elif operator == 4:
-        key = "attributes__"+field
+        query={"layer" : layer_id, attribute : { "$ne" : value}}
     elif operator == 5:
-        key = "attributes__"+field+"__lte"
+        query={"layer" : layer_id, attribute : { "$lte" : value}}
     elif operator == 6:
-        key = "attributes__"+field+"__gte"
+        query={"layer" : layer_id, attribute : { "$gte" : value}}
     elif operator == 7:
-        if "%" in value:
-            if value.startswith("%") and value.endswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__icontains"
-            elif value.startswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__endswith"
-            elif value.endswith("%"):
-                value = value.strip("%")
-                key = "attributes__"+field+"__startswith"
-            elif not value.startswith("%") and not value.endswith("%"):
-                value = value.split("%")
-                key1 = "attributes__"+field+"__startswith"
-                key2 = "attributes__"+field+"__endswith"
-                filter_dict = {}
-                filter_dict[key1] = value[0]
-                filter_dict[key2] = value[1]
-                result_dataset = dataset.filter(**filter_dict)
-                return result_dataset
-    filter_dict = {}
-    filter_dict[key] = value
-    result_dataset = dataset.filter(**filter_dict)
-    return result_dataset
+        query = {"layer": layer_id, attribute: {'$regex' : value}}
+        # if "%" in value:
+        #     if value.startswith("%") and value.endswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/{value}/'
+        #         query = {"layer" : layer_id, attribute : value}
+        #     elif value.startswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/{value}$/'
+        #         query={"layer" : layer_id, attribute : value}
+        #     elif value.endswith("%"):
+        #         value = value.strip("%")
+        #         value = f'/^{value}/'
+        #         query={"layer" : layer_id, attribute : value}
+        #     elif not value.startswith("%") and not value.endswith("%"):
+        #         value = value.split("%")
+        #         value1='/^'+value[0]+'/'
+        #         value2='/'+value[1]+'$/'
+        #         query={"$and" : [{"layer" : layer_id, attribute : value1},{"layer" : layer_id, attribute : value2}]}
+    return query

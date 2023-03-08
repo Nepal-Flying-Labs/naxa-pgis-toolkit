@@ -6,6 +6,7 @@ import time
 import zipfile
 from logging import exception
 
+os.environ['USE_PYGEOS'] = '0'
 import geopandas
 from celery import Celery, shared_task
 from django.db import connection, transaction
@@ -14,7 +15,7 @@ from rest_framework.response import Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from config.settings.base import MEDIA_ROOT, env
+from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from config.settings.local import geoserver
 from pgis_toolkit.maps.api.serializers import (
     VectorLayerSerializer,
@@ -50,16 +51,20 @@ from pgis_toolkit.maps.utils.layer_upload import (
 def UploadVectorLayer(layer_id,request_data):
     print("entered UploadVectorLayer",layer_id)
     errors=[]
-    dir = MEDIA_ROOT+"/geofiles/"
+    dir = f'{MEDIA_ROOT}/geofiles/{layer_id}/'
     try:
+        layer_inst = None
         layer_file_instance=None
         tries=1
         while tries<3:
             if Layer.objects.filter(id=layer_id).exists() and LayerFile.objects.filter(layer=layer_id).exists():
+                layer_inst = Layer.objects.get(id=layer_id)
                 layer_file_instance=LayerFile.objects.get(layer=layer_id)
                 break
             time.sleep(3)
         if not layer_file_instance:
+            layer_inst.upload_status='failed'
+            layer_inst.save()
             return 'Error Occured from UploadVectorLayer: couldnot save/extract upoaded file', None
 
         '''Knowing file extension'''
@@ -81,18 +86,28 @@ def UploadVectorLayer(layer_id,request_data):
             response = handleGPX(layer_id)
         else:
             clear_dir(dir)
+            layer_inst.upload_status='failed'
+            layer_inst.save()
             return 'Error Occured: Invalid file extension', None
 
         clear_dir(dir)
         if response=="successful":
+            # layer = Layer.active.get(id=layer_id)
+            layer_inst.upload_status='successful'
+            layer_inst.save()
             return "successful", layer_id
         else:
-            Layer.objects.filter(id=layer_id).delete()
+            # layer = Layer.active.get(id=layer_id)
+            layer_inst.upload_status='failed'
+            layer_inst.save()
+            # Layer.objects.filter(id=layer_id).delete()
             return response, None
 
     except Exception as e:
         clear_dir(dir)
-        Layer.objects.filter(id=layer_id).delete()
+        layer_inst.upload_status='failed'
+        layer_inst.save()
+        # Layer.objects.filter(id=layer_id).delete()
         errors.append({'errorName': str(e), 'details': str(e)})
         return 'Error Occured from UploadVectorLayer: '+ str(errors), None
 
@@ -131,6 +146,7 @@ def UpdateVectorLayer(layer_instance, request_data):
     try:
         # geoserver.create_workspace(workspace="custom_workspace")
         errors=[]
+        update_dict = {}
         vector_layer_instance=Vectorlayer.objects.get(layer=layer_instance.id)
         vector_layer_serializer = VectorLayerUpdateSerializer(vector_layer_instance, data=request_data, partial=True)
         if vector_layer_serializer.is_valid():
@@ -140,7 +156,7 @@ def UpdateVectorLayer(layer_instance, request_data):
             for er in vector_layer_serializer._errors:
                 errors.append(
                     {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
-            return errors
+            return errors, update_dict
 
         '''Save vector layer style'''
         project_style=None if request_data['project_style']=="default" else request_data['project_style']
@@ -160,6 +176,10 @@ def UpdateVectorLayer(layer_instance, request_data):
         if 'std_icon' in request_data.keys():
             layerstyle_instance.std_icon=StandardIcon.objects.get(id=request_data['std_icon']) if request_data['std_icon'] else None
         layerstyle_instance.save()
+        update_dict['icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.icon.url}" if layerstyle_instance.icon else None
+        # update_dict['icon_size'] = layerstyle_instance.icon_size
+        update_dict['style'] = layerstyle_instance.style
+        update_dict['std_icon'] = f"{env('BACKEND_URL')}{layerstyle_instance.std_icon.icon.url}" if layerstyle_instance.std_icon else None
 
         if "sub_layers_mapping_field" in request_data.keys() and request_data['sub_layers_mapping_field'] !="":
             # with transaction.atomic():
@@ -189,9 +209,9 @@ def UpdateVectorLayer(layer_instance, request_data):
                         feature.save()
                         # print(feature.sub_layer,"after save")
             # update_bbox(layer_instance)
-        return "successful"
+        return "successful", update_dict
     except Exception as e:
-        return str(e)
+        return str(e), update_dict
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def UploadRasterLayer(layer_id, request_dict):
@@ -215,6 +235,8 @@ def UploadRasterLayer(layer_id, request_dict):
         if raster_layer_serializer.is_valid():
             raster_layer_serializer.save()
         else:
+            layer_instance.upload_status='failed'
+            layer_instance.save()
             for er in raster_layer_serializer._errors:
                 errors.append(
                     {'errorName': er, 'details': raster_layer_serializer._errors[er][0]})
@@ -249,15 +271,17 @@ def UploadRasterLayer(layer_id, request_dict):
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
             '''clearing the uploaded file directory'''
-        dir = MEDIA_ROOT + '/geofiles'
+        dir = f'{MEDIA_ROOT}/geofiles/{layer_id}/'
         clear_dir(dir)
+        layer_instance.upload_status='successful'
+        layer_instance.save()
         return "successful", layer_id
     except Exception as e:
-        layer_instance.delete()
-        layer_file_instance.delete()
+        # layer_instance.delete()
+        # layer_file_instance.delete()
         return str(e), None
 
-@shared_task(max_retries=1, soft_time_limit=8000)
+# @shared_task(max_retries=1, soft_time_limit=8000)
 def UpdateRasterLayer(layer_id, request_dict):
     from django.core.files import File
 
@@ -285,10 +309,12 @@ def UpdateRasterLayer(layer_id, request_dict):
                 path=sld_path, workspace=raster_layer_instance.geoserver_workspace)
             geoserver.publish_style(layer_name=raster_layer_instance.geoserver_layer_name,
                                     style_name=raster_layer_instance.geoserver_layer_name, workspace=raster_layer_instance.geoserver_workspace)
-            return "successful", layer_id
-        return "successful", layer_id
+            # return "successful", layer_id
+            return "successful"
+        return "successful"
     except Exception as e:
-        return str(e), None
+        # return str(e),
+        return str(e)
 
 def UploadWMSLayer(layer_id, request_dict):
     if 'url' in request_dict.keys() and request_dict['url'] != "":
@@ -441,3 +467,152 @@ def handleDataMergeUpdate(layer_id, missed_col, extra_col, verified):
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))
         return ('Error: ' + str(e))
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id):
+
+    import osmnx as ox
+    ox.config(log_console=True, use_cache=True)
+    from pgis_toolkit.maps.utils.network_analysis import generate_routes
+
+    try:
+        lat = (origin_lat + destination_lat)/2
+        long = (origin_long + destination_long)/2
+        # lat = 0.319363
+        # long = 34.572876
+        G = ox.graph_from_point((lat, long), dist=distance)
+        response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G, analysis_id)
+        return response, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return (str(e), 400)
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
+
+    from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
+    try:
+        response, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
+        return response, stat, message, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return None, "error", str(e), 400
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
+
+    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis
+    try:
+        response, stat, message, status = buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
+        return response, stat, message, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return None, "error", str(e), 400
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def BufferData(analysis_id, layer_ids):
+
+    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis_data
+    try:
+        response, stat, message, status = buffer_analysis_data(analysis_id, layer_ids)
+        return response, stat, message, status
+    except Exception as e:
+        print("error occured in handleDataMergeUpdate: " + str(e))
+        return None, "error", str(e), 400
+
+@shared_task(bind=True, max_retries=3, soft_time_limit=800)
+def delete_query_layers(self):
+    try:
+        print('****deleting query layers and query_feature_collection of more than 24 hours from uploaded date****')
+        from datetime import datetime, timedelta, timezone
+
+        from pgis_toolkit.maps.models import QueryFeatureCollection, QueryLayer
+        current_datetime = datetime.now().replace(tzinfo=timezone.utc)
+        threshold = current_datetime - timedelta(days=1)
+        QueryLayer.active.filter(uploaded_date__lt=threshold).delete()
+    except Exception as e:
+        return("Query Layer Delete Task fail, error: " + str(e))
+
+def FeatureImageFromURL(feature_qs, mod_field):
+    # try:
+    from django.core.exceptions import ValidationError
+    from django.core.validators import URLValidator
+
+    from pgis_toolkit.maps.models import FeatureCollection, FeatureImage
+    '''create FeatureImage objects'''
+    # print(feature_qs.count(), "is features count insdie FeatureFromURL")
+    feature_image_objs = []
+    url_validator = URLValidator()
+    for feature in feature_qs:
+        if feature[mod_field]:
+            possible_urls = feature[mod_field].split(',')
+            for url in possible_urls:
+                try:
+                    url_validator(url)
+                    # print(url, "passed")
+                    if not FeatureImage.objects.filter(feature_id=feature['id'], url=url).exists():
+                        feature_image_objs.append(FeatureImage(feature_id=feature['id'], url=url))
+                except ValidationError:
+                    # print(url, "failed")
+                    continue
+    # print(len(feature_image_objs), "is length")
+    FeatureImage.objects.bulk_create(feature_image_objs)
+    # except Exception as e:
+    #     return str(e)
+
+def remove(file):
+    if os.path.exists(file):
+        os.remove(file)
+
+@shared_task(bind=True, max_retries=3, soft_time_limit=800)
+def BulkUploadImage(self, layer, file_bytes_base64_str, zip_file_name, image_field):
+    try:
+        import base64
+        import json
+        import os
+
+        from bson.json_util import dumps, loads
+
+        from config.settings.base import MEDIA_ROOT, MONGO_DB
+        from pgis_toolkit.maps.models import FeatureImage
+        file_path = f'{MEDIA_ROOT}/feature_images/{layer}/{zip_file_name}'
+        feature_coll = MONGO_DB['featurecollections']
+        image_path = f'{MEDIA_ROOT}/feature_images/{layer}/'
+        os.makedirs(image_path, exist_ok=True)
+        '''encode from string'''
+        file_bytes_base64 = file_bytes_base64_str.encode('utf-8')
+        '''decode back into file'''
+        file_bytes = base64.b64decode(file_bytes_base64)
+        '''write the zip file'''
+        with open(file_path, 'wb') as f:
+            f.write(file_bytes)
+        '''open and extract the zip file'''
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            files = zip_ref.namelist()
+            for filename in files:
+                if '/' in filename:
+                    name = filename.split('/')[0]
+                    '''delete the zip file now'''
+                    remove(file_path)
+                    return f'The zipfile contains a directory {name}. Please try again with a zipfile containing image files only.'
+            zip_ref.extractall(image_path)
+        '''delete the zip file now'''
+        remove(file_path)
+        feature_image_objs = []
+        for filename in files:
+            feature = feature_coll.find({"layer":int(layer), f"attributes.{image_field}": {"$regex": filename}}, {"id":1, "_id":0})
+            feature_json = json.loads(dumps(feature))
+            if feature_json:
+                for feature in feature_json:
+                    if not FeatureImage.objects.filter(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}').exists():
+                        feature_image_objs.append(FeatureImage(feature_id=feature['id'], image=f'feature_images/{layer}/{filename}'))
+            else:
+                '''remove only those file with no match. duplicate file replaces original. so cannot remove duplicates.'''
+                print(image_path+filename, "is image path + filename")
+                os.remove(image_path+filename)
+        '''create feature images at last'''
+        FeatureImage.objects.bulk_create(feature_image_objs)
+        return 'successful'
+    except Exception as e:
+        remove(file_path)
+        return str(e)

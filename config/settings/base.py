@@ -6,6 +6,7 @@ from pathlib import Path
 
 import environ
 from corsheaders.defaults import default_headers
+from pymongo import MongoClient
 
 ROOT_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
 # pgis_toolkit/
@@ -54,6 +55,13 @@ DATABASES = {
         'HOST':env('POSTGRES_HOST',default='postgres'),
 }
 }
+MONGO_DB_USERNAME=env("MONGO_DB_USERNAME", default="root")
+MONGO_DB_PASSWORD=env("MONGO_DB_PASSWORD",default="root")
+MONGO_DB_HOST=env("MONGO_DB_HOST",default="pgis_toolkit_local_mongo")
+MONGO_DB_PORT=env("MONGO_DB_PORT",default="27017")
+MONGO_DB_NAME=env("MONGO_DB_NAME",default="pgis_toolkit_mongo")
+client = MongoClient(f'mongodb://{MONGO_DB_USERNAME}:{MONGO_DB_PASSWORD}@{MONGO_DB_HOST}:{MONGO_DB_PORT}')
+MONGO_DB = client[MONGO_DB_NAME]
 
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 # https://docs.djangoproject.com/en/stable/ref/settings/#std:setting-DEFAULT_AUTO_FIELD
@@ -315,7 +323,7 @@ REST_FRAMEWORK = {
 
 '''simple_jwt authentication'''
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     # 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     # "REFRESH_TOKEN_LIFETIME": timedelta(minutes=3),
@@ -346,3 +354,23 @@ SPECTACULAR_SETTINGS = {
 URL = env("URL", default='')
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+#Sentry Configuration
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
+sentry_sdk.init(
+    dsn=env("SENTRY_DSN", default="https://382ffe6052144366bd4271226e3b3f7e@o4504370595561472.ingest.sentry.io/4504370598051840"),
+    integrations=[
+        DjangoIntegration(),
+    ],
+
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0,
+
+    # If you wish to associate users to errors (assuming you are using
+    # django.contrib.auth) you may enable sending PII data.
+    send_default_pii=True
+)

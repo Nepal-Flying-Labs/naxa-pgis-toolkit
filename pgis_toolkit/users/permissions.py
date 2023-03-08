@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.permissions import BasePermission
 
 from pgis_toolkit.projects.models import Project
-from pgis_toolkit.users.models import UserRole
+from pgis_toolkit.users.models import PreliminaryUser, UserRole
 
 # from users.models import User
 User = get_user_model()
@@ -58,7 +58,6 @@ class IsAuthorizedInviter(BasePermission):
             if 'project_name' in request_keys and request.data['project_name'] != "":
                 project_name = request.data['project_name']
             group_id=get_user_group(user_id, organization_id, project_id)
-            print(group_id, "is group id")
             permission_list=get_permission_list(group_id)
             if project_name:
                 '''user who can add a project can invite other users in that particular project in any role.'''
@@ -74,6 +73,34 @@ class IsAuthorizedInviter(BasePermission):
             return False
         except Exception as e:
             print("Error occured in IsAuthorizedInviter Permission Check Error. Details:", str(e))
+            return False
+
+class UpdatePreliminaryUserPermission(BasePermission):
+    """
+    Permission Check for expire/ delete and resend email invitation.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            request_keys = request.data.keys()
+            pk=request.resolver_match.kwargs.get('pk')
+            resend = request.data.get('resend', False)
+            print(resend, "is ressend")
+            print(pk, "is pk")
+            user_id = request.user.id
+            if request.user.is_superuser:
+                return True
+            pre_user_inst = PreliminaryUser.objects.get(id=pk)
+            group_id=get_user_group(user_id, pre_user_inst.organization, pre_user_inst.project)
+            permission_list=get_permission_list(group_id)
+            if 'change_preliminaryuser' in permission_list:
+                if resend:
+                    return check_invitation_hierarchy(group_id, pre_user_inst.group.id)
+                else:
+                    return True
+            return False
+        except Exception as e:
+            print("Error occured in UpdatePreliminaryUserPermission Permission Check Error. Details:", str(e))
             return False
 
 # class IsTaskAuthorized(BasePermission):

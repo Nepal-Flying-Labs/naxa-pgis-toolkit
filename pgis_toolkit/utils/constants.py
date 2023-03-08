@@ -15,7 +15,8 @@ DATA_TYPE_CHOICES=(
                     ("int",_("Integer")),
                     ("float",_('Decimal')),
                     ('str',_('Text')),
-                    ('date',_('Date'))
+                    ('date',_('Date')),
+                    ('image', _('Image')),
                 )
 
 UNIT_CHOICES=(
@@ -54,4 +55,52 @@ CURRENT_YEAR = int(date.today().year)
 STATUS_CHOICES = (
     ('Pending', _('Pending')),
     ('Expired', _('Expired'))
+)
+
+THEMATIC_AREA_CHOICES = (
+    ('Climate change and Energy', _('Climate change and Energy')),
+)
+
+PROJECT_STATUS_CHOICES = (
+    ('ongoing', _('Ongoing')),
+    ('completed', _('Completed')),
+    ('draft', _('Draft')),
+)
+
+ANALYSIS_TYPE_CHOICES = (
+    ('optimum_route', _('Optimum Route Analysis')),
+    ('service_area', _('Service Area Analysis')),
+    ('buffer', _('Buffer Analysis')),
+)
+
+NETWORK_MODE = (
+    ('Drive', _('Drive')),
+    ('Cycle', _('Cycle')),
+    ('Walk', _('Walk')),
+)
+
+LAYER_STATUS_CHOICES = (
+    ('valid', _('Valid')),
+    ('invalid', _('Invalid')),
+    ('unchecked', _('Unchecked')),
+)
+
+LAYER_SOURCE_CHOICES = (
+    ('osm', _('OSM')),
+    ('survey', _('Survey')),
+    ('computer', _('Computer')),
+)
+
+LAYER_UPLOAD_STATUS = (
+    ('uploading', _('Uploading')),
+    ('successful', _('Successful')),
+    ('failed', _('Failure')),
+)
+
+DOCUMENT_FILE_TYPE = (
+    ('doc', _('DOCX')),
+    ('pdf', _('PDF')),
+    ('excel', _('Excel')),
+    ('csv', _('CSV')),
+    ('url', 'URL')
 )
