@@ -414,17 +414,36 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
             errors =[]
             choice_inst = self.get_object()
             attr_name = choice_inst.attribute.name
+            mod_attr_name = '{'+choice_inst.attribute.name+'}'
             prev_value = choice_inst.name
+            data_type = choice_inst.attribute.data_type
             serializer = self.get_serializer(choice_inst, request.data, partial=True)
             if serializer.is_valid():
                 value = serializer.validated_data.get('name', None)
-                layer = choice_inst.attribute.layer.id
-                feature_qs = FeatureCollection.active.filter(layer=layer, attributes__contains={attr_name: prev_value})
-                for feature in feature_qs:
-                    feature.attributes[attr_name] = value
-                FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
-                serializer.save()
-                return Response(data=serializer.data, status=status.HTTP_200_OK)
+                try:
+                    if data_type == 'str':
+                        mod_value = '"'+value+'"'
+                    else:
+                        mod_value = value
+                    layer = choice_inst.attribute.layer.id
+                    # for feature in feature_qs:
+                    #     feature.attributes[attr_name] = value
+                    # FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '{mod_value}')
+                                WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer, f"attributes.{attr_name}":prev_value},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Updating the feature attriutes value failed:', str(e))
+                    return Response(data={'message': 'Updating the feature attriutes value failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 for er in serializer._errors:
                     errors.append(
