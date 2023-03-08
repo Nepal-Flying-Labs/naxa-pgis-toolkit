@@ -259,6 +259,39 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            errors =[]
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                attr_name = serializer.validated_data.get('name')
+                layer = serializer.validated_data.get('layer').id
+                mod_attr_name = '{'+attr_name+'}'
+                value = ""
+                try:
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""')
+                                WHERE layer_id={layer} AND is_deleted = false
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Creating layer attribute failed:', str(e))
+                    return Response(data={'message': 'Creating layer attribute failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
     def partial_update(self, request, *args, **kwargs):
         try:
             errors = []
