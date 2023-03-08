@@ -259,6 +259,39 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            errors =[]
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                attr_name = serializer.validated_data.get('name')
+                layer = serializer.validated_data.get('layer').id
+                mod_attr_name = '{'+attr_name+'}'
+                value = ""
+                try:
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""')
+                                WHERE layer_id={layer} AND is_deleted = false
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Creating layer attribute failed:', str(e))
+                    return Response(data={'message': 'Creating layer attribute failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
     def partial_update(self, request, *args, **kwargs):
         try:
             errors = []
@@ -293,12 +326,37 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         try:
-            instance = self.get_object()
-            '''delete layer attribute'''
-            self.perform_destroy(instance)
-            return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
-        except Http404:
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+            attribute_inst = self.get_object()
+            attr_name = attribute_inst.name
+            layer = attribute_inst.layer.id
+            # mod_attr_name = '{'+attr_name+'}'
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    update_sql = f'''
+                            UPDATE maps_featurecollection
+                            SET attributes = attributes - '{attr_name}'
+                            WHERE layer_id={layer} AND is_deleted = false
+                        '''
+                    cursor.execute(update_sql)
+                '''update in mongo'''
+                feature_coll.update_many({"layer":layer},{"$unset": {f"attributes.{attr_name}": ""}}, upsert=False)
+                '''delete layer attribute'''
+                self.perform_destroy(attribute_inst)
+                return Response(data={'message': 'Layer Attribute delete successful.'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Layer Attribute delete failed:', str(e))
+                return Response(data={'message': 'Layer Attribute delete failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+        # try:
+        #     instance = self.get_object()
+        #     '''delete layer attribute'''
+        #     self.perform_destroy(instance)
+        #     return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
+        # except Http404:
+        #     return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 '''Bulk create FeatureImage from feature attributes when a image field is set.'''
 @api_view(['POST'])
@@ -332,7 +390,7 @@ def bulk_create_image_from_urls(request, *args, **kwargs):
             return Response(data={'message': 'Bulk Feature Image create successful'}, status=200)
         except Exception as e:
             print('pool error')
-            return Response(data={'message': str(e)}, status=400)
+            return Response(data={'message': str(e)}, status=500)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
@@ -394,7 +452,7 @@ def get_bulk_upload_image_response(request):
 
 class DropdownChoiceViewset(viewsets.ModelViewSet):
     queryset = DropdownChoice.objects.all()
-    http_method_names = ('get', 'patch', 'post')
+    http_method_names = ('get', 'patch', 'post', 'delete')
     permission_classes = [IsAuthenticated]
     serializer_class = DropdownChoiceSerializer
 
@@ -414,22 +472,70 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
             errors =[]
             choice_inst = self.get_object()
             attr_name = choice_inst.attribute.name
+            mod_attr_name = '{'+choice_inst.attribute.name+'}'
             prev_value = choice_inst.name
+            data_type = choice_inst.attribute.data_type
             serializer = self.get_serializer(choice_inst, request.data, partial=True)
             if serializer.is_valid():
                 value = serializer.validated_data.get('name', None)
-                layer = choice_inst.attribute.layer.id
-                feature_qs = FeatureCollection.active.filter(layer=layer, attributes__contains={attr_name: prev_value})
-                for feature in feature_qs:
-                    feature.attributes[attr_name] = value
-                FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
-                serializer.save()
-                return Response(data=serializer.data, status=status.HTTP_200_OK)
+                try:
+                    if data_type == 'str':
+                        mod_value = '"'+value+'"'
+                    else:
+                        mod_value = value
+                    layer = choice_inst.attribute.layer.id
+                    # for feature in feature_qs:
+                    #     feature.attributes[attr_name] = value
+                    # FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '{mod_value}')
+                                WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer, f"attributes.{attr_name}":prev_value},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Updating the feature attriutes value failed:', str(e))
+                    return Response(data={'message': 'Updating the feature attriutes value failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            choice_inst = self.get_object()
+            attr_name = choice_inst.attribute.name
+            mod_attr_name = '{'+choice_inst.attribute.name+'}'
+            prev_value = choice_inst.name
+            value = ""
+            try:
+
+                layer = choice_inst.attribute.layer.id
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    update_sql = f'''
+                            UPDATE maps_featurecollection
+                            SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""')
+                            WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
+                        '''
+                    cursor.execute(update_sql)
+                '''update in mongo'''
+                feature_coll.update_many({"layer":layer, f"attributes.{attr_name}":prev_value},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                '''delete attribute dropdown object'''
+                self.perform_destroy(choice_inst)
+                return Response(data={'message': 'Dropdown value delete successful.'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Dropdown value delete failed:', str(e))
+                return Response(data={'message': 'Dropdown value delete failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
