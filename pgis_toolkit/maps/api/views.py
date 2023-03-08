@@ -326,12 +326,37 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         try:
-            instance = self.get_object()
-            '''delete layer attribute'''
-            self.perform_destroy(instance)
-            return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
-        except Http404:
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+            attribute_inst = self.get_object()
+            attr_name = attribute_inst.name
+            layer = attribute_inst.layer.id
+            # mod_attr_name = '{'+attr_name+'}'
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    update_sql = f'''
+                            UPDATE maps_featurecollection
+                            SET attributes = attributes - '{attr_name}'
+                            WHERE layer_id={layer} AND is_deleted = false
+                        '''
+                    cursor.execute(update_sql)
+                '''update in mongo'''
+                feature_coll.update_many({"layer":layer},{"$unset": {f"attributes.{attr_name}": ""}}, upsert=False)
+                '''delete layer attribute'''
+                self.perform_destroy(attribute_inst)
+                return Response(data={'message': 'Layer Attribute delete successful.'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Layer Attribute delete failed:', str(e))
+                return Response(data={'message': 'Layer Attribute delete failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+        # try:
+        #     instance = self.get_object()
+        #     '''delete layer attribute'''
+        #     self.perform_destroy(instance)
+        #     return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
+        # except Http404:
+        #     return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 '''Bulk create FeatureImage from feature attributes when a image field is set.'''
 @api_view(['POST'])
