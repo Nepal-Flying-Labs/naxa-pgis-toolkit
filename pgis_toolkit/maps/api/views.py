@@ -273,7 +273,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
                     with connection.cursor() as cursor:
                         update_sql = f'''
                                 UPDATE maps_featurecollection
-                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""')
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""'), synced = false
                                 WHERE layer_id={layer} AND is_deleted = false
                             '''
                         cursor.execute(update_sql)
@@ -335,7 +335,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
                 with connection.cursor() as cursor:
                     update_sql = f'''
                             UPDATE maps_featurecollection
-                            SET attributes = attributes - '{attr_name}'
+                            SET attributes = attributes - '{attr_name}', synced = false
                             WHERE layer_id={layer} AND is_deleted = false
                         '''
                     cursor.execute(update_sql)
@@ -491,7 +491,7 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
                     with connection.cursor() as cursor:
                         update_sql = f'''
                                 UPDATE maps_featurecollection
-                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '{mod_value}')
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '{mod_value}'), synced = false
                                 WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
                             '''
                         cursor.execute(update_sql)
@@ -524,7 +524,7 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
                 with connection.cursor() as cursor:
                     update_sql = f'''
                             UPDATE maps_featurecollection
-                            SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""')
+                            SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""'), synced = false
                             WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
                         '''
                     cursor.execute(update_sql)
