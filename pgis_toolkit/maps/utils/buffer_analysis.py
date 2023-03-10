@@ -145,7 +145,6 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
             for origin in origins:
                 geos_origins.append(GeosPoint(origin[0], origin[1]))
             for buff_area in buffer_areas_list:
-                print(buff_area, "is buffer area")
                 buff_area_id = buff_area.id
                 pois_dict = {}
                 for poi in pois:
@@ -161,11 +160,8 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                 buff_area.pois = pois_dict
                 origin_list = []
                 for i, point in enumerate(geos_origins):
-                    print(point, "is point")
                     if point.within(buff_area.geometry):
-                        print(point, "is point inside this buffer area")
                         origin_list.append(origins[i])
-                print('--------------------------------------------------------------------------------------')
                 ''''''
                 # origin_list =[]
                 # for id , origin in enumerate(origins):
