@@ -133,7 +133,7 @@ def check_overlapping(layer):
     """
     gdf = get_all_layer(layer)
     total_data = len(gdf)
-    sql = f'''SELECT a.* From
+    sql = f'''SELECT DISTINCT a.* From
             (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
             INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
             (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
