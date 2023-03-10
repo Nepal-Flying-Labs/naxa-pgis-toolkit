@@ -139,60 +139,64 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         while iterate:
             if BufferAreas.active.filter(analysis_id=analysis_id).exists():
                 iterate=False
-        if pois:
-            try:
-                geos_origins = []
-                for origin in origins:
-                    geos_origins.append(GeosPoint(origin[0], origin[1]))
-                for buff_area in buffer_areas_list:
-                    buff_area_id = buff_area.id
-                    pois_dict = {}
-                    for poi in pois:
-                        pois_sql = f'''
-                        SELECT mirror.id
-                        FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
-                        JOIN (SELECT id, geometry FROM maps_featurecollectionmirror WHERE layer_id={poi} and is_deleted=false) mirror
-                        ON ST_Contains(buffer.geometry, mirror.geometry);
-                        '''
-                        # mirror = gpd.read_postgis(pois_sql, con=con, geom_col='geometry', crs="epsg:4326")
-                        mirror= pd.read_sql_query(pois_sql, con)
-                        pois_dict[poi] = list(mirror['id'])
-                    buff_area.pois = pois_dict
-                    origin_list = []
-                    for i, point in enumerate(geos_origins):
-                        if point.within(buff_area.geometry):
-                            origin_list.append(origins[i])
-                    ''''''
-                    # origin_list =[]
-                    # for id , origin in enumerate(origins):
-                    #     origin_list.append((id, f'POINT({origin[0]} {origin[1]})'))
-                    # origin_tuple = tuple(origin_list)
-                    # print(origin_tuple, "is origin tuple")
-                    # origin_sql = f'''
-                    # WITH  origin_table (id, point) AS (VALUES {origin_tuple})
-                    # SELECT origins.id
-                    # FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
-                    # JOIN (SELECT id, ST_PointFromText(point::text, 4326) AS geometry FROM origin_table) origins
-                    # ON ST_Contains(buffer.geometry, origins.geometry);
-                    # '''
-                    # print(origin_sql, "is origin sql")
-                    # with connection.cursor() as cursor:
-                    #     cursor.execute(origin_sql)
-                    #     result = cursor.fetchall()
-                    #     print(result, "is result")
-                    # origin_df= pd.read_sql_query(origin_sql, con)
-                    # origin_ids = list(origin_df['id'])
-                    # final_origin_list = []
-                    # for id in origin_ids:
-                    #     print(id, origins[i], "is id and origin point")
-                    #     final_origin_list.append(origins[i])
-                    # buff_area.origin = final_origin_list
-                    ''''''
-                    buff_area.origin = origin_list
-                    buff_area.save()
-            except Exception as e:
-                print('eror in checking pois within buffer zones:', str(e))
-                pass
+        # if pois:
+        try:
+            geos_origins = []
+            for origin in origins:
+                geos_origins.append(GeosPoint(origin[0], origin[1]))
+            for buff_area in buffer_areas_list:
+                print(buff_area, "is buffer area")
+                buff_area_id = buff_area.id
+                pois_dict = {}
+                for poi in pois:
+                    pois_sql = f'''
+                    SELECT mirror.id
+                    FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                    JOIN (SELECT id, geometry FROM maps_featurecollectionmirror WHERE layer_id={poi} and is_deleted=false) mirror
+                    ON ST_Contains(buffer.geometry, mirror.geometry);
+                    '''
+                    # mirror = gpd.read_postgis(pois_sql, con=con, geom_col='geometry', crs="epsg:4326")
+                    mirror= pd.read_sql_query(pois_sql, con)
+                    pois_dict[poi] = list(mirror['id'])
+                buff_area.pois = pois_dict
+                origin_list = []
+                for i, point in enumerate(geos_origins):
+                    print(point, "is point")
+                    if point.within(buff_area.geometry):
+                        print(point, "is point inside this buffer area")
+                        origin_list.append(origins[i])
+                print('--------------------------------------------------------------------------------------')
+                ''''''
+                # origin_list =[]
+                # for id , origin in enumerate(origins):
+                #     origin_list.append((id, f'POINT({origin[0]} {origin[1]})'))
+                # origin_tuple = tuple(origin_list)
+                # print(origin_tuple, "is origin tuple")
+                # origin_sql = f'''
+                # WITH  origin_table (id, point) AS (VALUES {origin_tuple})
+                # SELECT origins.id
+                # FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                # JOIN (SELECT id, ST_PointFromText(point::text, 4326) AS geometry FROM origin_table) origins
+                # ON ST_Contains(buffer.geometry, origins.geometry);
+                # '''
+                # print(origin_sql, "is origin sql")
+                # with connection.cursor() as cursor:
+                #     cursor.execute(origin_sql)
+                #     result = cursor.fetchall()
+                #     print(result, "is result")
+                # origin_df= pd.read_sql_query(origin_sql, con)
+                # origin_ids = list(origin_df['id'])
+                # final_origin_list = []
+                # for id in origin_ids:
+                #     print(id, origins[i], "is id and origin point")
+                #     final_origin_list.append(origins[i])
+                # buff_area.origin = final_origin_list
+                ''''''
+                buff_area.origin = origin_list
+                buff_area.save()
+        except Exception as e:
+            print('eror in checking pois within buffer zones:', str(e))
+            pass
         analysis_inst = Analysis.active.get(id=analysis_id)
         analysis_inst.bbox = list(data.total_bounds)
         analysis_inst.save()
