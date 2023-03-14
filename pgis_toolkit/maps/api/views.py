@@ -2828,7 +2828,13 @@ def feature_popup(request, *args, **kwargs):
         feature_qs = FeatureCollection.active.filter(id=feature_id)
         if feature_qs.exists():
             feature_inst = feature_qs[0]
+        else:
+            return Response(data={'message': 'feature not found'}, status=404)
         attributes = feature_inst.attributes
+        '''remove image field'''
+        image_field_qs = LayerAttribute.objects.filter(layer=feature_inst.layer, data_type='image')
+        if image_field_qs.exists():
+            attributes.pop(image_field_qs[0].name, None)
         vector_layer = Vectorlayer.objects.filter(layer=feature_inst.layer)
         if vector_layer.exists():
             popup_fields = vector_layer[0].popup_fields
@@ -2844,7 +2850,7 @@ def feature_popup(request, *args, **kwargs):
         attr_keys = result.keys()
         popup = {}
         attribute_qs = LayerAttribute.objects.filter(
-            layer=feature_inst.layer, name__in=attr_keys).exclude(alias=None).values_list('name', 'alias')
+            layer=feature_inst.layer, name__in=attr_keys).exclude(alias__in=[None, '']).values_list('name', 'alias')
         attribute_dict = {}
         for tup in attribute_qs:
             attribute_dict[tup[0]] = tup[1]
