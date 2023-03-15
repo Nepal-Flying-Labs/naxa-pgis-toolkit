@@ -279,7 +279,7 @@ def fix_multipart(layer):
                             sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom
                                         FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                             sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
-                            sql_result.drop(['geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                            sql_result.drop(['feature_id', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
                             if len(sql_result) == 1:
                                 FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
                             else:
