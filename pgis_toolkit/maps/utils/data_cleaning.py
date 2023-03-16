@@ -279,15 +279,16 @@ def fix_multipart(layer):
                             sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom
                                         FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                             sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
-                            sql_result.drop(['feature_id', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                            sql_result.drop(['synced', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
                             if len(sql_result) == 1:
-                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt, 'synced': False})
                             else:
                                 for i, s_row in sql_result.iterrows():
                                     if i == 0:
-                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt, 'synced': False})
                                     else:
                                         s_row.pop('id')
+                                        s_row.pop('feature_id')
                                         obj_dict = {}
                                         for key, value in s_row.items():
                                             if key == 'geom':
@@ -360,15 +361,16 @@ def fix_overlapping(layer):
                                     sql = f'''SELECT a.*, (ST_Dump(a.geometry)).geom as geom
                                                 FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                                     sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
-                                    sql_result.drop(['feature_id', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                                    sql_result.drop(['synced', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
                                     if len(sql_result) == 1:
-                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                                        FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt, 'synced': False})
                                     else:
                                         for i, s_row in sql_result.iterrows():
                                             if i == 0:
-                                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                                FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt, 'synced': False})
                                             else:
                                                 s_row.pop('id')
+                                                s_row.pop('feature_id')
                                                 obj_dict = {}
                                                 for key, value in s_row.items():
                                                     if key == 'geom':
@@ -411,15 +413,16 @@ def fix_self_intersection(layer):
                         sql = f'''SELECT a.*, (ST_Dump(ST_Node(a.geometry))).geom
                                     FROM (SELECT * FROM maps_featurecollectionmirror WHERE id={row.id}) a'''
                         sql_result = gpd.read_postgis(sql, con=con, geom_col='geom', crs=4326)
-                        sql_result.drop(['feature_id', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
+                        sql_result.drop(['synced', 'geometry', 'uploaded_date', 'last_updated'], axis=1, inplace=True)
                         if len(sql_result) == 1:
-                            FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt})
+                            FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': sql_result.loc[0,'geom'].wkt, 'synced': False})
                         else:
                             for i, s_row in sql_result.iterrows():
                                 if i == 0:
-                                    FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt})
+                                    FeatureCollectionMirror.active.update_or_create(id=row.id, defaults={'geometry': s_row.geom.wkt, 'synced': False})
                                 else:
                                     s_row.pop('id')
+                                    s_row.pop('feature_id')
                                     obj_dict = {}
                                     for key, value in s_row.items():
                                         if key == 'geom':
