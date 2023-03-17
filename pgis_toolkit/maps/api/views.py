@@ -2623,50 +2623,71 @@ class BufferAnalysisAPIView(APIView):
             field = request.query_params.get('field', None)
             analysis_id = request.query_params.get('analysis', None)
             view = request.query_params.get('view', None)
-            if layer_id and field:
-                if not analysis_id:
-                    return Response(data={'message': 'params analysis is missing.'}, status=400)
-                buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
-                pois_qs = buff_qs.values('pois')
-                feature_ids = []
+            if layer_id and not view:
+                layer = Layer.active.get(id=layer_id)
+                if LayerAttribute.objects.filter(layer=layer_id).exists():
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    return Response (data=attribute_qs, status=200)
+                else:
+                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+            if not analysis_id:
+                return Response(data={'message': 'params analysis is missing.'}, status=400)
+            buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+            pois_qs = buff_qs.values('pois')
+            feature_ids = []
+            if view=='list':
                 for pois in pois_qs:
                     pois_json = pois['pois']
-                    if pois_json and layer_id in pois_json:
-                        feature_ids = feature_ids + pois_json[layer_id]
+                    if pois_json:
+                        feature_ids_list = pois_json.values()
+                        for ids_list in feature_ids_list:
+                            feature_ids = feature_ids + ids_list
                 if not feature_ids:
                     return Response(data={'message': 'No any POI features found inside the buffer for the layer'}, status=400)
-                if view=='list':
+                feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids).order_by('id')
+                attribute_keys = feature_qs[0].attributes.keys()
+                result = []
+                if 'name' in attribute_keys:
+                    for feature in feature_qs:
+                        attributes = feature.attributes
+                        feature_dict = {}
+                        feature_dict['id'] = feature.id
+                        feature_dict['name'] = attributes['name']
+                        layer = feature.layer
+                        feature_dict['layer_id'] = layer.id
+                        feature_dict['layer'] = layer.name
+                        for buff in buff_qs:
+                            if feature.geometry.within(buff.geometry):
+                                origin = buff.origin
+                                feature_dict['origin'] = origin
+                                feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                        result.append(feature_dict)
+                else:
+                    for feature in feature_qs:
+                        attributes = feature.attributes
+                        feature_dict = {}
+                        feature_dict['id'] = feature.id
+                        feature_dict['name'] = ''
+                        layer = feature.layer
+                        feature_dict['layer_id'] = layer.id
+                        feature_dict['layer'] = layer.name
+                        for buff in buff_qs:
+                            if feature.geometry.within(buff.geometry):
+                                origin = buff.origin
+                                feature_dict['origin'] = origin
+                                feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                        result.append(feature_dict)
+                return Response(data=result, status=200)
+            elif view =='chart':
+                if layer_id and field:
+                    for pois in pois_qs:
+                        pois_json = pois['pois']
+                        if pois_json and layer_id in pois_json:
+                            feature_ids = feature_ids + pois_json[layer_id]
+                    if not feature_ids:
+                        return Response(data={'message': 'No any POI features found inside the buffer for the layer'}, status=400)
                     feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids).order_by('id')
                     attribute_keys = feature_qs[0].attributes.keys()
-                    result = []
-                    if 'name' in attribute_keys:
-                        for feature in feature_qs:
-                            attributes = feature.attributes
-                            feature_dict = {}
-                            feature_dict['id'] = feature.id
-                            feature_dict['name'] = attributes['name']
-                            feature_dict[field] = attributes[field]
-                            for buff in buff_qs:
-                                if feature.geometry.within(buff.geometry):
-                                    origin = buff.origin
-                                    feature_dict['origin'] = origin
-                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1]))
-                            result.append(feature_dict)
-                    else:
-                        for feature in feature_qs:
-                            attributes = feature.attributes
-                            feature_dict = {}
-                            feature_dict['id'] = feature.id
-                            feature_dict['name'] = ''
-                            feature_dict[field] = attributes[field]
-                            for buff in buff_qs:
-                                if feature.geometry.within(buff.geometry):
-                                    origin = buff.origin
-                                    feature_dict['origin'] = origin
-                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
-                            result.append(feature_dict)
-                    return Response(data=result, status=200)
-                elif view =='chart':
                     result = {}
                     mod_field = 'attributes__'+ field
                     feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
@@ -2691,17 +2712,9 @@ class BufferAnalysisAPIView(APIView):
                     #     result[feat['_id']] = feat['count']
                     return Response(data=result, status=200)
                 else:
-                    return Response(data={'message': 'view params is missing!'}, status=400)
-
-            elif layer_id:
-                layer = Layer.active.get(id=layer_id)
-                if LayerAttribute.objects.filter(layer=layer_id).exists():
-                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
-                    return Response (data=attribute_qs, status=200)
-                else:
-                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+                    return Response(data={'message': 'layer or field params is missing!'}, status=400)
             else:
-                return Response(data={'message': 'layer or field params is missing!'}, status=400)
+                return Response(data={'message': 'view params is missing!'}, status=400)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
