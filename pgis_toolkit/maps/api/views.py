@@ -2850,7 +2850,7 @@ def feature_popup(request, *args, **kwargs):
         attr_keys = result.keys()
         popup = {}
         attribute_qs = LayerAttribute.objects.filter(
-            layer=feature_inst.layer, name__in=attr_keys).exclude(alias__in=[None, '']).values_list('name', 'alias')
+            layer=feature_inst.layer, name__in=attr_keys).exclude(alias=None).exclude(alias='').values_list('name', 'alias')
         attribute_dict = {}
         for tup in attribute_qs:
             attribute_dict[tup[0]] = tup[1]
