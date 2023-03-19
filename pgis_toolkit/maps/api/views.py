@@ -3743,6 +3743,7 @@ class LayerFromOptimumPathAnalysis(APIView):
                             'length': route.length,
                             'travel_time': route.travel_time,
                             'is_optimum': route.is_optimum,
+                            'obstacles': route.obstacles
                         }
                         feature_objs.append(FeatureCollection(geometry=route.geometry, layer=layer_instance, attributes=attributes_json))
                     FeatureCollection.active.bulk_create(feature_objs)
@@ -3877,7 +3878,7 @@ class LayerFromBufferAnalysis(APIView):
                     for buff_area in buffer_areas:
                         attributes_json = {
                             'analysis_id': buff_area.analysis_id,
-                            'orgin': buff_area.origin,
+                            'orgin': str(buff_area.origin),
                             'area': buff_area.area,
                             'pois': buff_area.pois,
                         }
