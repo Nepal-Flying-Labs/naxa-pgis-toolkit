@@ -146,6 +146,7 @@ from .serializers import (
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
+    FeatureCollectionMirrorListSerializer,
     FeatureCollectionMirrorSerializer,
     FeatureCollectionRetrieveSerializer,
     FeatureCollectionSerializer,
@@ -3451,7 +3452,7 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
     http_method_names = ['get', 'patch', 'post']
     default_serializer_class = FeatureCollectionMirrorSerializer
     serializer_classes = {
-        # 'list': FeatureCollectionListSerializer,
+        'list': FeatureCollectionMirrorListSerializer,
         'retrieve': FeatureCollectionMirrorSerializer
     }
     # permission_classes=[FeatureCollectionPermission]
@@ -3459,6 +3460,44 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
     pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            # paginator = CustomPageNumberPagination()
+            layer_id = request.query_params.get('layer', None)
+            mirror_ids = request.query_params.get('ids', None)
+            if not layer_id:
+                return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            if mirror_ids:
+                mirror_ids = [int(id) for id in mirror_ids.split(',')]
+                queryset = self.queryset.filter(layer__id=layer_id, id__in=mirror_ids)
+            else:
+                queryset = self.queryset.filter(layer__id=layer_id)
+            '''search_key'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                search_fields = list(queryset.first().attributes.keys())
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs['attributes__'+field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            ''''order_by'''
+            order_by = request.query_params.get('ordering', None)
+            if order_by:
+                if 'id' in order_by:
+                    queryset = queryset.order_by(order_by)
+                else:
+                    queryset = queryset.order_by('attributes__'+order_by)
+            # paginated_queryset = paginator.paginate_queryset(queryset, request)
+            # serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            # return paginator.get_paginated_response(data=serializer.data)
+            serializer = self.get_serializer(queryset, many=True, context={})
+            return Response(data=serializer.data, status=200)
+        except Exception as e:
+            return Response(data=str(e), status=400)
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         try:

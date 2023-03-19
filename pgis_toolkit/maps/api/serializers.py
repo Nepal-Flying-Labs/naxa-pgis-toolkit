@@ -243,6 +243,16 @@ class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
         model = FeatureCollectionMirror
         fields= '__all__'
 
+class FeatureCollectionMirrorListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollectionMirror
+        fields = ('id',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation |= instance.attributes
+        return representation
+
 class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkRoutes
