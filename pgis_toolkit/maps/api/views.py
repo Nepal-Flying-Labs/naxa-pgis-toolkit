@@ -1506,6 +1506,16 @@ class AdvanceQueryAPIView(APIView):
                 QueryFeatureCollection.active.filter(id__in=feature_ids).delete()
             return Response(data={'message': str(e)}, status=400)
 
+    def delete(self, request, *args, **kwargs):
+        try:
+            layer = request.data.get('layer', None)
+            if not layer:
+                return Response(data={'message': 'layer params is missing'}, status=400)
+            QueryLayer.active.get(id=layer).delete()
+            return Response(data={'message': 'Query Layer delete successful'}, status=400)
+        except Exception as e:
+            print("Query Layer Delete Task fail, error: " + str(e))
+            return Response(data={'message': str(e)}, status=400)
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
