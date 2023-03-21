@@ -1512,7 +1512,7 @@ class AdvanceQueryAPIView(APIView):
             if not layer:
                 return Response(data={'message': 'layer params is missing'}, status=400)
             QueryLayer.active.get(id=layer).delete()
-            return Response(data={'message': 'Query Layer delete successful'}, status=400)
+            return Response(data={'message': 'Query Layer delete successful'}, status=200)
         except Exception as e:
             print("Query Layer Delete Task fail, error: " + str(e))
             return Response(data={'message': str(e)}, status=400)
