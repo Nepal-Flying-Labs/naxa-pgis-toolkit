@@ -246,7 +246,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             # check_mandatory = request.query_params.get('check_mandatory', False)
             if not layer:
                 return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory', 'dropdown_field')
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory', 'dropdown_field', 'editable')
             # if check_mandatory == True or check_mandatory == 'True':
             #     mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
             #     if mandatory_fields:
