@@ -1347,8 +1347,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk','layer')
-
+    # vector_tile_fields = ('pk','layer','label')
     def get(self, request, *args, **kwargs):
         '''Authentication'''
         auth = request.headers['Authorization']
@@ -1362,18 +1361,29 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             user_id = auth_token.user_id
         if not User.active.filter(id=user_id).exists():
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
-        queryset=FeatureCollection.active.all()
+        
         request_keys = request.GET.keys()
         '''filter by layer id'''
         if 'layer' not in request_keys or request.GET['layer'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id=request.GET['layer']
-        queryset=queryset.filter(layer=layer_id)
+        # Retrieve label feild from vectorlayer
+        vectorlayer=Vectorlayer.objects.get(layer=layer_id)
+        label_field=vectorlayer.label_field
+    
+        #add the retrieved label feild into queryset
+        if label_field:
+            queryset=FeatureCollection.active.filter(layer=layer_id).annotate(label=KeyTextTransform(label_field, 'attributes'))
+            vector_tile_fields = ('pk','layer','label')
+        else:
+            queryset=FeatureCollection.active.filter(layer=layer_id)
+            self.vector_tile_fields = ('pk','layer') 
 
         if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
             sub_layer_id=request.GET['sub_layer']
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
+       
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''{{baseURL}}api/maps/advance_query/
