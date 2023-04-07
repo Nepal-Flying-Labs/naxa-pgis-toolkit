@@ -24,6 +24,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import URLValidator
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
+from django.db.models.fields.json import KeyTextTransform 
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -1370,11 +1371,11 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
         # Retrieve label feild from vectorlayer
         vectorlayer=Vectorlayer.objects.get(layer=layer_id)
         label_field=vectorlayer.label_field
-    
+        show_label=vectorlayer.show_label
         #add the retrieved label feild into queryset
-        if label_field:
+        if label_field and show_label:
             queryset=FeatureCollection.active.filter(layer=layer_id).annotate(label=KeyTextTransform(label_field, 'attributes'))
-            vector_tile_fields = ('pk','layer','label')
+            self.vector_tile_fields = ('pk','layer','label')
         else:
             queryset=FeatureCollection.active.filter(layer=layer_id)
             self.vector_tile_fields = ('pk','layer') 
