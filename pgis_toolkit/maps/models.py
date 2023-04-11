@@ -461,6 +461,11 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
     destination_lat = models.FloatField(max_length=20, null=True, blank=True)
     route_origin = models.JSONField(default=list, blank=True, null=True)
     route_destination = models.JSONField(default=list, blank=True, null=True)
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
+
 
     class Meta:
         app_label = 'maps'
