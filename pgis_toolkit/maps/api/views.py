@@ -2986,6 +2986,23 @@ def analysis_layer(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+''''''
+@api_view(['GET'])
+def analysis_type_list(request, *args, **kwargs):
+    project_id = request.query_params.get('project_id', None)
+    type = request.query_params.get('type', None)
+    if  project_id is None:
+        return Response(data={"message":"project_id is required parmas"},status=400)
+    if not Project.objects.filter(id=project_id).exists():
+        return Response(data={"message":"project with that name does not exist"},status=400)
+    if type not in ('optimum_route','service_area','buffer'):
+        return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
+    if type == 'optimum_route':
+        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route')
+        return Response(data={"data":optimum_qs.values('name','uploaded_date','id')},status=200)
+    elif type == 'buffer':
+        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer')
+        return Response(data={"data":buffer_qs.values('name','uploaded_date','id')},status=200) 
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]

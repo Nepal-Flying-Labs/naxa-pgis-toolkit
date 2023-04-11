@@ -41,6 +41,7 @@ from pgis_toolkit.maps.api.views import (
     ThemeViewset,
     analysis_layer,
     analysis_layers,
+    analysis_type_list,
     buffer_column,
     buffer_distance,
     bulk_create_image_from_urls,
@@ -207,7 +208,7 @@ urlpatterns = [
     # path('buffer_analysis_data/', BufferAnalysisDataAPIView.as_view(), name='buffer_analysis_data'),
     path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromBufferAnalysis.as_view(), name='layer_from_buffer'),
-
+    path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
     #==================
     #   Advance Query
     #==================
