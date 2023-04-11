@@ -526,6 +526,10 @@ class BufferAnalysis(DateTimeStamp, IsDeleted):
     radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
     dissolve_output = models.BooleanField(default=False)
     total_area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
 
     class Meta:
         app_label = 'maps'
