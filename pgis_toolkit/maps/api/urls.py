@@ -39,7 +39,7 @@ from pgis_toolkit.maps.api.views import (
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
-    analysis_layer,
+    analysis_result_detail,
     analysis_result_list,
     analysis_type_list,
     buffer_column,
@@ -199,7 +199,7 @@ urlpatterns = [
     #==================
     path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
     path('analysis_result_list/', analysis_result_list, name='analysis_layers'),
-    path('analysis_layer/', analysis_layer, name='analysis_layers'),
+    path('analysis_result_detail/', analysis_result_detail, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
     path('optimum_route_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),

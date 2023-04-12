@@ -2964,28 +2964,46 @@ def analysis_result_list(request, *args, **kwargs):
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layer(request, *args, **kwargs):
+def analysis_result_detail(request, *args, **kwargs):
     try:
         project = request.query_params.get('project', None)
-        analysis_id = request.query_params.get('analysis_id', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        analys_qs = Analysis.active.filter(project=project, id=analysis_id)
-        if analys_qs.exists():
-            analysis = analys_qs[0]
-            if analysis.type == 'optimum_route':
-                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+        id = request.query_params.get('id', None)
+        analysis_type = request.query_params.get('analysis_type', None)
+        
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project and analysis_type and id are required'}, status=400)
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'project id  does not exists'}, status=400)
+        analysis_dict={}
+        if analysis_type == 'optimum_route':
+                optimum_route_qs = OptimumRoute.active.filter(id=id)
+               
                 if optimum_route_qs.exists():
-                    optimum_route = optimum_route_qs[0]
-                    analysis_dict=get_analysis_dict(analysis, optimum_route)
-            elif analysis.type == 'buffer':
-                buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
-                buffer_analysis = buffer_analysis_qs[0]
-                analysis_dict = get_buffer_dict(analysis, buffer_analysis)
-            return Response(analysis_dict, status=200)
-        else:
-            return Response(data={'message': 'Analysis object not found'}, status=400)
+                    optimal_route_instance=optimum_route_qs[0]
+                    analysis_id=optimal_route_instance.analysis_id
+                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id)
+                    serializer = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+                   
+                    analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
+                    analysis_dict['routes'] = serializer.data
+                else:
+                    return Response(data={"message":"analysis with this id does not exists"},status=400)
+        elif analysis_type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
+                if buffer_analysis_qs.exists():  
+                    buffer_analysis_instance=buffer_analysis_qs[0]
+                    analysis_id=buffer_analysis_instance.analysis_id 
+                    queryset = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+                    serializer = BufferAreasMapSerializer(queryset, many=True)
+                    analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                    analysis_dict['buffer_areas'] = serializer.data
+                else:
+                    return Response(data={"message":"analysis with id does not exists"},status=400)
+                    
+        return Response(analysis_dict, status=200)
+        
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
