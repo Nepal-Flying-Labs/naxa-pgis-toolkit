@@ -2954,10 +2954,10 @@ def analysis_result_list(request, *args, **kwargs):
             return Response(data={'message': 'analysis_id does not exist'}, status=400)
 
         if analysis_type== 'optimum_route':
-            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).values('id','name','uploaded_date')
+            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('id').values('id','name','uploaded_date')
             return Response(optimum_qs, status=200)
         elif analysis_type == 'buffer':
-            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).values('id','name','uploaded_date')
+            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('id').values('id','name','uploaded_date')
             return Response(buffer_qs, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
@@ -3019,11 +3019,11 @@ def analysis_type_list(request, *args, **kwargs):
     if type not in ('optimum_route','service_area','buffer'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
     if type == 'optimum_route':
-        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route')
-        return Response(data={"data":optimum_qs.values('name','uploaded_date','id')},status=200)
+        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('id').values('name','uploaded_date','id')
+        return Response(data={"data":optimum_qs},status=200)
     elif type == 'buffer':
-        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer')
-        return Response(data={"data":buffer_qs.values('name','uploaded_date','id')},status=200) 
+        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('id').values('name','uploaded_date','id')
+        return Response(data={"data":buffer_qs},status=200) 
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
