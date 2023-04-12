@@ -2941,21 +2941,24 @@ def get_buffer_dict(analysis, buffer_analysis):
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layers(request, *args, **kwargs):
+def analysis_result_list(request, *args, **kwargs):
     try:
         project = request.query_params.get('project', None)
         analysis_type = request.query_params.get('analysis_type', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        ana_type_list=[]
-        analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
-        for analysis in analys_qs:
-            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
-            optimum_route = optimum_route_qs[0]
-            analysis_dict=get_analysis_dict(analysis, optimum_route)
-            ana_type_list.append(analysis_dict)
-        return Response(ana_type_list, status=200)
+        analysis_id=request.query_params.get('analysis_id', None)
+        if not project or not analysis_type or  not analysis_id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'project id  does not exists'}, status=400)
+        if not Analysis.objects.filter(project=project,id=analysis_id).exists():
+            return Response(data={'message': 'analysis_id does not exist'}, status=400)
+
+        if analysis_type== 'optimum_route':
+            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).values('analysis_id','name','uploaded_date')
+            return Response(optimum_qs, status=200)
+        elif analysis_type == 'buffer':
+            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).values('analysis_id','name','uploaded_date')
+            return Response(buffer_qs, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
