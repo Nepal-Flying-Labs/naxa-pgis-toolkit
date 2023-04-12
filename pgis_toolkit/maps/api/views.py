@@ -2954,10 +2954,10 @@ def analysis_result_list(request, *args, **kwargs):
             return Response(data={'message': 'analysis_id does not exist'}, status=400)
 
         if analysis_type== 'optimum_route':
-            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).values('analysis_id','name','uploaded_date')
+            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).values('id','name','uploaded_date')
             return Response(optimum_qs, status=200)
         elif analysis_type == 'buffer':
-            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).values('analysis_id','name','uploaded_date')
+            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).values('id','name','uploaded_date')
             return Response(buffer_qs, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
