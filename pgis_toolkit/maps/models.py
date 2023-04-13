@@ -473,6 +473,7 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    optimum_id=models.IntegerField(db_index=True,blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
