@@ -232,7 +232,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 total_length = round(final_df['length'].sum(),2)
                 # total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
                 total_time_secs = round(total_length/average_velocity,2)
-                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id}
+                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id,'optimum_id':optimum_route_id}
                 serializer = NetworkRoutesSerializer(data=result_dict)
                 if serializer.is_valid():
                     network_routes_objs.append(NetworkRoutes(**result_dict))

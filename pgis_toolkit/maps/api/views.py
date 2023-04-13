@@ -2532,6 +2532,7 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
+            title=request_dict['title']
             type=request_dict['type']
             mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
@@ -2539,9 +2540,9 @@ class OptimumRouteAnalysisAPIView(APIView):
             '''create analysis_instance'''
             if Analysis.active.filter(name=name, type=type, project=project).exists():
                 return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
+            analysis_inst = Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=title)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2971,25 +2972,26 @@ def analysis_result_detail(request, *args, **kwargs):
         analysis_type = request.query_params.get('analysis_type', None)
         
         if not project or not analysis_type or  not id:
-            return Response(data={'message': 'project and analysis_type and id are required'}, status=400)
+            return Response(data={'message': 'project, analysis_type and id  params are required'}, status=400)
         if not project or not analysis_type or  not id:
             return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
         if not Project.objects.filter(id=project).exists():
-            return Response(data={'message': 'project id  does not exists'}, status=400)
+            return Response(data={'message': 'Project does not exists'}, status=400)
         analysis_dict={}
         if analysis_type == 'optimum_route':
                 optimum_route_qs = OptimumRoute.active.filter(id=id)
                
                 if optimum_route_qs.exists():
                     optimal_route_instance=optimum_route_qs[0]
+                    optimal_id=optimal_route_instance.id
                     analysis_id=optimal_route_instance.analysis_id
-                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id)
+                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id,optimum_id=optimal_id)
                     serializer = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
-                   
+
                     analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
                     analysis_dict['routes'] = serializer.data
                 else:
-                    return Response(data={"message":"analysis with this id does not exists"},status=400)
+                    return Response(data={"message":"Analysis does not exists"},status=400)
         elif analysis_type == 'buffer':
                 buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
                 if buffer_analysis_qs.exists():  
@@ -3000,7 +3002,7 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['buffer_areas'] = serializer.data
                 else:
-                    return Response(data={"message":"analysis with id does not exists"},status=400)
+                    return Response(data={"message":"Analysis does not exists"},status=400)
                     
         return Response(analysis_dict, status=200)
         
