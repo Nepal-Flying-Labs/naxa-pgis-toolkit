@@ -2608,11 +2608,12 @@ class BufferAnalysisAPIView(APIView):
         try:
             analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois']
+            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois','title']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, pois are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, project, name, type, pois,title are required!'}, status=400)
             name = request_dict['name']
+            title=request_dict['title']
             type = request_dict['type']
             project = int(request_dict['project'])
             origins = json.loads(request_dict['origins'])
@@ -2621,12 +2622,12 @@ class BufferAnalysisAPIView(APIView):
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='Polygon', project=project)
+            # '''create analysis_instance'''
+            # if Analysis.active.filter(name=name, type=type, project=project).exists():
+            #     return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
+            analysis_inst,_ = Analysis.active.get_or_create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output)
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=title, geom_type='Polygon')
             buffer_id = buffer_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":

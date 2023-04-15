@@ -132,7 +132,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         data = data.to_crs("epsg:4326")
         buffer_objs = []
         for i, row in data.iterrows():
-            result_dict = {'geometry': row.geometry.wkt, 'area': area, 'bbox': list(row.geometry.bounds), 'analysis_id': analysis_id}
+            result_dict = {'geometry': row.geometry.wkt, 'area': area, 'bbox': list(row.geometry.bounds), 'analysis_id': analysis_id,'buffer_analysis_id':buffer_id}
             buffer_objs.append(BufferAreas(**result_dict))
         buffer_areas_list = BufferAreas.active.bulk_create(buffer_objs)
         iterate = True
