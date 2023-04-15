@@ -2997,7 +2997,8 @@ def analysis_result_detail(request, *args, **kwargs):
                 if buffer_analysis_qs.exists():  
                     buffer_analysis_instance=buffer_analysis_qs[0]
                     analysis_id=buffer_analysis_instance.analysis_id 
-                    queryset = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+                    buffer_analysis_id=buffer_analysis_instance.id
+                    queryset = BufferAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('id')
                     serializer = BufferAreasMapSerializer(queryset, many=True)
                     analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['buffer_areas'] = serializer.data
