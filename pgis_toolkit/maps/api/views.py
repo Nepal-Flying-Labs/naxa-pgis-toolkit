@@ -2517,10 +2517,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','title']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type, title are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2537,10 +2537,10 @@ class OptimumRouteAnalysisAPIView(APIView):
             mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             project = int(request_dict['project'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, project=project)
+            # '''create analysis_instance'''
+            # if Analysis.active.filter(name=name, type=type, project=project).exists():
+            #     return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
+            analysis_inst,_ = Analysis.active.get_or_create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
             optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=title)
             optimum_route_id = optimum_route_inst.id
@@ -3415,7 +3415,11 @@ def copy_features(request, *args, **kwargs):
         reset_data = request.data.get('reset_data', False)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
+       
         if not FeatureCollection.active.filter(layer=layer).exists():
+            print("layerrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-->>>",layer
+            )
+            print("no layer----------------------------------------------------->>>>>>>>",FeatureCollection.active.filter(layer=layer).exists())
             return Response(data={'message': 'No any features found for the layer'}, status=400)
         if reset_data == True or reset_data == 'True':
             sql = f'''--update existing mirror features
