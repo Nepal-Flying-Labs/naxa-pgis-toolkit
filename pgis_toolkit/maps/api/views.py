@@ -2951,7 +2951,7 @@ def analysis_result_list(request, *args, **kwargs):
         if not project or not analysis_type or  not analysis_id:
             return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
         if not Project.objects.filter(id=project).exists():
-            return Response(data={'message': 'project id  does not exists'}, status=400)
+            return Response(data={'message': 'project id  does not exists'}, status=404)
         if not Analysis.objects.filter(project=project,id=analysis_id).exists():
             return Response(data={'message': 'analysis_id does not exist'}, status=400)
 
@@ -3019,7 +3019,7 @@ def analysis_type_list(request, *args, **kwargs):
     if  project_id is None:
         return Response(data={"message":"project_id is required parmas"},status=400)
     if not Project.objects.filter(id=project_id).exists():
-        return Response(data={"message":"project with that name does not exist"},status=400)
+        return Response(data={"message":"project with that name does not exist"},status=404)
     if type not in ('optimum_route','service_area','buffer'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
     if type == 'optimum_route':
@@ -3415,11 +3415,7 @@ def copy_features(request, *args, **kwargs):
         reset_data = request.data.get('reset_data', False)
         if not layer:
             return Response(data={'message': 'layer params is missing'}, status=400)
-       
         if not FeatureCollection.active.filter(layer=layer).exists():
-            print("layerrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-->>>",layer
-            )
-            print("no layer----------------------------------------------------->>>>>>>>",FeatureCollection.active.filter(layer=layer).exists())
             return Response(data={'message': 'No any features found for the layer'}, status=400)
         if reset_data == True or reset_data == 'True':
             sql = f'''--update existing mirror features
