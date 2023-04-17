@@ -3019,7 +3019,7 @@ def analysis_type_list(request, *args, **kwargs):
     if  project_id is None:
         return Response(data={"message":"project_id is required parmas"},status=400)
     if not Project.objects.filter(id=project_id).exists():
-        return Response(data={"message":"project with that name does not exist"},status=404)
+        return Response(data={"message":"Project does not exist"},status=404)
     if type not in ('optimum_route','service_area','buffer'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
     if type == 'optimum_route':
