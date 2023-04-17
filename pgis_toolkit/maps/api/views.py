@@ -2956,10 +2956,10 @@ def analysis_result_list(request, *args, **kwargs):
             return Response(data={'message': 'analysis_id does not exist'}, status=400)
 
         if analysis_type== 'optimum_route':
-            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('id').values('id','name','uploaded_date')
+            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
             return Response(optimum_qs, status=200)
         elif analysis_type == 'buffer':
-            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('id').values('id','name','uploaded_date')
+            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
             return Response(buffer_qs, status=200)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
@@ -2986,7 +2986,7 @@ def analysis_result_detail(request, *args, **kwargs):
                     optimal_route_instance=optimum_route_qs[0]
                     optimal_id=optimal_route_instance.id
                     analysis_id=optimal_route_instance.analysis_id
-                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id,optimum_id=optimal_id)
+                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id,optimum_id=optimal_id).order_by('-id')
                     serializer = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
 
                     analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
@@ -2999,7 +2999,7 @@ def analysis_result_detail(request, *args, **kwargs):
                     buffer_analysis_instance=buffer_analysis_qs[0]
                     analysis_id=buffer_analysis_instance.analysis_id 
                     buffer_analysis_id=buffer_analysis_instance.id
-                    queryset = BufferAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('id')
+                    queryset = BufferAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('-id')
                     serializer = BufferAreasMapSerializer(queryset, many=True)
                     analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['buffer_areas'] = serializer.data
@@ -3023,10 +3023,10 @@ def analysis_type_list(request, *args, **kwargs):
     if type not in ('optimum_route','service_area','buffer'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
     if type == 'optimum_route':
-        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('id').values('name','uploaded_date','id')
+        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
         return Response(data={"data":optimum_qs},status=200)
     elif type == 'buffer':
-        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('id').values('name','uploaded_date','id')
+        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
         return Response(data={"data":buffer_qs},status=200) 
 
 class ProjectMapConfigAPIView(APIView):
