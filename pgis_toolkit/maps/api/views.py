@@ -2537,15 +2537,14 @@ class OptimumRouteAnalysisAPIView(APIView):
             mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             project = int(request_dict['project'])            
-            analysis_id = request.query_params.get('analysis', None)                             
-            
-            if analysis_id is not None:
+            analysis_id = request.POST.get('analysis_id', None)                             
+            if analysis_id :
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
-            else:    
-                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
+            else:  
+                    analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
             optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
             optimum_route_id = optimum_route_inst.id
@@ -2627,7 +2626,7 @@ class BufferAnalysisAPIView(APIView):
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
-            analysis_id = request.query_params.get('analysis', None)
+            analysis_id = request.POST.get('analysis_id', None)   
             if analysis_id :
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
