@@ -2653,7 +2653,7 @@ class BufferAnalysisAPIView(APIView):
         try:
             layer_id = request.query_params.get('layer', None)
             field = request.query_params.get('field', None)
-            analysis_id = request.query_params.get('analysis', None)
+            buffer_analysis_id= request.query_params.get('buffer_analysis_id', None)
             view = request.query_params.get('view', None)
             if layer_id and not view:
                 layer = Layer.active.get(id=layer_id)
@@ -2662,9 +2662,9 @@ class BufferAnalysisAPIView(APIView):
                     return Response (data=attribute_qs, status=200)
                 else:
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
-            if not analysis_id:
-                return Response(data={'message': 'params analysis is missing.'}, status=400)
-            buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+            if not buffer_analysis_id:
+                return Response(data={'message': 'params buffer_analysis_id is missing.'}, status=400)
+            buff_qs = BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id).order_by('id')
             pois_qs = buff_qs.values('pois')
             feature_ids = []
             if view=='list':
@@ -2962,7 +2962,7 @@ def analysis_result_list(request, *args, **kwargs):
             return Response(data={'message': 'Project   does not exists'}, status=404)
         if not Analysis.objects.filter(project=project,id=analysis_id).exists():
             return Response(data={'message': 'Analysis does not exist'}, status=404)
-        
+
         if analysis_type== 'optimum_route':
             if OptimumRoute.objects.filter(analysis_id=analysis_id).exists():           
                 optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
