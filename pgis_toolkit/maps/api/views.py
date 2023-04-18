@@ -2959,16 +2959,22 @@ def analysis_result_list(request, *args, **kwargs):
         if not project or not analysis_type or  not analysis_id:
             return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
         if not Project.objects.filter(id=project).exists():
-            return Response(data={'message': 'project id  does not exists'}, status=404)
+            return Response(data={'message': 'Project   does not exists'}, status=404)
         if not Analysis.objects.filter(project=project,id=analysis_id).exists():
-            return Response(data={'message': 'analysis_id does not exist'}, status=400)
+            return Response(data={'message': 'Analysis does not exist'}, status=404)
 
         if analysis_type== 'optimum_route':
-            optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
-            return Response(optimum_qs, status=200)
+            if OptimumRoute.objects.filter(analysis_id=analysis_id).exists():           
+                optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                return Response(optimum_qs, status=200)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
         elif analysis_type == 'buffer':
-            buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
-            return Response(buffer_qs, status=200)
+            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+                buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                return Response(buffer_qs, status=200)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
