@@ -2517,10 +2517,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','title']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','result_name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type, title are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type,result_name are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2532,19 +2532,19 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
-            result_name=request_dict['title']
+            result_name=request_dict['result_name']
             type=request_dict['type']
             mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             project = int(request_dict['project'])            
-            analysis_id = request.POST.get('analysis_id', None)                             
+            analysis_id = request_dict.get('analysis_id',None)   
             if analysis_id :
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
             else:  
-                    analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
+                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
             optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
             optimum_route_id = optimum_route_inst.id
@@ -2626,7 +2626,7 @@ class BufferAnalysisAPIView(APIView):
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
-            analysis_id = request.POST.get('analysis_id', None)   
+            analysis_id = request_dict.get('analysis_id',None)  
             if analysis_id :
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
@@ -2962,7 +2962,7 @@ def analysis_result_list(request, *args, **kwargs):
             return Response(data={'message': 'Project   does not exists'}, status=404)
         if not Analysis.objects.filter(project=project,id=analysis_id).exists():
             return Response(data={'message': 'Analysis does not exist'}, status=404)
-
+        
         if analysis_type== 'optimum_route':
             if OptimumRoute.objects.filter(analysis_id=analysis_id).exists():           
                 optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
