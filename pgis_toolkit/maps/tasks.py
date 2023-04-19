@@ -157,7 +157,9 @@ def UpdateVectorLayer(layer_instance, request_data):
                 errors.append(
                     {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
             return errors, update_dict
-
+        '''append show_label and label_field'''
+        update_dict['show_label'] = vector_layer_instance.show_label
+        update_dict['label_field'] = vector_layer_instance.label_field
         '''Save vector layer style'''
         project_style=None if request_data['project_style']=="default" else request_data['project_style']
         style_qs=LayerStyle.objects.filter(layer=layer_instance.id,project_style=project_style)
