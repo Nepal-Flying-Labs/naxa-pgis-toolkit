@@ -2858,7 +2858,6 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         route_id=request.GET['route']
         queryset=NetworkRoutes.active.filter(id=route_id)
-        print(queryset,'=================================------------->')
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
