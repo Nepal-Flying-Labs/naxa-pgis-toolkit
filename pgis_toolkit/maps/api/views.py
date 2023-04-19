@@ -2838,7 +2838,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = 'route'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','optimum_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -2858,6 +2858,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         route_id=request.GET['route']
         queryset=NetworkRoutes.active.filter(id=route_id)
+        print(queryset,'=================================------------->')
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
@@ -3897,7 +3898,7 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
     '''
     vector_tile_layer_name = 'buffer_area'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
