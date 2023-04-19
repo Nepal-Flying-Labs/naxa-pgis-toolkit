@@ -3854,11 +3854,11 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
     def get_queryset(self, pk=None, *args, **kwargs):
         try:
             id = self.request.resolver_match.kwargs.get('pk')
-            analysis_id = self.request.query_params.get('analysis', None)
+            optimum_id = self.request.query_params.get('optimum_id', None)
             if id:
                 queryset=self.queryset.filter(id=id)
-            elif analysis_id:
-                queryset=self.queryset.filter(analysis_id=analysis_id)
+            elif optimum_id:
+                queryset=self.queryset.filter(optimum_id=optimum_id)
             return queryset
         except Exception as e:
             return str(e)
