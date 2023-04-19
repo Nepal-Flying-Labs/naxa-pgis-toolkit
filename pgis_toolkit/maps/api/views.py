@@ -24,7 +24,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import URLValidator
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
-from django.db.models.fields.json import KeyTextTransform 
+from django.db.models.fields.json import KeyTextTransform
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -677,9 +677,13 @@ def project_theme_layers(request):
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
                         layer_item['geom_type'] = vector_layer[0].geom_type
+                        layer_item['show_label'] = vector_layer[0].show_label
+                        layer_item['label_field'] = vector_layer[0].label_field
                     else:
                         layer_item['bbox'] = []
                         layer_item['geom'] = ''
+                        layer_item['show_label'] = ''
+                        layer_item['label_field'] = ''
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 elif layer['layer_type']=='Raster':
                     raster_layer = RasterLayer.objects.filter(layer=layer['id'])
@@ -730,9 +734,13 @@ def project_theme_layers(request):
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
                     layer_item['geom_type'] = vector_layer[0].geom_type
+                    layer_item['show_label'] = vector_layer[0].show_label
+                    layer_item['label_field'] = vector_layer[0].label_field
                 else:
                     layer_item['bbox'] = []
                     layer_item['geom_type'] = ''
+                    layer_item['show_label'] = ''
+                    layer_item['label_field'] = ''
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
             elif layer['layer_type']=='Raster':
@@ -1362,7 +1370,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             user_id = auth_token.user_id
         if not User.active.filter(id=user_id).exists():
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
-        
+
         request_keys = request.GET.keys()
         '''filter by layer id'''
         if 'layer' not in request_keys or request.GET['layer'] == "":
@@ -1378,13 +1386,13 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             self.vector_tile_fields = ('pk','layer','label')
         else:
             queryset=FeatureCollection.active.filter(layer=layer_id)
-            self.vector_tile_fields = ('pk','layer') 
+            self.vector_tile_fields = ('pk','layer')
 
         if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
             sub_layer_id=request.GET['sub_layer']
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
-       
+
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''{{baseURL}}api/maps/advance_query/
