@@ -1778,6 +1778,71 @@ def layer_download(request):
         if os.path.exists(root_dir): shutil.rmtree(root_dir)
         return Response(status=400, data={'message': str(e)})
 
+@api_view(['GET'])
+def download_analyis_optimumroute(request):
+    id = request.query_params.get('id', None)
+    if not id :
+        return Response(data={"message":"id is required params"},status=200)
+        #  get the optimumRoute instance
+    if OptimumRoute.objects.filter(id=id).exists():           
+        optimum_qs=OptimumRoute.objects.filter(id=id)[0]
+        optimum_id=optimum_qs.id    
+    else:
+        return Response(data={'message':"Analysis does not exists"},status=404)
+    #get all the NetworkRoute instance assocciated with that OptimumRoute instance              
+
+    combined_obstacles={}
+    network_qs=NetworkRoutes.objects.filter(optimum_id=optimum_id)
+    for network in network_qs:
+        for key,value in network.obstacles.items():
+            if key not in combined_obstacles:
+                combined_obstacles[key]=value
+            else:
+                if value not in combined_obstacles[key] :
+                    combined_obstacles[key] += value
+
+    dir = f'{MEDIA_ROOT}/analysis_download/{optimum_qs.name}/'
+    root_dir = f'{MEDIA_ROOT}/analysis_download/'
+    db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+    con = create_engine(db_connection_url)
+    #for obstacles
+    sql_temp= "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE id={}" 
+    gdf_all = geopandas.GeoDataFrame()
+    for layer_id, feature_ids in combined_obstacles.items():
+        for feature_id in feature_ids:
+            sql_query = sql_temp.format(feature_id)
+            gdf = geopandas.read_postgis(sql_query, con)
+            number_df = pandas.DataFrame(gdf['id'])
+            attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+            '''remove the attributes dictionary now'''
+            gdf = gdf.drop(columns=['attributes'])
+            attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+            gdf=gdf.merge(attribute_number_df, on='id')
+            gdf.set_crs(4326, allow_override=True)
+            gdf_all = pd.concat([gdf_all,gdf],ignore_index=True)
+    os.makedirs(dir, exist_ok=True)        
+    gdf_all.to_file(dir+optimum_qs.name+".shp")   
+    #now for the routes
+    gdf_all = geopandas.GeoDataFrame()
+    sql_temp= "SELECT id, geometry AS geom,route_no,length,travel_time,is_optimum FROM maps_networkroutes WHERE id={}" 
+    for network in network_qs:
+        sql_query = sql_temp.format(network.id)
+        gdf = geopandas.read_postgis(sql_query, con)
+        gdf.set_crs(4326, allow_override=True)
+        gdf.to_file(dir+str(network.route_no)+".shp") 
+    zipfile_name = root_dir + f'{optimum_qs.name}'
+    base_dir = f'{optimum_qs.name}/' #relative dir of files to zip from the root dir
+    shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+    # zip file path
+    file_url = root_dir + f'{optimum_qs.name}.zip'
+    vector_file = open(file_url, 'rb')
+    response = HttpResponse(vector_file, content_type='application/force-download')
+    response['Content-Disposition'] = 'attachment; filename="%s"' % f'{optimum_qs.name}.zip'
+    return response
+
+  
+
+
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
     Viewset for FeatureCollection innstance
