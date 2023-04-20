@@ -1796,11 +1796,12 @@ def download_analyis_optimumroute(request):
     for network in network_qs:
         for key,value in network.obstacles.items():
             if key not in combined_obstacles:
-                combined_obstacles[key]=value
+                combined_obstacles[key] = value
             else:
-                if value not in combined_obstacles[key] :
-                    combined_obstacles[key] += value
-
+                for item in value:
+                    if item not in combined_obstacles[key]:
+                        combined_obstacles[key].append(item)
+    
     dir = f'{MEDIA_ROOT}/analysis_download/{optimum_qs.name}/'
     root_dir = f'{MEDIA_ROOT}/analysis_download/'
     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
@@ -1838,6 +1839,7 @@ def download_analyis_optimumroute(request):
     vector_file = open(file_url, 'rb')
     response = HttpResponse(vector_file, content_type='application/force-download')
     response['Content-Disposition'] = 'attachment; filename="%s"' % f'{optimum_qs.name}.zip'
+    if os.path.exists(root_dir): shutil.rmtree(root_dir)
     return response
 
 @api_view(['GET'])
@@ -1855,12 +1857,13 @@ def download_analysis_buffer(request):
     bufferarea_qs=BufferAreas.objects.filter(buffer_analysis_id=buffer_id)
     combined_pois={}
     for area in bufferarea_qs:
-        for key,value in area.pois.items():
+        for key, value in area.pois.items():
             if key not in combined_pois:
-                combined_pois[key]=value
+                combined_pois[key] = value
             else:
-                if value not in combined_pois[key] :
-                    combined_pois[key] += value
+                for item in value:
+                    if item not in combined_pois[key]:
+                        combined_pois[key].append(item)
     dir = f'{MEDIA_ROOT}/analysis_download/{buffer_qs.name}/'
     root_dir = f'{MEDIA_ROOT}/analysis_download/'
     db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
@@ -1888,7 +1891,7 @@ def download_analysis_buffer(request):
         sql_query = sql_temp.format(area.id)
         gdf = geopandas.read_postgis(sql_query, con)
         gdf.set_crs(4326, allow_override=True)
-        gdf.to_file(dir+str(area.id)+".shp") 
+        gdf.to_file(dir+str(area.id)+"Buffer"+".shp") 
     zipfile_name = root_dir + f'{buffer_qs.name}'
     base_dir = f'{buffer_qs.name}/' #relative dir of files to zip from the root dir
     shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
@@ -1897,6 +1900,7 @@ def download_analysis_buffer(request):
     vector_file = open(file_url, 'rb')
     response = HttpResponse(vector_file, content_type='application/force-download')
     response['Content-Disposition'] = 'attachment; filename="%s"' % f'{buffer_qs.name}.zip'
+    if os.path.exists(root_dir): shutil.rmtree(root_dir)
     return response
 
 
