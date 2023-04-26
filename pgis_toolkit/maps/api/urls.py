@@ -41,8 +41,6 @@ from pgis_toolkit.maps.api.views import (
     ThemeViewset,
     analysis_layer,
     analysis_layers,
-    buffer_column,
-    buffer_distance,
     bulk_create_image_from_urls,
     bulk_del_null_geom,
     bulk_template_download,
@@ -58,7 +56,6 @@ from pgis_toolkit.maps.api.views import (
     check_self_intersecting_geometry,
     cleaning_error_features,
     copy_features,
-    data_buffer,
     delete_sequence,
     feature_popup,
     fix_duplicate_geometry,
@@ -151,11 +148,11 @@ data_clean_urls = [
     path('sync_features/', sync_features, name='sync_features'),
 ]
 
-data_analysis_urls = [
-    path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
-    path('buffer_by_column/', buffer_column, name="buffer_by_column"),
-    path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
-]
+# data_analysis_urls = [
+#     path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
+#     path('buffer_by_column/', buffer_column, name="buffer_by_column"),
+#     path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
+# ]
 
 def trigger_error(request):
     division_by_zero = 1 / 0
@@ -228,4 +225,4 @@ urlpatterns = [
     path('category/', category, name='category'),
     path('delete_sequence/', delete_sequence, name='delete_sequence'),
     path('cancel_layer_upload/', cancel_layer_upload, name='cancel_layer_upload')
-] + data_clean_urls + data_analysis_urls
+] + data_clean_urls

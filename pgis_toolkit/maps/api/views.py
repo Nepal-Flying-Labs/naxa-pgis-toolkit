@@ -3276,74 +3276,74 @@ def fix_isolated_geometry(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def buffer_distance(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    distance = request.query_params.get('distance', None)
-    dissolve = request.query_params.get('dissolve', None)
-    if dissolve:
-        if dissolve == 'true':
-            dissolve = True
-        else:
-            dissolve = False
-    else:
-        dissolve = False
-    if not layer:
-        return Response(data={'message': 'layer params is missing!'}, status=400)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        data = buffer_by_distance(layer_qs, float(distance), dissolve)
-        return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def buffer_distance(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     distance = request.query_params.get('distance', None)
+#     dissolve = request.query_params.get('dissolve', None)
+#     if dissolve:
+#         if dissolve == 'true':
+#             dissolve = True
+#         else:
+#             dissolve = False
+#     else:
+#         dissolve = False
+#     if not layer:
+#         return Response(data={'message': 'layer params is missing!'}, status=400)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         data = buffer_by_distance(layer_qs, float(distance), dissolve)
+#         return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def buffer_column(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    column = request.query_params.get('column', None)
-    ratio = request.query_params.get('ratio', None)
-    dissolve = request.query_params.get('dissolve', None)
-    if dissolve:
-        if dissolve == 'true':
-            dissolve = True
-        else:
-            dissolve = False
-    else:
-        dissolve = False
-    if not layer or not column or not ratio or not dissolve:
-        return Response(data={'message': 'Params are missing!'}, status=400)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        data = buffer_by_column_value(layer_qs, column, float(ratio), dissolve)
-        return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def buffer_column(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     column = request.query_params.get('column', None)
+#     ratio = request.query_params.get('ratio', None)
+#     dissolve = request.query_params.get('dissolve', None)
+#     if dissolve:
+#         if dissolve == 'true':
+#             dissolve = True
+#         else:
+#             dissolve = False
+#     else:
+#         dissolve = False
+#     if not layer or not column or not ratio or not dissolve:
+#         return Response(data={'message': 'Params are missing!'}, status=400)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         data = buffer_by_column_value(layer_qs, column, float(ratio), dissolve)
+#         return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def data_buffer(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    layers = request.query_params.get('layers', None)
-    distance = request.query_params.get('distance', None)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        layers_qs = []
-        for layer in json.loads(layers):
-            gdf = geopandas.read_postgis("SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + str(layer), con, geom_col="geometry")
-            gdf = gdf.join(pd.DataFrame(gdf.pop('attributes').values.tolist()))
-            layers_qs.append(gdf)
-        data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
-        return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def data_buffer(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     layers = request.query_params.get('layers', None)
+#     distance = request.query_params.get('distance', None)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         layers_qs = []
+#         for layer in json.loads(layers):
+#             gdf = geopandas.read_postgis("SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + str(layer), con, geom_col="geometry")
+#             gdf = gdf.join(pd.DataFrame(gdf.pop('attributes').values.tolist()))
+#             layers_qs.append(gdf)
+#         data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
+#         return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
 '''cleaning error map toogle bar api'''
 @api_view(['GET'])
