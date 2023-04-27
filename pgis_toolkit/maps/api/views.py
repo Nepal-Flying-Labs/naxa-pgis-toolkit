@@ -47,7 +47,6 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
-    BufferAnalysis,
     BufferAreas,
     Category,
     CeleryTask,
@@ -68,6 +67,7 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplateAttribute,
     ProjectsLayerTemplateDropdownChoice,
     ProjectStyle,
+    ProximityAnalysis,
     QueryFeatureCollection,
     QueryLayer,
     RasterLayer,
@@ -2647,7 +2647,7 @@ class BufferAnalysisAPIView(APIView):
             else:
                 analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
+            buffer_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
             buffer_id = buffer_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2988,11 +2988,11 @@ def analysis_result_list(request, *args, **kwargs):
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
         elif analysis_type == 'buffer':
-            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+            if ProximityAnalysis.objects.filter(analysis_id=analysis_id).exists():
                 if search_key:
-                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                    buffer_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
                 else:
-                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                    buffer_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
                 paginated_qs = paginator.paginate_queryset(buffer_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:

@@ -10,7 +10,7 @@ from shapely.geometry import Point
 from sqlalchemy import create_engine
 
 from config.settings.base import env
-from pgis_toolkit.maps.models import Analysis, BufferAnalysis, BufferAreas
+from pgis_toolkit.maps.models import Analysis, BufferAreas, ProximityAnalysis
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -196,15 +196,15 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         analysis_inst = Analysis.active.get(id=analysis_id)
         analysis_inst.bbox = list(data.total_bounds)
         analysis_inst.save()
-        buffer_inst = BufferAnalysis.active.get(id=buffer_id)
+        buffer_inst = ProximityAnalysis.active.get(id=buffer_id)
         buffer_inst.total_area = area * len(origins)
         buffer_inst.save()
         return analysis_id, "success", "", 200
     except Exception as e:
         if Analysis.objects.filter(id=analysis_id).exists():
             Analysis.objects.get(id=analysis_id).delete()
-        if BufferAnalysis.objects.filter(id=buffer_id).exists():
-            BufferAnalysis.objects.get(id=buffer_id).delete()
+        if ProximityAnalysis.objects.filter(id=buffer_id).exists():
+            ProximityAnalysis.objects.get(id=buffer_id).delete()
         return None, "error", str(e), 400
 
 def buffer_analysis_data(analysis_id, layer_ids):

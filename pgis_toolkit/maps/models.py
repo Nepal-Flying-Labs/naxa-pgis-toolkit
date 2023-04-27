@@ -521,7 +521,7 @@ class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
     class Meta:
         app_label = 'maps'
 
-class BufferAnalysis(DateTimeStamp, IsDeleted):
+class ProximityAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     origins = models.JSONField(default=list, blank=True, null=True)
     radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
