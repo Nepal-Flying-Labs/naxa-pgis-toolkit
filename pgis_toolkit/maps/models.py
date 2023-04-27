@@ -535,7 +535,7 @@ class ProximityAnalysis(DateTimeStamp, IsDeleted):
     class Meta:
         app_label = 'maps'
 
-class BufferAreas(DateTimeStamp, IsDeleted):
+class ProximityAreas(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     buffer_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
     origin = models.JSONField(default=list, blank=True, null=True)

@@ -47,7 +47,6 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
-    BufferAreas,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -68,6 +67,7 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplateDropdownChoice,
     ProjectStyle,
     ProximityAnalysis,
+    ProximityAreas,
     QueryFeatureCollection,
     QueryLayer,
     RasterLayer,
@@ -142,8 +142,6 @@ from pgis_toolkit.utils.vectortile import (
 
 from .serializers import (
     AnalysisSerializer,
-    BufferAreasMapSerializer,
-    BufferAreasSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
@@ -169,6 +167,8 @@ from .serializers import (
     ProjectsLayerTemplateDropdownChoiceSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    ProximityAreasMapSerializer,
+    ProximityAreasSerializer,
     QueryFeatureCollectionListSerializer,
     QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
@@ -2676,7 +2676,7 @@ class BufferAnalysisAPIView(APIView):
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
             if not buffer_analysis_id:
                 return Response(data={'message': 'params buffer_analysis_id is missing.'}, status=400)
-            buff_qs = BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id).order_by('id')
+            buff_qs = ProximityAreas.active.filter(buffer_analysis_id=buffer_analysis_id).order_by('id')
             pois_qs = buff_qs.values('pois')
             feature_ids = []
             if view=='list':
@@ -2763,18 +2763,18 @@ class BufferAnalysisAPIView(APIView):
             return Response(data={'message': str(e)}, status=400)
 
 '''Buffer Areas Table'''
-class BufferAreasCollection(viewsets.ModelViewSet):
+class ProximityAreasCollection(viewsets.ModelViewSet):
     '''
-    Viewset for BufferAreas objects
+    Viewset for ProximityAreas objects
     '''
-    queryset = BufferAreas.active.all()
+    queryset = ProximityAreas.active.all()
     http_method_names = ['get']
-    serializer_class = BufferAreasSerializer
+    serializer_class = ProximityAreasSerializer
 
-    # default_serializer_class = BufferAreasSerializer
+    # default_serializer_class = ProximityAreasSerializer
     # serializer_classes = {
-    #     'list': BufferAreasSerializer,
-    #     'retrieve': BufferAreasSerializer,
+    #     'list': ProximityAreasSerializer,
+    #     'retrieve': ProximityAreasSerializer,
     # }
 
     def get_queryset(self, pk=None, *args, **kwargs):
@@ -2956,8 +2956,8 @@ def get_buffer_dict(analysis, buffer_analysis):
     analysis_dict['bbox'] = analysis.bbox
     # analysis_dict['origins'] = buffer_analysis.origins
     analysis_dict['total_area'] = buffer_analysis.total_area
-    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
-    serializer = BufferAreasMapSerializer(queryset, many=True)
+    queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
+    serializer = ProximityAreasMapSerializer(queryset, many=True)
     analysis_dict['buffer_areas'] = serializer.data
     return analysis_dict
 
@@ -3035,8 +3035,8 @@ def analysis_result_detail(request, *args, **kwargs):
                     buffer_analysis_instance=buffer_analysis_qs[0]
                     analysis_id=buffer_analysis_instance.analysis_id
                     buffer_analysis_id=buffer_analysis_instance.id
-                    queryset = BufferAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('-id')
-                    serializer = BufferAreasMapSerializer(queryset, many=True)
+                    queryset = ProximityAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('-id')
+                    serializer = ProximityAreasMapSerializer(queryset, many=True)
                     analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['buffer_areas'] = serializer.data
                 else:
@@ -3951,7 +3951,7 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
         if 'area' not in request_keys or request.GET['area'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         area=request.GET['area']
-        queryset=BufferAreas.active.filter(id=area)
+        queryset=ProximityAreas.active.filter(id=area)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
@@ -3975,7 +3975,7 @@ class LayerFromBufferAnalysis(APIView):
                 theme = Theme.objects.get(id=theme)
                 if Layer.active.filter(theme=theme, name=name).exists():
                     return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
-                buffer_areas = BufferAreas.active.filter(analysis_id=analysis)
+                buffer_areas = ProximityAreas.active.filter(analysis_id=analysis)
                 if buffer_areas:
                     try:
                         layer_instance = Layer.active.create(theme=theme, name=name, layer_type='Vector',display_on_map=True)

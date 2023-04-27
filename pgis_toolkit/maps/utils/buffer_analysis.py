@@ -10,7 +10,7 @@ from shapely.geometry import Point
 from sqlalchemy import create_engine
 
 from config.settings.base import env
-from pgis_toolkit.maps.models import Analysis, BufferAreas, ProximityAnalysis
+from pgis_toolkit.maps.models import Analysis, ProximityAnalysis, ProximityAreas
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -133,11 +133,11 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
         buffer_objs = []
         for i, row in data.iterrows():
             result_dict = {'geometry': row.geometry.wkt, 'area': area, 'bbox': list(row.geometry.bounds), 'analysis_id': analysis_id,'buffer_analysis_id':buffer_id}
-            buffer_objs.append(BufferAreas(**result_dict))
-        buffer_areas_list = BufferAreas.active.bulk_create(buffer_objs)
+            buffer_objs.append(ProximityAreas(**result_dict))
+        buffer_areas_list = ProximityAreas.active.bulk_create(buffer_objs)
         iterate = True
         while iterate:
-            if BufferAreas.active.filter(analysis_id=analysis_id).exists():
+            if ProximityAreas.active.filter(analysis_id=analysis_id).exists():
                 iterate=False
         # if pois:
         try:
@@ -150,7 +150,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                 for poi in pois:
                     pois_sql = f'''
                     SELECT mirror.id
-                    FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                    FROM (SELECT id, geometry FROM maps_proximityAreas WHERE id={buff_area_id}) buffer
                     JOIN (SELECT id, geometry FROM maps_featurecollectionmirror WHERE layer_id={poi} and is_deleted=false) mirror
                     ON ST_Contains(buffer.geometry, mirror.geometry);
                     '''
@@ -171,7 +171,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
                 # origin_sql = f'''
                 # WITH  origin_table (id, point) AS (VALUES {origin_tuple})
                 # SELECT origins.id
-                # FROM (SELECT id, geometry FROM maps_bufferareas WHERE id={buff_area_id}) buffer
+                # FROM (SELECT id, geometry FROM maps_proximityAreas WHERE id={buff_area_id}) buffer
                 # JOIN (SELECT id, ST_PointFromText(point::text, 4326) AS geometry FROM origin_table) origins
                 # ON ST_Contains(buffer.geometry, origins.geometry);
                 # '''
@@ -209,7 +209,7 @@ def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, po
 
 def buffer_analysis_data(analysis_id, layer_ids):
     try:
-        sql = f'''SELECT id, geometry FROM maps_bufferareas WHERE analysis_id={analysis_id}'''
+        sql = f'''SELECT id, geometry FROM maps_proximityAreas WHERE analysis_id={analysis_id}'''
         gdf = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
         print(gdf)
         return analysis_id, "success", "", 200

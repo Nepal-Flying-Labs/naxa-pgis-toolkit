@@ -307,9 +307,9 @@ class AnalysisSerializer(serializers.ModelSerializer):
         model = Analysis
         fields = '__all__'
 
-class BufferAreasMapSerializer(serializers.ModelSerializer):
+class ProximityAreasMapSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BufferAreas
+        model = ProximityAreas
         fields = ('id', 'area', 'bbox', 'origin')
 
     def to_representation(self, instance):
@@ -329,9 +329,9 @@ class BufferAreasMapSerializer(serializers.ModelSerializer):
         representation['poi'] = poi_list
         return representation
 
-class BufferAreasSerializer(serializers.ModelSerializer):
+class ProximityAreasSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BufferAreas
+        model = ProximityAreas
         fields = ('id', 'area', 'origin')
 
     def to_representation(self, instance):

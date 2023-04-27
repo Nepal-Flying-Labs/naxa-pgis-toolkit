@@ -8,7 +8,6 @@ from pgis_toolkit.maps.api.views import (
     AnalysisViewset,
     BufferAnalysisAPIView,
     BufferAnalysisDataAPIView,
-    BufferAreasCollection,
     BufferAreaTileQuerySet,
     DataMergeUpdateAPIView,
     DropdownChoiceViewset,
@@ -34,6 +33,7 @@ from pgis_toolkit.maps.api.views import (
     ProjectMapConfigAPIView,
     ProjectsLayerTemplateDropdownChoiceViewset,
     ProjectStyleViewset,
+    ProximityAreasCollection,
     QueryFeatureCollectionViewset,
     ServiceAreaAnalysisAPIView,
     StandardIconViewset,
@@ -119,9 +119,9 @@ router.register(r'analysis', AnalysisViewset, basename='analysis')
 router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
 
 #==================
-#  BufferAreas
+#  ProximityAreas
 #==================
-router.register(r'buffer_area_collection', BufferAreasCollection, basename='buffer_area_collection')
+router.register(r'buffer_area_collection', ProximityAreasCollection, basename='buffer_area_collection')
 app_name = "projects"
 
 data_clean_urls = [
