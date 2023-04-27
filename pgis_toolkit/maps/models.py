@@ -537,7 +537,7 @@ class ProximityAnalysis(DateTimeStamp, IsDeleted):
 
 class ProximityAreas(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
-    buffer_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
+    proximity_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
     origin = models.JSONField(default=list, blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')

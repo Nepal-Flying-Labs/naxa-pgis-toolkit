@@ -116,7 +116,7 @@ def find_data_within_buffer(data, distance: float, layers: list) -> dict:
         datas.append(df)
     return datas
 
-def buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
+def proximity_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
     try:
         points = []
         for origin in origins:

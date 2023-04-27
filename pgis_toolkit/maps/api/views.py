@@ -110,11 +110,6 @@ from pgis_toolkit.maps.tasks import (
     handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
-from pgis_toolkit.maps.utils.buffer_analysis import (
-    buffer_by_column_value,
-    buffer_by_distance,
-    find_data_within_buffer,
-)
 from pgis_toolkit.maps.utils.data_cleaning import (
     check_duplicate,
     check_multipart,
@@ -132,6 +127,11 @@ from pgis_toolkit.maps.utils.data_cleaning import (
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
+from pgis_toolkit.maps.utils.proximity_analysis import (
+    buffer_by_column_value,
+    buffer_by_distance,
+    find_data_within_buffer,
+)
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import (
@@ -2608,7 +2608,7 @@ class ServiceAreaAnalysisAPIView(APIView):
             # analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
-class BufferAnalysisAPIView(APIView):
+class ProximityAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
         '''Buffer Analysis
 
@@ -2656,16 +2656,16 @@ class BufferAnalysisAPIView(APIView):
             response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
-            print('Error occured in BufferAnalysisAPIView',str(e))
+            print('Error occured in ProximityAnalysisAPIView',str(e))
             if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
     def get(self, request, *args, **kwargs):
-        '''{{baseURL}}api/maps/buffer_analysis/?layer=1&field=DISTRICT&analysis=&view=list'''
+        '''{{baseURL}}api/maps/proximity_analysis/?layer=1&field=DISTRICT&analysis=&view=list'''
         try:
             layer_id = request.query_params.get('layer', None)
             field = request.query_params.get('field', None)
-            buffer_analysis_id= request.query_params.get('buffer_analysis_id', None)
+            proximity_analysis_id= request.query_params.get('proximity_analysis_id', None)
             view = request.query_params.get('view', None)
             if layer_id and not view:
                 layer = Layer.active.get(id=layer_id)
@@ -2674,9 +2674,9 @@ class BufferAnalysisAPIView(APIView):
                     return Response (data=attribute_qs, status=200)
                 else:
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
-            if not buffer_analysis_id:
-                return Response(data={'message': 'params buffer_analysis_id is missing.'}, status=400)
-            buff_qs = ProximityAreas.active.filter(buffer_analysis_id=buffer_analysis_id).order_by('id')
+            if not proximity_analysis_id:
+                return Response(data={'message': 'params proximity_analysis_id is missing.'}, status=400)
+            buff_qs = ProximityAreas.active.filter(proximity_analysis_id=proximity_analysis_id).order_by('id')
             pois_qs = buff_qs.values('pois')
             feature_ids = []
             if view=='list':
@@ -2780,11 +2780,11 @@ class ProximityAreasCollection(viewsets.ModelViewSet):
     def get_queryset(self, pk=None, *args, **kwargs):
         try:
             id = self.request.resolver_match.kwargs.get('pk')
-            buffer_analysis_id = self.request.query_params.get('buffer_analysis_id', None)
+            proximity_analysis_id = self.request.query_params.get('proximity_analysis_id', None)
             if id:
                 queryset=self.queryset.filter(id=id)
-            elif buffer_analysis_id:
-                queryset=self.queryset.filter(buffer_analysis_id=buffer_analysis_id)
+            elif proximity_analysis_id:
+                queryset=self.queryset.filter(proximity_analysis_id=proximity_analysis_id)
             return queryset
         except Exception as e:
             return str(e)
@@ -2792,7 +2792,7 @@ class ProximityAreasCollection(viewsets.ModelViewSet):
     # def get_serializer_class(self):
     #     return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-class BufferAnalysisDataAPIView(APIView):
+class ProximityAnalysisDataAPIView(APIView):
     def post(self, request, *args, **kwarggs):
         '''Buffer Analysis
 
@@ -2948,14 +2948,14 @@ def get_analysis_dict(analysis, optimum_route):
     analysis_dict['routes'] = serialize.data
     return analysis_dict
 
-def get_buffer_dict(analysis, buffer_analysis):
+def get_buffer_dict(analysis, proximity_analysis):
     analysis_dict={}
     analysis_dict['id'] = analysis.id
     analysis_dict['name'] = analysis.name
     analysis_dict['geom_type'] = analysis.geom_type
     analysis_dict['bbox'] = analysis.bbox
-    # analysis_dict['origins'] = buffer_analysis.origins
-    analysis_dict['total_area'] = buffer_analysis.total_area
+    # analysis_dict['origins'] = proximity_analysis.origins
+    analysis_dict['total_area'] = proximity_analysis.total_area
     queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
     serializer = ProximityAreasMapSerializer(queryset, many=True)
     analysis_dict['buffer_areas'] = serializer.data
@@ -3030,14 +3030,14 @@ def analysis_result_detail(request, *args, **kwargs):
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
         elif analysis_type == 'buffer':
-                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
-                if buffer_analysis_qs.exists():
-                    buffer_analysis_instance=buffer_analysis_qs[0]
-                    analysis_id=buffer_analysis_instance.analysis_id
-                    buffer_analysis_id=buffer_analysis_instance.id
-                    queryset = ProximityAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('-id')
+                proximity_analysis_qs = ProximityAnalysis.active.filter(id=id)
+                if proximity_analysis_qs.exists():
+                    proximity_analysis_instance=proximity_analysis_qs[0]
+                    analysis_id=proximity_analysis_instance.analysis_id
+                    proximity_analysis_id=proximity_analysis_instance.id
+                    queryset = ProximityAreas.active.filter(analysis_id=analysis_id,proximity_analysis_id=proximity_analysis_id).order_by('-id')
                     serializer = ProximityAreasMapSerializer(queryset, many=True)
-                    analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                    analysis_dict = proximity_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['buffer_areas'] = serializer.data
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
@@ -3932,7 +3932,7 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
     '''
     vector_tile_layer_name = 'buffer_area'
-    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','proximity_analysis_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -3956,7 +3956,7 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''Save Buffer Analysis Layer into main Layer Table'''
-class LayerFromBufferAnalysis(APIView):
+class LayerFromProximityAnalysis(APIView):
     def post(self, request, *args, **kwargs):
         try:
             analysis = request.data.get('analysis', None)
