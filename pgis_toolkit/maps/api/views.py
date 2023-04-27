@@ -2552,9 +2552,13 @@ class OptimumRouteAnalysisAPIView(APIView):
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
             else:
+                if Analysis.active.filter(project=project, name=name).exists():
+                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
                 analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
+            if OptimumRoute.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2828,16 +2832,16 @@ def get_analysis_task_response(request):
         result = AsyncResult(task_id, app=app)
         if result.ready():   # check task state: true/false
             try:
-                response, stat, message, code = result.get()
+                analysis_id, optimum_route_id, stat, message, code = result.get()
                 if code == 200:
-                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
+                    return Response(data={'analysis_id':analysis_id, 'optimum_route_id': optimum_route_id, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=code)
+                    return Response(data={'analysis_id':analysis_id, 'optimum_route_id': optimum_route_id, 'status': stat, 'message': message}, status=code)
             except Exception as e:
-                return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(data={'analysis_id': None, 'status': "processing", 'message': ""}, status=200)
+                return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "processing", 'message': ""}, status=200)
     except Exception as e:
-        return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):

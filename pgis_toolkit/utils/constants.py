@@ -74,9 +74,9 @@ ANALYSIS_TYPE_CHOICES = (
 )
 
 NETWORK_MODE = (
-    ('Drive', _('Drive')),
-    ('Cycle', _('Cycle')),
-    ('Walk', _('Walk')),
+    ('drive', _('Drive')),
+    ('cycle', _('Cycle')),
+    ('walk', _('Walk')),
 )
 
 LAYER_STATUS_CHOICES = (

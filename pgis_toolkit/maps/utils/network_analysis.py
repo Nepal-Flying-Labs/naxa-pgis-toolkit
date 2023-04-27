@@ -202,7 +202,6 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                     SELECT * FROM segments WHERE geometry IS NOT NULL'''
         else:
             raise Exception('No features mirror found')
-        print(sql, "is sql")
         # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
@@ -250,7 +249,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             network_list = NetworkRoutes.active.bulk_create(network_routes_objs)
             iterate = True
             while iterate:
-                if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
+                if NetworkRoutes.active.filter(optimum_id=optimum_route_id).exists():
                     iterate=False
             buffer_distance = 0.00004499640028797696 # 5m in degree
             if obstacles is not None:
@@ -270,33 +269,34 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                         route_inst.save()
                 except:
                     pass
-            '''update Analysis object bbox'''
-            analysis_bbox = bbox_list[0]
-            for bbox in bbox_list:
-                if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
-                if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
-                if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
-                if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
-            analysis_inst = Analysis.active.get(id=analysis_id)
-            analysis_inst.bbox=analysis_bbox
-            analysis_inst.save()
+            # '''update Analysis object bbox'''
+            # analysis_bbox = bbox_list[0]
+            # for bbox in bbox_list:
+            #     if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
+            #     if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
+            #     if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
+            #     if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
+            # analysis_inst = Analysis.active.get(id=analysis_id)
+            # analysis_inst.bbox=analysis_bbox
+            # analysis_inst.save()
             optimum_route_inst = OptimumRoute.active.get(id=optimum_route_id)
+            optimum_route_inst.bbox = bbox_list[0]
             optimum_route_inst.route_origin = [G.nodes[orig_node_id]['y'], G.nodes[orig_node_id]['x']]
             optimum_route_inst.route_destination = [G.nodes[dest_node_id]['y'], G.nodes[dest_node_id]['x']]
             optimum_route_inst.save()
-            return analysis_id, "success", "", 200
+            return analysis_id, optimum_route_id, "success", "", 200
         except Exception as e:
-            if Analysis.objects.filter(id=analysis_id).exists():
-                Analysis.objects.get(id=analysis_id).delete()
+            # if Analysis.objects.filter(id=analysis_id).exists():
+            #     Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
-            return None, "route_not_found", str(e), 200
+            return None, None, "route_not_found", str(e), 200
     except Exception as e:
-        if Analysis.objects.filter(id=analysis_id).exists():
-            Analysis.objects.get(id=analysis_id).delete()
+        # if Analysis.objects.filter(id=analysis_id).exists():
+        #     Analysis.objects.get(id=analysis_id).delete()
         if OptimumRoute.objects.filter(id=optimum_route_id).exists():
             OptimumRoute.objects.get(id=optimum_route_id).delete()
-        return None, "error", str(e), 400
+        return None, None, "error", str(e), 400
 
 def service_area_analysis(road_network, analysis_id, optimum_route_id):
     errors=[]
