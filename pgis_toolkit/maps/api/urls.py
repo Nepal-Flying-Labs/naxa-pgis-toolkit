@@ -39,8 +39,9 @@ from pgis_toolkit.maps.api.views import (
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
-    analysis_layer,
-    analysis_layers,
+    analysis_result_detail,
+    analysis_result_list,
+    analysis_type_list,
     bulk_create_image_from_urls,
     bulk_del_null_geom,
     bulk_template_download,
@@ -194,8 +195,8 @@ urlpatterns = [
     #     Analysis
     #==================
     path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
-    path('analysis_layers/', analysis_layers, name='analysis_layers'),
-    path('analysis_layer/', analysis_layer, name='analysis_layers'),
+    path('analysis_result_list/', analysis_result_list, name='analysis_layers'),
+    path('analysis_result_detail/', analysis_result_detail, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
     path('optimum_route_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
@@ -204,7 +205,7 @@ urlpatterns = [
     # path('buffer_analysis_data/', BufferAnalysisDataAPIView.as_view(), name='buffer_analysis_data'),
     path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromBufferAnalysis.as_view(), name='layer_from_buffer'),
-
+    path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
     #==================
     #   Advance Query
     #==================

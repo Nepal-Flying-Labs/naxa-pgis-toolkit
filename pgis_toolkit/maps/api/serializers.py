@@ -260,7 +260,7 @@ class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        optimum_route_instance = OptimumRoute.active.get(analysis_id=instance.analysis_id)
+        optimum_route_instance = OptimumRoute.active.get(id=instance.optimum_id)
         representation['origin'] = f'({optimum_route_instance.origin_long}, {optimum_route_instance.origin_lat})'
         representation['destination'] = f'({optimum_route_instance.destination_long}, {optimum_route_instance.destination_lat})'
         '''obstacles'''

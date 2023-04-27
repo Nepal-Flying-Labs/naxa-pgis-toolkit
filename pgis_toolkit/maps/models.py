@@ -461,6 +461,11 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
     destination_lat = models.FloatField(max_length=20, null=True, blank=True)
     route_origin = models.JSONField(default=list, blank=True, null=True)
     route_destination = models.JSONField(default=list, blank=True, null=True)
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
+
 
     class Meta:
         app_label = 'maps'
@@ -468,6 +473,7 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    optimum_id=models.IntegerField(db_index=True,blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
@@ -521,12 +527,17 @@ class BufferAnalysis(DateTimeStamp, IsDeleted):
     radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
     dissolve_output = models.BooleanField(default=False)
     total_area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
 
     class Meta:
         app_label = 'maps'
 
 class BufferAreas(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    buffer_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
     origin = models.JSONField(default=list, blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')

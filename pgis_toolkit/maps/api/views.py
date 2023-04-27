@@ -2525,10 +2525,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','result_name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type,result_name are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2540,16 +2540,21 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
+            result_name=request_dict['result_name']
             type=request_dict['type']
             mode = request_dict['mode']
             display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             project = int(request_dict['project'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
+            analysis_id = request_dict.get('analysis_id',None)
+            if analysis_id :
+                try:
+                    analysis_inst = Analysis.active.get(id=analysis_id)
+                except Exception as e:
+                    return Response(data={"message":str(e)},status=400)
+            else:
+                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2615,11 +2620,12 @@ class BufferAnalysisAPIView(APIView):
         try:
             analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois']
+            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois','result_name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, pois are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, project, name, type, pois,result_name are required!'}, status=400)
             name = request_dict['name']
+            result_name=request_dict['result_name']
             type = request_dict['type']
             project = int(request_dict['project'])
             origins = json.loads(request_dict['origins'])
@@ -2628,12 +2634,16 @@ class BufferAnalysisAPIView(APIView):
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='Polygon', project=project)
+            analysis_id = request_dict.get('analysis_id',None)
+            if analysis_id :
+                try:
+                    analysis_inst = Analysis.active.get(id=analysis_id)
+                except Exception as e:
+                    return Response(data={"message":str(e)},status=400)
+            else:
+                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output)
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
             buffer_id = buffer_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2651,7 +2661,7 @@ class BufferAnalysisAPIView(APIView):
         try:
             layer_id = request.query_params.get('layer', None)
             field = request.query_params.get('field', None)
-            analysis_id = request.query_params.get('analysis', None)
+            buffer_analysis_id= request.query_params.get('buffer_analysis_id', None)
             view = request.query_params.get('view', None)
             if layer_id and not view:
                 layer = Layer.active.get(id=layer_id)
@@ -2660,9 +2670,9 @@ class BufferAnalysisAPIView(APIView):
                     return Response (data=attribute_qs, status=200)
                 else:
                     return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
-            if not analysis_id:
-                return Response(data={'message': 'params analysis is missing.'}, status=400)
-            buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
+            if not buffer_analysis_id:
+                return Response(data={'message': 'params buffer_analysis_id is missing.'}, status=400)
+            buff_qs = BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id).order_by('id')
             pois_qs = buff_qs.values('pois')
             feature_ids = []
             if view=='list':
@@ -2766,11 +2776,11 @@ class BufferAreasCollection(viewsets.ModelViewSet):
     def get_queryset(self, pk=None, *args, **kwargs):
         try:
             id = self.request.resolver_match.kwargs.get('pk')
-            analysis_id = self.request.query_params.get('analysis', None)
+            buffer_analysis_id = self.request.query_params.get('buffer_analysis_id', None)
             if id:
                 queryset=self.queryset.filter(id=id)
-            elif analysis_id:
-                queryset=self.queryset.filter(analysis_id=analysis_id)
+            elif buffer_analysis_id:
+                queryset=self.queryset.filter(buffer_analysis_id=buffer_analysis_id)
             return queryset
         except Exception as e:
             return str(e)
@@ -2836,7 +2846,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = 'route'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','optimum_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -2949,51 +2959,103 @@ def get_buffer_dict(analysis, buffer_analysis):
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layers(request, *args, **kwargs):
+def analysis_result_list(request, *args, **kwargs):
+    paginator = CustomPageNumberPagination()
     try:
         project = request.query_params.get('project', None)
         analysis_type = request.query_params.get('analysis_type', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        ana_type_list=[]
-        analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
-        for analysis in analys_qs:
-            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
-            optimum_route = optimum_route_qs[0]
-            analysis_dict=get_analysis_dict(analysis, optimum_route)
-            ana_type_list.append(analysis_dict)
-        return Response(ana_type_list, status=200)
+        analysis_id=request.query_params.get('analysis_id', None)
+        if not project or not analysis_type or  not analysis_id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'Project   does not exists'}, status=404)
+        if not Analysis.objects.filter(project=project,id=analysis_id).exists():
+            return Response(data={'message': 'Analysis does not exist'}, status=404)
+
+        if analysis_type== 'optimum_route':
+            if OptimumRoute.objects.filter(analysis_id=analysis_id).exists():
+                optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(optimum_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
+        elif analysis_type == 'buffer':
+            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+                buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layer(request, *args, **kwargs):
+def analysis_result_detail(request, *args, **kwargs):
     try:
         project = request.query_params.get('project', None)
-        analysis_id = request.query_params.get('analysis_id', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        analys_qs = Analysis.active.filter(project=project, id=analysis_id)
-        if analys_qs.exists():
-            analysis = analys_qs[0]
-            if analysis.type == 'optimum_route':
-                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+        id = request.query_params.get('id', None)
+        analysis_type = request.query_params.get('analysis_type', None)
+
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project, analysis_type and id  params are required'}, status=400)
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'Project does not exists'}, status=400)
+        analysis_dict={}
+        if analysis_type == 'optimum_route':
+                optimum_route_qs = OptimumRoute.active.filter(id=id)
+
                 if optimum_route_qs.exists():
-                    optimum_route = optimum_route_qs[0]
-                    analysis_dict=get_analysis_dict(analysis, optimum_route)
-            elif analysis.type == 'buffer':
-                buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
-                buffer_analysis = buffer_analysis_qs[0]
-                analysis_dict = get_buffer_dict(analysis, buffer_analysis)
-            return Response(analysis_dict, status=200)
-        else:
-            return Response(data={'message': 'Analysis object not found'}, status=400)
+                    optimal_route_instance=optimum_route_qs[0]
+                    optimal_id=optimal_route_instance.id
+                    analysis_id=optimal_route_instance.analysis_id
+                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id,optimum_id=optimal_id).order_by('-id')
+                    serializer = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+
+                    analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
+                    analysis_dict['routes'] = serializer.data
+                else:
+                    return Response(data={"message":"Analysis does not exists"},status=400)
+        elif analysis_type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
+                if buffer_analysis_qs.exists():
+                    buffer_analysis_instance=buffer_analysis_qs[0]
+                    analysis_id=buffer_analysis_instance.analysis_id
+                    buffer_analysis_id=buffer_analysis_instance.id
+                    queryset = BufferAreas.active.filter(analysis_id=analysis_id,buffer_analysis_id=buffer_analysis_id).order_by('-id')
+                    serializer = BufferAreasMapSerializer(queryset, many=True)
+                    analysis_dict = buffer_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                    analysis_dict['buffer_areas'] = serializer.data
+                else:
+                    return Response(data={"message":"Analysis does not exists"},status=400)
+
+        return Response(analysis_dict, status=200)
+
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+''''''
+@api_view(['GET'])
+def analysis_type_list(request, *args, **kwargs):
+    paginator = CustomPageNumberPagination()
+    project_id = request.query_params.get('project_id', None)
+    type = request.query_params.get('type', None)
+    if  project_id is None:
+        return Response(data={"message":"project_id is required parmas"},status=400)
+    if not Project.objects.filter(id=project_id).exists():
+        return Response(data={"message":"Project does not exist"},status=404)
+    if type not in ('optimum_route','service_area','buffer'):
+        return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
+    if type == 'optimum_route':
+        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
+        paginated_qs = paginator.paginate_queryset(optimum_qs, request)
+        return paginator.get_paginated_response(paginated_qs)
+    elif type == 'buffer':
+        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+        paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+        return paginator.get_paginated_response(paginated_qs)
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
@@ -3806,11 +3868,11 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
     def get_queryset(self, pk=None, *args, **kwargs):
         try:
             id = self.request.resolver_match.kwargs.get('pk')
-            analysis_id = self.request.query_params.get('analysis', None)
+            optimum_id = self.request.query_params.get('optimum_id', None)
             if id:
                 queryset=self.queryset.filter(id=id)
-            elif analysis_id:
-                queryset=self.queryset.filter(analysis_id=analysis_id)
+            elif optimum_id:
+                queryset=self.queryset.filter(optimum_id=optimum_id)
             return queryset
         except Exception as e:
             return str(e)
@@ -3849,7 +3911,7 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
     '''
     vector_tile_layer_name = 'buffer_area'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
