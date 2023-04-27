@@ -3040,9 +3040,11 @@ def analysis_result_detail(request, *args, **kwargs):
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
-''''''
 @api_view(['GET'])
 def analysis_type_list(request, *args, **kwargs):
+    '''
+    Returns list of analysis objects.
+    '''
     paginator = CustomPageNumberPagination()
     project_id = request.query_params.get('project_id', None)
     type = request.query_params.get('type', None)
@@ -3052,12 +3054,20 @@ def analysis_type_list(request, *args, **kwargs):
         return Response(data={"message":"Project does not exist"},status=404)
     if type not in ('optimum_route','service_area','buffer'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
+    '''search_key'''
+    search_key = request.query_params.get('search', None)
     if type == 'optimum_route':
-        optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
+        if search_key:
+            optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+        else:
+            optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
         paginated_qs = paginator.paginate_queryset(optimum_qs, request)
         return paginator.get_paginated_response(paginated_qs)
     elif type == 'buffer':
-        buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+        if search_key:
+            buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+        else:
+            buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
         paginated_qs = paginator.paginate_queryset(buffer_qs, request)
         return paginator.get_paginated_response(paginated_qs)
 
