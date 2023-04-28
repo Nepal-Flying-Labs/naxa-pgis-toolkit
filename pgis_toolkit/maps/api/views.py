@@ -127,11 +127,7 @@ from pgis_toolkit.maps.utils.data_cleaning import (
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
-from pgis_toolkit.maps.utils.proximity_analysis import (
-    buffer_by_column_value,
-    buffer_by_distance,
-    find_data_within_buffer,
-)
+from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import (
@@ -2610,7 +2606,7 @@ class ServiceAreaAnalysisAPIView(APIView):
 
 class ProximityAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
-        '''Buffer Analysis
+        '''Proximity Analysis
 
         Parameters
         ----------
@@ -2640,20 +2636,26 @@ class ProximityAnalysisAPIView(APIView):
             pois = json.loads(request_dict['pois'])
             analysis_id = request_dict.get('analysis_id',None)
             if analysis_id :
+                first_analysis = False
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
             else:
+                first_analysis = True
+                if Analysis.active.filter(project=project, name=name).exists():
+                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
                 analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
             analysis_id = analysis_inst.id
-            buffer_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
-            buffer_id = buffer_inst.id
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
+            proximity_id = proximity_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             print('Error occured in ProximityAnalysisAPIView',str(e))
@@ -2704,7 +2706,7 @@ class ProximityAnalysisAPIView(APIView):
                             if feature.geometry.within(buff.geometry):
                                 origin = buff.origin
                                 feature_dict['origin'] = origin
-                                feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                                feature_dict['proximity_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
                         result.append(feature_dict)
                 else:
                     for feature in feature_qs:
@@ -2719,7 +2721,7 @@ class ProximityAnalysisAPIView(APIView):
                             if feature.geometry.within(buff.geometry):
                                 origin = buff.origin
                                 feature_dict['origin'] = origin
-                                feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                                feature_dict['proximity_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
                         result.append(feature_dict)
                 return Response(data=result, status=200)
             elif view =='chart':
@@ -2762,7 +2764,7 @@ class ProximityAnalysisAPIView(APIView):
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
-'''Buffer Areas Table'''
+'''Proximity Areas Table'''
 class ProximityAreasCollection(viewsets.ModelViewSet):
     '''
     Viewset for ProximityAreas objects
@@ -2832,16 +2834,16 @@ def get_analysis_task_response(request):
         result = AsyncResult(task_id, app=app)
         if result.ready():   # check task state: true/false
             try:
-                analysis_id, optimum_route_id, stat, message, code = result.get()
+                analysis_id, sub_analysis_id, stat, message, code = result.get()
                 if code == 200:
-                    return Response(data={'analysis_id':analysis_id, 'optimum_route_id': optimum_route_id, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
+                    return Response(data={'analysis_id':analysis_id, 'sub_analysis_id': sub_analysis_id, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'analysis_id':analysis_id, 'optimum_route_id': optimum_route_id, 'status': stat, 'message': message}, status=code)
+                    return Response(data={'analysis_id':analysis_id, 'sub_analysis_id': sub_analysis_id, 'status': stat, 'message': message}, status=code)
             except Exception as e:
-                return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "processing", 'message': ""}, status=200)
+                return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "processing", 'message': ""}, status=200)
     except Exception as e:
-        return Response(data={'analysis_id': None, 'optimum_route_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
@@ -2958,7 +2960,7 @@ def get_buffer_dict(analysis, proximity_analysis):
     analysis_dict['total_area'] = proximity_analysis.total_area
     queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
     serializer = ProximityAreasMapSerializer(queryset, many=True)
-    analysis_dict['buffer_areas'] = serializer.data
+    analysis_dict['proximity_areas'] = serializer.data
     return analysis_dict
 
 '''Analysis layers api for map page'''
@@ -2987,16 +2989,18 @@ def analysis_result_list(request, *args, **kwargs):
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
-        elif analysis_type == 'buffer':
+        elif analysis_type == 'proximity':
             if ProximityAnalysis.objects.filter(analysis_id=analysis_id).exists():
                 if search_key:
-                    buffer_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                    proximity_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
                 else:
-                    buffer_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
-                paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+                    proximity_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(proximity_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
+        else:
+            return Response(data={'message': 'type params invalid.'}, status=400)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
@@ -3013,7 +3017,7 @@ def analysis_result_detail(request, *args, **kwargs):
         if not project or not analysis_type or  not id:
             return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
         if not Project.objects.filter(id=project).exists():
-            return Response(data={'message': 'Project does not exists'}, status=400)
+            return Response(data={'message': 'Project doeanalysis_dicts not exists'}, status=400)
         analysis_dict={}
         if analysis_type == 'optimum_route':
                 optimum_route_qs = OptimumRoute.active.filter(id=id)
@@ -3029,7 +3033,7 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict['routes'] = serializer.data
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
-        elif analysis_type == 'buffer':
+        elif analysis_type == 'proximity':
                 proximity_analysis_qs = ProximityAnalysis.active.filter(id=id)
                 if proximity_analysis_qs.exists():
                     proximity_analysis_instance=proximity_analysis_qs[0]
@@ -3038,10 +3042,11 @@ def analysis_result_detail(request, *args, **kwargs):
                     queryset = ProximityAreas.active.filter(analysis_id=analysis_id,proximity_analysis_id=proximity_analysis_id).order_by('-id')
                     serializer = ProximityAreasMapSerializer(queryset, many=True)
                     analysis_dict = proximity_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
-                    analysis_dict['buffer_areas'] = serializer.data
+                    analysis_dict['proximity_areas'] = serializer.data
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
-
+        else:
+            return Response(data={'message': 'type params invalid.'}, status=400)
         return Response(analysis_dict, status=200)
 
     except Exception as e:
@@ -3059,7 +3064,7 @@ def analysis_type_list(request, *args, **kwargs):
         return Response(data={"message":"project_id is required parmas"},status=400)
     if not Project.objects.filter(id=project_id).exists():
         return Response(data={"message":"Project does not exist"},status=404)
-    if type not in ('optimum_route','service_area','buffer'):
+    if type not in ('optimum_route','proximity'):
         return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
     '''search_key'''
     search_key = request.query_params.get('search', None)
@@ -3070,11 +3075,11 @@ def analysis_type_list(request, *args, **kwargs):
             optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
         paginated_qs = paginator.paginate_queryset(optimum_qs, request)
         return paginator.get_paginated_response(paginated_qs)
-    elif type == 'buffer':
+    elif type == 'proximity':
         if search_key:
-            buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            buffer_qs  = Analysis.objects.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
         else:
-            buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+            buffer_qs  = Analysis.objects.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
         paginated_qs = paginator.paginate_queryset(buffer_qs, request)
         return paginator.get_paginated_response(paginated_qs)
 

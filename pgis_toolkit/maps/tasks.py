@@ -501,15 +501,15 @@ def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destina
         return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
+def CreateBuffer(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis):
 
     from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis
     try:
-        response, stat, message, status = proximity_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
-        return response, stat, message, status
+        analysis_id, proximity_id, stat, message, status = proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis)
+        return analysis_id, proximity_id, stat, message, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
-        return None, "error", str(e), 400
+        print("error occured in CreateBuffer: " + str(e))
+        return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def BufferData(analysis_id, layer_ids):

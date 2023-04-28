@@ -121,7 +121,7 @@ router.register(r'network_route_collection', NetworkRoutesCollection, basename='
 #==================
 #  ProximityAreas
 #==================
-router.register(r'buffer_area_collection', ProximityAreasCollection, basename='buffer_area_collection')
+router.register(r'proximity_area_collection', ProximityAreasCollection, basename='proximity_area_collection')
 app_name = "projects"
 
 data_clean_urls = [
@@ -148,12 +148,6 @@ data_clean_urls = [
     #sync features to feature_collection table after data clean
     path('sync_features/', sync_features, name='sync_features'),
 ]
-
-# data_analysis_urls = [
-#     path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
-#     path('buffer_by_column/', buffer_column, name="buffer_by_column"),
-#     path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
-# ]
 
 def trigger_error(request):
     division_by_zero = 1 / 0
