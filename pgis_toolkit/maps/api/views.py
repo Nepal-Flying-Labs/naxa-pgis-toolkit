@@ -2722,6 +2722,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 first_analysis = False
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
+                    road_network = OptimumRoute.active.filter(analysis_id=analysis_id)[0].road_network
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
             else:
