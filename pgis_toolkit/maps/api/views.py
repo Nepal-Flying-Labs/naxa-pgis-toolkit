@@ -2543,11 +2543,13 @@ class OptimumRouteAnalysisAPIView(APIView):
             project = int(request_dict['project'])
             analysis_id = request_dict.get('analysis_id',None)
             if analysis_id :
+                first_analysis = False
                 try:
                     analysis_inst = Analysis.active.get(id=analysis_id)
                 except Exception as e:
                     return Response(data={"message":str(e)},status=400)
             else:
+                first_analysis = True
                 if Analysis.active.filter(project=project, name=name).exists():
                     return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
                 analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
@@ -2564,7 +2566,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis)
             else:
                 response = 'source parameter is missing!'
                 status = 400
@@ -3980,8 +3982,8 @@ class LayerFromProximityAnalysis(APIView):
                 theme = Theme.objects.get(id=theme)
                 if Layer.active.filter(theme=theme, name=name).exists():
                     return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
-                buffer_areas = ProximityAreas.active.filter(analysis_id=analysis)
-                if buffer_areas:
+                proximity_areas = ProximityAreas.active.filter(analysis_id=analysis)
+                if proximity_areas:
                     try:
                         layer_instance = Layer.active.create(theme=theme, name=name, layer_type='Vector',display_on_map=True)
                     except Exception as e:
@@ -3992,21 +3994,21 @@ class LayerFromProximityAnalysis(APIView):
                     vector_layer_instance.save()
                     '''create features'''
                     feature_objs = []
-                    for buff_area in buffer_areas:
+                    for proximity_area in proximity_areas:
                         attributes_json = {
-                            'analysis_id': buff_area.analysis_id,
-                            'orgin': str(buff_area.origin),
-                            'area': buff_area.area,
-                            'pois': buff_area.pois,
+                            'analysis_id': proximity_area.analysis_id,
+                            'orgin': str(proximity_area.origin),
+                            'area': proximity_area.area,
+                            'pois': proximity_area.pois,
                         }
-                        feature_objs.append(FeatureCollection(geometry=buff_area.geometry, layer=layer_instance, attributes=attributes_json))
+                        feature_objs.append(FeatureCollection(geometry=proximity_area.geometry, layer=layer_instance, attributes=attributes_json))
                     FeatureCollection.active.bulk_create(feature_objs)
                     layer_instance.upload_status='successful'
                     layer_instance.is_clean = True
                     layer_instance.save()
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=201)
                 else:
-                    return Response(data={'message': "Buffer Areas not found for the analysis"}, status=404)
+                    return Response(data={'message': "Proximity Areas not found for the analysis"}, status=404)
             else:
                 return Response(data={'message': "Analysis matching queryset does not exist!"}, status=404)
 
