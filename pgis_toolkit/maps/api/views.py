@@ -3931,12 +3931,12 @@ class AnalysisViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
+class ProximityAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Buffer Regions
-    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
+    url:"http://0.0.0.0:8000/api/maps/proximity_area_vectortile/{z}/{x}/{y}/?area=",
     '''
-    vector_tile_layer_name = 'buffer_area'
+    vector_tile_layer_name = 'proximity_area'
     vector_tile_fields = ('id', 'analysis_id','proximity_analysis_id')
 
     def get(self, request, *args, **kwargs):
