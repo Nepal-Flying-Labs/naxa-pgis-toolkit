@@ -33,88 +33,88 @@ def dissolve_data(data):
     df = gpd.GeoDataFrame(crs='epsg:3857', geometry=[data]).explode()
     return df
 
-def proximity_by_distance(data, distance: float, dissolve: bool) -> dict:
-    """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
+# def proximity_by_distance(data, distance: float, dissolve: bool) -> dict:
+#     """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
 
-    Parameters
-    ----------
-    data : GeoDataFrame
-        The data to proximity
-    distance : float
-        The proximity distance
-    dissolve : bool
-        If to dissolved overlapping geometries after proximity
+#     Parameters
+#     ----------
+#     data : GeoDataFrame
+#         The data to proximity
+#     distance : float
+#         The proximity distance
+#     dissolve : bool
+#         If to dissolved overlapping geometries after proximity
 
-    Returns
-    -------
-    data : GeoDataFrame
-        The dissolved geodataframe
-    """
-    distance = 10 if distance is None else distance
-    dissolve = False if dissolve is None else dissolve
-    gdf = data.to_crs("epsg:3857")
-    data = gdf.proximity(float(distance))
-    data = gpd.GeoDataFrame(crs='epsg:3857', geometry=data, columns=gdf.columns.values)
-    if dissolve:
-        data = dissolve_data(data)
-    data = data.to_crs("epsg:4326")
-    return data
+#     Returns
+#     -------
+#     data : GeoDataFrame
+#         The dissolved geodataframe
+#     """
+#     distance = 10 if distance is None else distance
+#     dissolve = False if dissolve is None else dissolve
+#     gdf = data.to_crs("epsg:3857")
+#     data = gdf.proximity(float(distance))
+#     data = gpd.GeoDataFrame(crs='epsg:3857', geometry=data, columns=gdf.columns.values)
+#     if dissolve:
+#         data = dissolve_data(data)
+#     data = data.to_crs("epsg:4326")
+#     return data
 
-def proximity_by_column_value(data, column: str, ratio: float, dissolve: bool) -> dict:
-    """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
+# def proximity_by_column_value(data, column: str, ratio: float, dissolve: bool) -> dict:
+#     """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
 
-    Parameters
-    ----------
-    data : GeoDataFrame
-        The data to proximity
-    column: str
-        Column name which will be used for proximity value
-    ratio : float
-        Factor to multiply the column value
-    dissolve : bool
-        If to dissolved overlapping geometries after proximity
+#     Parameters
+#     ----------
+#     data : GeoDataFrame
+#         The data to proximity
+#     column: str
+#         Column name which will be used for proximity value
+#     ratio : float
+#         Factor to multiply the column value
+#     dissolve : bool
+#         If to dissolved overlapping geometries after proximity
 
-    Returns
-    -------
-    data : GeoDataFrame
-        The dissolved geodataframe
-    """
-    ratio = 1 if ratio is None else ratio
-    dissolve = False if dissolve is None else dissolve
-    data = data.to_crs("epsg:3857")
-    df = gpd.GeoDataFrame(geometry=[])
-    for index, row in data.iterrows():
-        proximity_value = row[column] * ratio
-        proximity = row['geometry'].proximity(proximity_value)
-        df = df.append(gpd.GeoDataFrame(geometry=[proximity]))
-    if dissolve:
-        df = dissolve_data(df)
-    df = df.to_crs("epsg:4326")
-    return df
+#     Returns
+#     -------
+#     data : GeoDataFrame
+#         The dissolved geodataframe
+#     """
+#     ratio = 1 if ratio is None else ratio
+#     dissolve = False if dissolve is None else dissolve
+#     data = data.to_crs("epsg:3857")
+#     df = gpd.GeoDataFrame(geometry=[])
+#     for index, row in data.iterrows():
+#         proximity_value = row[column] * ratio
+#         proximity = row['geometry'].proximity(proximity_value)
+#         df = df.append(gpd.GeoDataFrame(geometry=[proximity]))
+#     if dissolve:
+#         df = dissolve_data(df)
+#     df = df.to_crs("epsg:4326")
+#     return df
 
-def find_data_within_proximity(data, distance: float, layers: list) -> dict:
-    """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
+# def find_data_within_proximity(data, distance: float, layers: list) -> dict:
+#     """Buffer geometries for provided distance and dissolve overlapping geometries after proximity
 
-    Parameters
-    ----------
-    data : GeoDataFrame
-        The data to proximity
-    distance : float
-        The proximity distance
-    layers : list
-        layer list to find data of
+#     Parameters
+#     ----------
+#     data : GeoDataFrame
+#         The data to proximity
+#     distance : float
+#         The proximity distance
+#     layers : list
+#         layer list to find data of
 
-    Returns
-    -------
-    data : GeoDataFrame
-        The dissolved geodataframe
-    """
-    proximityed_data = proximity_by_distance(data, distance, False)
-    datas = []
-    for layer in layers:
-        df = gpd.sjoin(proximityed_data, layer, op="within")
-        datas.append(df)
-    return datas
+#     Returns
+#     -------
+#     data : GeoDataFrame
+#         The dissolved geodataframe
+#     """
+#     proximityed_data = proximity_by_distance(data, distance, False)
+#     datas = []
+#     for layer in layers:
+#         df = gpd.sjoin(proximityed_data, layer, op="within")
+#         datas.append(df)
+#     return datas
 
 def proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis):
     try:
@@ -208,11 +208,11 @@ def proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_
             ProximityAnalysis.objects.get(id=proximity_id).delete()
         return None, None, "error", str(e), 400
 
-def proximity_data(analysis_id, layer_ids):
-    try:
-        sql = f'''SELECT id, geometry FROM maps_proximityAreas WHERE analysis_id={analysis_id}'''
-        gdf = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
-        print(gdf)
-        return analysis_id, "success", "", 200
-    except Exception as e:
-        return None, "error", str(e), 400
+# def proximity_data(analysis_id, layer_ids):
+#     try:
+#         sql = f'''SELECT id, geometry FROM maps_proximityAreas WHERE analysis_id={analysis_id}'''
+#         gdf = gpd.read_postgis(sql, con=con, geom_col='geometry', crs=4326)
+#         print(gdf)
+#         return analysis_id, "success", "", 200
+#     except Exception as e:
+#         return None, "error", str(e), 400

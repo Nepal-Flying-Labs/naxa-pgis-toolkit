@@ -2933,37 +2933,37 @@ def feature_popup(request, *args, **kwargs):
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-def get_analysis_dict(analysis, optimum_route):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    analysis_dict['mode'] = optimum_route.mode
-    analysis_dict['origin_long'] = optimum_route.origin_long
-    analysis_dict['origin_lat'] = optimum_route.origin_lat
-    analysis_dict['destination_long'] = optimum_route.destination_long
-    analysis_dict['destination_lat'] = optimum_route.destination_lat
-    analysis_dict['route_origin'] = optimum_route.route_origin
-    analysis_dict['route_destination'] = optimum_route.route_destination
-    # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
-    queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
-    serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
-    analysis_dict['routes'] = serialize.data
-    return analysis_dict
+# def get_analysis_dict(analysis, optimum_route):
+#     analysis_dict={}
+#     analysis_dict['id'] = analysis.id
+#     analysis_dict['name'] = analysis.name
+#     analysis_dict['geom_type'] = analysis.geom_type
+#     analysis_dict['bbox'] = analysis.bbox
+#     analysis_dict['mode'] = optimum_route.mode
+#     analysis_dict['origin_long'] = optimum_route.origin_long
+#     analysis_dict['origin_lat'] = optimum_route.origin_lat
+#     analysis_dict['destination_long'] = optimum_route.destination_long
+#     analysis_dict['destination_lat'] = optimum_route.destination_lat
+#     analysis_dict['route_origin'] = optimum_route.route_origin
+#     analysis_dict['route_destination'] = optimum_route.route_destination
+#     # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
+#     queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
+#     serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+#     analysis_dict['routes'] = serialize.data
+#     return analysis_dict
 
-def get_buffer_dict(analysis, proximity_analysis):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    # analysis_dict['origins'] = proximity_analysis.origins
-    analysis_dict['total_area'] = proximity_analysis.total_area
-    queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
-    serializer = ProximityAreasMapSerializer(queryset, many=True)
-    analysis_dict['proximity_areas'] = serializer.data
-    return analysis_dict
+# def get_buffer_dict(analysis, proximity_analysis):
+#     analysis_dict={}
+#     analysis_dict['id'] = analysis.id
+#     analysis_dict['name'] = analysis.name
+#     analysis_dict['geom_type'] = analysis.geom_type
+#     analysis_dict['bbox'] = analysis.bbox
+#     # analysis_dict['origins'] = proximity_analysis.origins
+#     analysis_dict['total_area'] = proximity_analysis.total_area
+#     queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
+#     serializer = ProximityAreasMapSerializer(queryset, many=True)
+#     analysis_dict['proximity_areas'] = serializer.data
+#     return analysis_dict
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
