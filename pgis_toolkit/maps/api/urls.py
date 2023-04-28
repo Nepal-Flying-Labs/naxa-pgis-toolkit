@@ -58,6 +58,8 @@ from pgis_toolkit.maps.api.views import (
     cleaning_error_features,
     copy_features,
     delete_sequence,
+    download_analysis_buffer,
+    export_optimum_route_analysis,
     feature_popup,
     fix_duplicate_geometry,
     fix_isolated_geometry,
@@ -78,8 +80,6 @@ from pgis_toolkit.maps.api.views import (
     sync_mirror_to_mongo,
     sync_template,
     update_template_attributes,
-    download_analyis_optimumroute,
-    download_analysis_buffer
 )
 
 router = DefaultRouter()
@@ -191,18 +191,17 @@ urlpatterns = [
     #     Analysis
     #==================
     path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
+    path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
     path('analysis_result_list/', analysis_result_list, name='analysis_layers'),
     path('analysis_result_detail/', analysis_result_detail, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
     path('optimum_route_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_optimum_path/', LayerFromOptimumPathAnalysis.as_view(), name='LayerFromOptimumPathAnalysis'),
+    path('export_optimum_route_analysis/',export_optimum_route_analysis,name='export_optimum_route_analysis'),
     path('proximity_analysis/', ProximityAnalysisAPIView.as_view(), name='proximity_analysis'),
-    # path('proximity_analysis_data/', ProximityAnalysisDataAPIView.as_view(), name='proximity_analysis_data'),
     path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
-    path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
-    path('download_analyis_optimumroute/',download_analyis_optimumroute,name='download_analyis_optimumroute'),
     path('download_analysis_buffer/',download_analysis_buffer,name='download_analysis_buffer'),
     #==================
     #   Advance Query

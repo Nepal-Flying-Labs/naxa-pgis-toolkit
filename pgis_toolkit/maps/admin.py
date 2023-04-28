@@ -126,16 +126,16 @@ class OptimumRouteAdmin(admin.ModelAdmin):
     list_filter = ('analysis_id', 'mode', 'paths')
 
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
-    list_filter = ('route_no', 'analysis_id')
+    list_display = ('id','is_deleted', 'analysis_id', 'optimum_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
+    list_filter = ('route_no', 'analysis_id', 'optimum_id')
 
 class ProximityAnalysisAdmin(admin.ModelAdmin):
     list_display = ('id','is_deleted', 'analysis_id', 'origins', 'radius', 'dissolve_output', 'total_area')
     list_filter = ('analysis_id', 'dissolve_output')
 
 class ProximityAreasAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'analysis_id', 'area')
-    list_filter = ('analysis_id', 'area')
+    list_display = ('id','is_deleted', 'analysis_id', 'proximity_analysis_id', 'area')
+    list_filter = ('analysis_id', 'proximity_analysis_id', 'area')
 
 class CeleryTaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'task_id', 'layer_id')
