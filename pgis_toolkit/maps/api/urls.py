@@ -78,6 +78,8 @@ from pgis_toolkit.maps.api.views import (
     sync_mirror_to_mongo,
     sync_template,
     update_template_attributes,
+    download_analyis_optimumroute,
+    download_analysis_buffer
 )
 
 router = DefaultRouter()
@@ -200,6 +202,8 @@ urlpatterns = [
     path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
     path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
+    path('download_analyis_optimumroute/',download_analyis_optimumroute,name='download_analyis_optimumroute'),
+    path('download_analysis_buffer/',download_analysis_buffer,name='download_analysis_buffer'),
     #==================
     #   Advance Query
     #==================
