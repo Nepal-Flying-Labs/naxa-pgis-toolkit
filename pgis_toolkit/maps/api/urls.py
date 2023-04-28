@@ -58,8 +58,8 @@ from pgis_toolkit.maps.api.views import (
     cleaning_error_features,
     copy_features,
     delete_sequence,
-    download_analysis_buffer,
     export_optimum_route_analysis,
+    export_proximity_analysis,
     feature_popup,
     fix_duplicate_geometry,
     fix_isolated_geometry,
@@ -202,7 +202,7 @@ urlpatterns = [
     path('proximity_analysis/', ProximityAnalysisAPIView.as_view(), name='proximity_analysis'),
     path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
-    path('download_analysis_buffer/',download_analysis_buffer,name='download_analysis_buffer'),
+    path('export_proximity_analysis/',export_proximity_analysis,name='export_proximity_analysis'),
     #==================
     #   Advance Query
     #==================

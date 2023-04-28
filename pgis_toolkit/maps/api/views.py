@@ -1795,6 +1795,7 @@ def export_optimum_route_analysis(request):
     Returns: Zipped Version of Analysis <File>
     '''
     try:
+        dir, file_url = None, None
         optimum_route_id = request.query_params.get('optimum_route_id', None)
         if not optimum_route_id :
             return Response(data={"message":"optimum_route_id is required params"},status=200)
@@ -1860,83 +1861,102 @@ def export_optimum_route_analysis(request):
         return response
     except Exception as e:
         '''clear dir and zip file'''
-        if os.path.exists(dir): shutil.rmtree(dir)
-        if os.path.isfile(file_url): os.remove(file_url)
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if dir and os.path.isfile(file_url): os.remove(file_url)
         return Response(status=400, data={'message': str(e)})
 
 @api_view(['GET'])
-def download_analysis_buffer(request):
-    id = request.query_params.get('id', None)
-    if not id :
-        return Response(data={"message":"id is required params"},status=200)
-        #  get the bufferanalysis instance
-    if BufferAnalysis.objects.filter(id=id).exists():
-        buffer_qs=BufferAnalysis.objects.filter(id=id)[0]
-        buffer_id=buffer_qs.id
-    else:
-        return Response(data={'message':"Analysis does not exists"},status=404)
-    #get all the BufferAreas instance assocciated with that BufferAnalysis instance
-    bufferarea_qs=BufferAreas.objects.filter(buffer_analysis_id=buffer_id)
-    combined_pois={}
-    for area in bufferarea_qs:
-        for key, value in area.pois.items():
-            if key not in combined_pois:
-                combined_pois[key] = value
-            else:
-                for item in value:
-                    if item not in combined_pois[key]:
-                        combined_pois[key].append(item)
-    dir = f'{MEDIA_ROOT}/analysis_download/{buffer_qs.name}/'
-    root_dir = f'{MEDIA_ROOT}/analysis_download/'
-    db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
-    con = create_engine(db_connection_url)
-    sql_temp= "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE id={}"
-    gdf_all = geopandas.GeoDataFrame()
-    for layer_id, feature_ids in combined_pois.items():
-        for feature_id in feature_ids:
-            sql_query = sql_temp.format(feature_id)
-            gdf = geopandas.read_postgis(sql_query, con)
-            number_df = pandas.DataFrame(gdf['id'])
-            attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
-            '''remove the attributes dictionary now'''
-            gdf = gdf.drop(columns=['attributes'])
-            attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
-            gdf=gdf.merge(attribute_number_df, on='id')
-            gdf.set_crs(4326, allow_override=True)
-            gdf_all = pd.concat([gdf_all,gdf],ignore_index=True)
-    os.makedirs(dir, exist_ok=True)
-    gdf_all.to_file(dir+buffer_qs.name+".shp")
-    #now for the buffer areas
-    gdf_all = geopandas.GeoDataFrame()
-    sql_temp= "SELECT id, geometry AS geom,area FROM maps_bufferareas WHERE id={}"
-    for area in bufferarea_qs:
-        sql_query = sql_temp.format(area.id)
-        gdf = geopandas.read_postgis(sql_query, con)
-        gdf.set_crs(4326, allow_override=True)
-        gdf.to_file(dir+str(area.id)+"Buffer"+".shp")
-    zipfile_name = root_dir + f'{buffer_qs.name}'
-    base_dir = f'{buffer_qs.name}/' #relative dir of files to zip from the root dir
-    shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
-    # zip file path
-    file_url = root_dir + f'{buffer_qs.name}.zip'
-    vector_file = open(file_url, 'rb')
-    response = HttpResponse(vector_file, content_type='application/force-download')
-    response['Content-Disposition'] = 'attachment; filename="%s"' % f'{buffer_qs.name}.zip'
-    if os.path.exists(root_dir): shutil.rmtree(root_dir)
-    return response
+def export_proximity_analysis(request):
+    '''
+    Description:
 
+    API to export Proximity Analysis
+    http://localhost:8000/api/maps/export_proximity_analysis/?proximity_analysis_id=38
 
+    Input args: proximity_analysis_id <int>
 
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        from shapely.geometry import Point as SPoint
+        dir, file_url = None, None
+        proximity_analysis_id = request.query_params.get('proximity_analysis_id', None)
+        if not proximity_analysis_id :
+            return Response(data={"message":"proximity_analysis_id is required params"},status=200)
+            #  get the bufferanalysis instance
+        proximity_analysis_qs = ProximityAnalysis.active.filter(id=proximity_analysis_id)
+        if proximity_analysis_qs.exists():
+            proximity_analysis_inst = proximity_analysis_qs[0]
+        else:
+            return Response(data={'message':"Proximity Analysis does not exists"},status=404)
 
+        '''retrieve all pois layer aggregrated from proximity areas'''
+        proximity_area_qs=ProximityAreas.active.filter(proximity_analysis_id=proximity_analysis_id)
+        combined_pois={}
+        for area in proximity_area_qs:
+            for layer, feature_ids in area.pois.items():
+                if layer not in combined_pois:
+                    combined_pois[layer] = feature_ids
+                else:
+                    for id in feature_ids:
+                        if id not in combined_pois[layer]:
+                            combined_pois[layer].append(id)
 
+        '''export these pois as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{proximity_analysis_inst.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        for layer_id, feature_ids in combined_pois.items():
+            if feature_ids:
+                if len(feature_ids) == 1:
+                    pois_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id = {feature_ids[0]}"
+                else:
+                    pois_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id IN {tuple(feature_ids)}"
+                gdf = geopandas.read_postgis(pois_sql, con)
+                number_df = pandas.DataFrame(gdf['id'])
+                attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+                '''remove the attributes dictionary now'''
+                gdf = gdf.drop(columns=['attributes'])
+                attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+                gdf=gdf.merge(attribute_number_df, on='id')
+                # gdf.set_crs(4326, allow_override=True)
+                layer_name = Layer.active.get(id=layer_id).name
+                gdf.to_file(dir+layer_name+".shp")
 
+        '''export proximity areas as a single layer'''
+        areas_sql = f"SELECT id, geometry AS geom, area FROM maps_proximityareas WHERE proximity_analysis_id={proximity_analysis_inst.id}"
+        gdf = geopandas.read_postgis(areas_sql, con)
+        # gdf.set_crs(4326, allow_override=True)
+        gdf.to_file(dir+"proximityareas.shp")
 
+        '''export all origin points as a single layer'''
+        points = []
+        for origin in proximity_analysis_inst.origins:
+            point = SPoint(origin[0], origin[1])
+            points.append(point)
+        gdf = geopandas.GeoDataFrame(geometry=points, crs=4326)
+        gdf.to_file(dir+"origins.shp")
 
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{proximity_analysis_inst.name}'
+        base_dir = f'{proximity_analysis_inst.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{proximity_analysis_inst.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{proximity_analysis_inst.name}.zip'
 
-
-
-
-
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if file_url and os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
