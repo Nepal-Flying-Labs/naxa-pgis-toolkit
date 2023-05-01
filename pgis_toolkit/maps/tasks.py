@@ -486,37 +486,37 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
         response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G, analysis_id)
         return response, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
+        print("error occured in CreateNetworkGraph: " + str(e))
         return (str(e), 400)
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
+def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis):
 
     from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
     try:
-        response, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
-        return response, stat, message, status
+        analysis_id, optimum_route_id, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis)
+        return analysis_id, optimum_route_id, stat, message, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
-        return None, "error", str(e), 400
+        print("error occured in CreateNetworkGraphSystem: " + str(e))
+        return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
+def CreateBuffer(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis):
 
-    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis
+    from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis
     try:
-        response, stat, message, status = buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
-        return response, stat, message, status
+        analysis_id, proximity_id, stat, message, status = proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis)
+        return analysis_id, proximity_id, stat, message, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
-        return None, "error", str(e), 400
+        print("error occured in CreateBuffer: " + str(e))
+        return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def BufferData(analysis_id, layer_ids):
 
-    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis_data
+    from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis_data
     try:
-        response, stat, message, status = buffer_analysis_data(analysis_id, layer_ids)
+        response, stat, message, status = proximity_analysis_data(analysis_id, layer_ids)
         return response, stat, message, status
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))

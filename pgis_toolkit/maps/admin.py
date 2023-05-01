@@ -126,16 +126,16 @@ class OptimumRouteAdmin(admin.ModelAdmin):
     list_filter = ('analysis_id', 'mode', 'paths')
 
 class NetworkRoutesAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'analysis_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
-    list_filter = ('route_no', 'analysis_id')
+    list_display = ('id','is_deleted', 'analysis_id', 'optimum_id', 'route_no', 'length', 'travel_time', 'uploaded_date')
+    list_filter = ('route_no', 'analysis_id', 'optimum_id')
 
-class BufferAnalysisAdmin(admin.ModelAdmin):
+class ProximityAnalysisAdmin(admin.ModelAdmin):
     list_display = ('id','is_deleted', 'analysis_id', 'origins', 'radius', 'dissolve_output', 'total_area')
     list_filter = ('analysis_id', 'dissolve_output')
 
-class BufferAreasAdmin(admin.ModelAdmin):
-    list_display = ('id','is_deleted', 'analysis_id', 'area')
-    list_filter = ('analysis_id', 'area')
+class ProximityAreasAdmin(admin.ModelAdmin):
+    list_display = ('id','is_deleted', 'analysis_id', 'proximity_analysis_id', 'area')
+    list_filter = ('analysis_id', 'proximity_analysis_id', 'area')
 
 class CeleryTaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'task_id', 'layer_id')
@@ -175,8 +175,8 @@ admin.site.register(SubLayerStyle,SubLayerStyleAdmin)
 admin.site.register(NetworkRoutes, NetworkRoutesAdmin)
 admin.site.register(Analysis, AnalysisAdmin)
 admin.site.register(OptimumRoute, OptimumRouteAdmin)
-admin.site.register(BufferAnalysis, BufferAnalysisAdmin)
-admin.site.register(BufferAreas, BufferAreasAdmin)
+admin.site.register(ProximityAnalysis, ProximityAnalysisAdmin)
+admin.site.register(ProximityAreas, ProximityAreasAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(CeleryTask, CeleryTaskAdmin)
 admin.site.register(QueryLayer, QueryLayerAdmin)
