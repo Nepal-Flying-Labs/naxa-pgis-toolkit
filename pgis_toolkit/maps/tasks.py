@@ -490,11 +490,11 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
         return (str(e), 400)
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis):
+def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
 
     from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
     try:
-        analysis_id, optimum_route_id, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis)
+        analysis_id, optimum_route_id, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
         return analysis_id, optimum_route_id, stat, message, status
     except Exception as e:
         print("error occured in CreateNetworkGraphSystem: " + str(e))

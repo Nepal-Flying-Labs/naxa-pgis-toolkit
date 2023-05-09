@@ -2698,7 +2698,7 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','result_name']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'analysis_id', 'name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
                     return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type,result_name are required!'}, status=400)
@@ -2713,28 +2713,17 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
-            result_name=request_dict['result_name']
-            type=request_dict['type']
             mode = request_dict['mode']
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
-            project = int(request_dict['project'])
             analysis_id = request_dict.get('analysis_id',None)
-            if analysis_id :
-                first_analysis = False
-                try:
-                    analysis_inst = Analysis.active.get(id=analysis_id)
-                    road_network = OptimumRoute.active.filter(analysis_id=analysis_id)[0].road_network
-                except Exception as e:
-                    return Response(data={"message":str(e)},status=400)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+                road_network = optimum_route_qs[0].road_network if optimum_route_qs else road_network
             else:
-                first_analysis = True
-                if Analysis.active.filter(project=project, name=name).exists():
-                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
-                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
-            analysis_id = analysis_inst.id
-            if OptimumRoute.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={"message": "Analysis not found"},status=404)
+            if OptimumRoute.active.filter(analysis_id=analysis_id, name=name).exists():
                 return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=name)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2744,7 +2733,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
