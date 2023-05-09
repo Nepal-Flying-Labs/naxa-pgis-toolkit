@@ -2698,10 +2698,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'analysis_id', 'name']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'analysis_id', 'name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type,result_name are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, name, ,analysis_id are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2789,42 +2789,30 @@ class ProximityAnalysisAPIView(APIView):
         try:
             analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois','result_name']
+            check_list = ['origins', 'radius', 'analysis_id', 'pois','name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, pois,result_name are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, name, pois, analysis_id are required!'}, status=400)
             name = request_dict['name']
-            result_name=request_dict['result_name']
-            type = request_dict['type']
-            project = int(request_dict['project'])
             origins = json.loads(request_dict['origins'])
             radius = float(request_dict['radius'])
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
             analysis_id = request_dict.get('analysis_id',None)
-            if analysis_id :
-                first_analysis = False
-                try:
-                    analysis_inst = Analysis.active.get(id=analysis_id)
-                except Exception as e:
-                    return Response(data={"message":str(e)},status=400)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
             else:
-                first_analysis = True
-                if Analysis.active.filter(project=project, name=name).exists():
-                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
-                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
-            analysis_id = analysis_inst.id
-            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={"message": "Analysis not found"},status=404)
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
                 return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
-            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
+            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
             proximity_id = proximity_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis)
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             print('Error occured in ProximityAnalysisAPIView',str(e))
