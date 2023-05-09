@@ -442,6 +442,7 @@ class ProjectMapConfig(DateTimeStamp,IsDeleted):
 class Analysis(DateTimeStamp,IsDeleted):
     name = models.CharField(max_length=254)
     project = models.IntegerField(db_index=True)
+    description = models.TextField(blank=True, null=True)
     display = models.BooleanField(default=False)
     type = models.CharField(max_length=100, choices=ANALYSIS_TYPE_CHOICES)
     geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
