@@ -2,6 +2,7 @@ import json
 
 from attr import fields
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from pgis_toolkit.maps.models import *
 from pgis_toolkit.maps.utils.project_style import get_style_detail
@@ -306,6 +307,18 @@ class AnalysisSerializer(serializers.ModelSerializer):
     class Meta:
         model = Analysis
         fields = '__all__'
+
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Analysis.active.all(),
+                fields=['name', 'project', 'type'],
+                message='Analysis name should be unique for a project.',
+            )
+        ]
+class AnalysisListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Analysis
+        fields = ('id', 'name', 'project', 'description', 'uploaded_date', 'last_updated')
 
 class ProximityAreasMapSerializer(serializers.ModelSerializer):
     class Meta:

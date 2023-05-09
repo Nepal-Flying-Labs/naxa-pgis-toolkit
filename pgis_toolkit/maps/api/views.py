@@ -137,6 +137,7 @@ from pgis_toolkit.utils.vectortile import (
 )
 
 from .serializers import (
+    AnalysisListSerializer,
     AnalysisSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
@@ -4088,28 +4089,38 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
 class AnalysisViewset(viewsets.ModelViewSet):
     '''Analysis CRUD operations'''
     queryset = Analysis.active.all()
-    http_method_names = ['patch']
+    http_method_names = ['get', 'post', 'patch']
     default_serializer_class = AnalysisSerializer
     serializer_classes = {
-        'list': AnalysisSerializer,
+        'list': AnalysisListSerializer,
         'retrieve': AnalysisSerializer,
     }
 
-    # def get_queryset(self, pk=None, *args, **kwargs):
-    #     try:
-    #         id = self.request.resolver_match.kwargs.get('pk')
-    #         project = self.request.query_params.get('project', None)
-    #         if id:
-    #             queryset=self.queryset.filter(id=id)
-    #         elif project:
-    #             queryset=self.queryset.filter(project=project)
-    #         return queryset
-    #     except Exception as e:
-    #         return str(e)
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            project = self.request.query_params.get('project', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif project:
+                queryset=self.queryset.filter(project=project).order_by('-id')
+            return queryset
+        except Exception as e:
+            return str(e)
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
+    # def create (self, request, *args, **kwargs):
+        # try:
+        #     serializer = self.get_serialzer(data=request.data)
+        #     if serialzier.is_valid():
+        #         project = request.data.get('project', None)
+        #         name = request.data.get('name', None)
+        #         type = request.data.get('type', None)
+        #         serialzier
+        # except Exception as e:
+        #     return Response(data={'message': str(e)}, status=400)
 class ProximityAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Buffer Regions
