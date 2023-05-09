@@ -137,6 +137,7 @@ from pgis_toolkit.utils.vectortile import (
 )
 
 from .serializers import (
+    AnalysisListSerializer,
     AnalysisSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
@@ -2697,10 +2698,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type','result_name']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'analysis_id', 'name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type,result_name are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, name, ,analysis_id are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2712,28 +2713,17 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
-            result_name=request_dict['result_name']
-            type=request_dict['type']
             mode = request_dict['mode']
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
-            project = int(request_dict['project'])
             analysis_id = request_dict.get('analysis_id',None)
-            if analysis_id :
-                first_analysis = False
-                try:
-                    analysis_inst = Analysis.active.get(id=analysis_id)
-                    road_network = OptimumRoute.active.filter(analysis_id=analysis_id)[0].road_network
-                except Exception as e:
-                    return Response(data={"message":str(e)},status=400)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+                road_network = optimum_route_qs[0].road_network if optimum_route_qs else road_network
             else:
-                first_analysis = True
-                if Analysis.active.filter(project=project, name=name).exists():
-                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
-                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
-            analysis_id = analysis_inst.id
-            if OptimumRoute.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={"message": "Analysis not found"},status=404)
+            if OptimumRoute.active.filter(analysis_id=analysis_id, name=name).exists():
                 return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=result_name)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=name)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2743,7 +2733,7 @@ class OptimumRouteAnalysisAPIView(APIView):
                 response = CreateNetworkGraph.delay(origin_long, origin_lat, destination_long, destination_lat, k, distance, analysis_id)
                 # response, status = CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_lat, k, distance)
             elif source == 'system':
-                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis)
+                response = CreateNetworkGraphSystem.delay(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
             else:
                 response = 'source parameter is missing!'
                 status = 400
@@ -2799,42 +2789,30 @@ class ProximityAnalysisAPIView(APIView):
         try:
             analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois','result_name']
+            check_list = ['origins', 'radius', 'analysis_id', 'pois','name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, pois,result_name are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, name, pois, analysis_id are required!'}, status=400)
             name = request_dict['name']
-            result_name=request_dict['result_name']
-            type = request_dict['type']
-            project = int(request_dict['project'])
             origins = json.loads(request_dict['origins'])
             radius = float(request_dict['radius'])
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
             analysis_id = request_dict.get('analysis_id',None)
-            if analysis_id :
-                first_analysis = False
-                try:
-                    analysis_inst = Analysis.active.get(id=analysis_id)
-                except Exception as e:
-                    return Response(data={"message":str(e)},status=400)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
             else:
-                first_analysis = True
-                if Analysis.active.filter(project=project, name=name).exists():
-                    return Response(data={'message': 'Analysis name cannot be duplicated for a project.'}, status=400)
-                analysis_inst= Analysis.active.create(name=name, type=type, display=display, project=project)
-            analysis_id = analysis_inst.id
-            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=result_name).exists():
+                return Response(data={"message": "Analysis not found"},status=404)
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
                 return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
-            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=result_name, geom_type='Polygon')
+            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
             proximity_id = proximity_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis)
+            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             print('Error occured in ProximityAnalysisAPIView',str(e))
@@ -4088,28 +4066,38 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
 class AnalysisViewset(viewsets.ModelViewSet):
     '''Analysis CRUD operations'''
     queryset = Analysis.active.all()
-    http_method_names = ['patch']
+    http_method_names = ['get', 'post', 'patch']
     default_serializer_class = AnalysisSerializer
     serializer_classes = {
-        'list': AnalysisSerializer,
+        'list': AnalysisListSerializer,
         'retrieve': AnalysisSerializer,
     }
 
-    # def get_queryset(self, pk=None, *args, **kwargs):
-    #     try:
-    #         id = self.request.resolver_match.kwargs.get('pk')
-    #         project = self.request.query_params.get('project', None)
-    #         if id:
-    #             queryset=self.queryset.filter(id=id)
-    #         elif project:
-    #             queryset=self.queryset.filter(project=project)
-    #         return queryset
-    #     except Exception as e:
-    #         return str(e)
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            project = self.request.query_params.get('project', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif project:
+                queryset=self.queryset.filter(project=project).order_by('-id')
+            return queryset
+        except Exception as e:
+            return str(e)
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
+    # def create (self, request, *args, **kwargs):
+        # try:
+        #     serializer = self.get_serialzer(data=request.data)
+        #     if serialzier.is_valid():
+        #         project = request.data.get('project', None)
+        #         name = request.data.get('name', None)
+        #         type = request.data.get('type', None)
+        #         serialzier
+        # except Exception as e:
+        #     return Response(data={'message': str(e)}, status=400)
 class ProximityAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Buffer Regions

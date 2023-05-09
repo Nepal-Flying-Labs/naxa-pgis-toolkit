@@ -164,7 +164,7 @@ def convert_shp2graph(gdf, make_G_bidi = True, name='unamed'):
             G.add_edge(u, v, **dict_row)
     return G
 
-def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id, first_analysis):
+def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id):
     errors=[]
     try:
         drive_osm_keys = ("primary", "secondary", "tertiary", "unclassified", "residential", "motorway")
@@ -286,14 +286,10 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             optimum_route_inst.save()
             return analysis_id, optimum_route_id, "success", "", 200
         except Exception as e:
-            if first_analysis and Analysis.objects.filter(id=analysis_id).exists():
-                Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
             return None, None, "route_not_found", str(e), 200
     except Exception as e:
-        if first_analysis and Analysis.objects.filter(id=analysis_id).exists():
-            Analysis.objects.get(id=analysis_id).delete()
         if OptimumRoute.objects.filter(id=optimum_route_id).exists():
             OptimumRoute.objects.get(id=optimum_route_id).delete()
         return None, None, "error", str(e), 400

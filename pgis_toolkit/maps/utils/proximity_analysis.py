@@ -116,7 +116,7 @@ def dissolve_data(data):
 #         datas.append(df)
 #     return datas
 
-def proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois, first_analysis):
+def proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois):
     try:
         points = []
         for origin in origins:
@@ -202,8 +202,6 @@ def proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_
         proximity_inst.save()
         return analysis_id, proximity_id, "success", "", 200
     except Exception as e:
-        if first_analysis and Analysis.objects.filter(id=analysis_id).exists():
-            Analysis.objects.get(id=analysis_id).delete()
         if ProximityAnalysis.objects.filter(id=proximity_id).exists():
             ProximityAnalysis.objects.get(id=proximity_id).delete()
         return None, None, "error", str(e), 400
