@@ -3049,6 +3049,40 @@ class BufferAreasCollection(viewsets.ModelViewSet):
             return paginator.get_paginated_response(data=serializer.data)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+
+class BufferAreaTileQuerySet(LayerMVTView, DetailView):
+    '''
+    VectorTile Generation for Buffer Regions
+    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=&buffer_analysis_id=",
+    '''
+    vector_tile_layer_name = 'buffer_area'
+    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id', 'attributes')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'area' in request_keys and request.GET['area'] != "":
+            area=request.GET['area']
+            queryset=BufferAreas.active.filter(id=area)
+        elif 'buffer_analysis_id' in request_keys and request.GET['buffer_analysis_id'] != "":
+            buffer_analysis_id=request.GET['buffer_analysis_id']
+            queryset=BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id)
+        else:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
+
 @api_view(['GET'])
 def get_analysis_task_response(request):
     '''
