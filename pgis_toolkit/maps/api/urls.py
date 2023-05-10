@@ -60,6 +60,7 @@ from pgis_toolkit.maps.api.views import (
     cleaning_error_features,
     copy_features,
     delete_sequence,
+    export_buffer_analysis,
     export_optimum_route_analysis,
     export_proximity_analysis,
     feature_popup,
@@ -191,6 +192,7 @@ urlpatterns = [
     path('export_proximity_analysis/',export_proximity_analysis,name='export_proximity_analysis'),
     path('buffer_analysis/', BufferAnalysisAPIView.as_view(), name='buffer_analysis'),
     path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('export_buffer_analysis/',export_buffer_analysis,name='export_buffer_analysis'),
 
     #==================
     #   Advance Query

@@ -1963,6 +1963,67 @@ def export_proximity_analysis(request):
         if file_url and os.path.isfile(file_url): os.remove(file_url)
         return Response(status=400, data={'message': str(e)})
 
+@api_view(['GET'])
+def export_buffer_analysis(request):
+    '''
+    Description:
+
+    API to export Buffer Analysis
+    http://localhost:8000/api/maps/export_buffer_analysis/?buffer_analysis_id=38
+
+    Input args: buffer_analysis_id <int>
+
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        from shapely.geometry import Point as SPoint
+        dir, file_url = None, None
+        buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+        if not buffer_analysis_id :
+            return Response(data={"message":"buffer_analysis_id is required params"},status=200)
+            #  get the bufferanalysis instance
+        buffer_analysis_qs = BufferAnalysis.active.filter(id=buffer_analysis_id)
+        if buffer_analysis_qs.exists():
+            buffer_analysis_inst = buffer_analysis_qs[0]
+        else:
+            return Response(data={'message':"Buffer Analysis does not exists"},status=404)
+
+        '''export these pois as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{buffer_analysis_inst.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        buffer_sql= f"SELECT id, geometry AS geom, area, attributes FROM maps_bufferareas WHERE buffer_analysis_id = {buffer_analysis_inst.id}"
+        gdf = geopandas.read_postgis(buffer_sql, con)
+        number_df = pandas.DataFrame(gdf['id'])
+        attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+        '''remove the attributes dictionary now'''
+        gdf = gdf.drop(columns=['attributes'])
+        attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+        gdf=gdf.merge(attribute_number_df, on='id')
+        layer_name = buffer_analysis_inst.name
+        gdf.to_file(dir+layer_name+".shp")
+
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{buffer_analysis_inst.name}'
+        base_dir = f'{buffer_analysis_inst.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{buffer_analysis_inst.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{buffer_analysis_inst.name}.zip'
+
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if file_url and os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
+
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
     Viewset for FeatureCollection innstance
