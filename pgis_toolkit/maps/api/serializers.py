@@ -364,3 +364,15 @@ class ProximityAreasSerializer(serializers.ModelSerializer):
                 poi_json = {}
         representation['poi'] = poi_list
         return representation
+
+class BufferAreasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAreas
+        fields = ('id', 'area')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        attributes = instance.attributes
+        if attributes:
+            representation |= attributes
+        return representation

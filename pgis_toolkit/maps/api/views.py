@@ -47,6 +47,8 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    BufferAnalysis,
+    BufferAreas,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -101,6 +103,7 @@ from pgis_toolkit.maps.tasks import (
     CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
+    CreateProximity,
     FeatureImageFromURL,
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -139,6 +142,7 @@ from pgis_toolkit.utils.vectortile import (
 from .serializers import (
     AnalysisListSerializer,
     AnalysisSerializer,
+    BufferAreasSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
@@ -1959,6 +1963,67 @@ def export_proximity_analysis(request):
         if file_url and os.path.isfile(file_url): os.remove(file_url)
         return Response(status=400, data={'message': str(e)})
 
+@api_view(['GET'])
+def export_buffer_analysis(request):
+    '''
+    Description:
+
+    API to export Buffer Analysis
+    http://localhost:8000/api/maps/export_buffer_analysis/?buffer_analysis_id=38
+
+    Input args: buffer_analysis_id <int>
+
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        from shapely.geometry import Point as SPoint
+        dir, file_url = None, None
+        buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+        if not buffer_analysis_id :
+            return Response(data={"message":"buffer_analysis_id is required params"},status=200)
+            #  get the bufferanalysis instance
+        buffer_analysis_qs = BufferAnalysis.active.filter(id=buffer_analysis_id)
+        if buffer_analysis_qs.exists():
+            buffer_analysis_inst = buffer_analysis_qs[0]
+        else:
+            return Response(data={'message':"Buffer Analysis does not exists"},status=404)
+
+        '''export these pois as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{buffer_analysis_inst.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        buffer_sql= f"SELECT id, geometry AS geom, area, attributes FROM maps_bufferareas WHERE buffer_analysis_id = {buffer_analysis_inst.id}"
+        gdf = geopandas.read_postgis(buffer_sql, con)
+        number_df = pandas.DataFrame(gdf['id'])
+        attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+        '''remove the attributes dictionary now'''
+        gdf = gdf.drop(columns=['attributes'])
+        attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+        gdf=gdf.merge(attribute_number_df, on='id')
+        layer_name = buffer_analysis_inst.name
+        gdf.to_file(dir+layer_name+".shp")
+
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{buffer_analysis_inst.name}'
+        base_dir = f'{buffer_analysis_inst.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{buffer_analysis_inst.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{buffer_analysis_inst.name}.zip'
+
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if file_url and os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
+
 class FeatureCollectionViewset(viewsets.ModelViewSet):
     '''
     Viewset for FeatureCollection innstance
@@ -2812,7 +2877,7 @@ class ProximityAnalysisAPIView(APIView):
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
+            response = CreateProximity.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             print('Error occured in ProximityAnalysisAPIView',str(e))
@@ -2951,35 +3016,133 @@ class ProximityAreasCollection(viewsets.ModelViewSet):
     # def get_serializer_class(self):
     #     return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-class ProximityAnalysisDataAPIView(APIView):
+class BufferAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
-        '''Buffer Analysis
+        """
+        Description:
+        ------------
+        Logic to generate buffer areas
 
-        Parameters
-        ----------
-        distance : float
+        Parameters:
+        -----------
+        layer: <int> layer_id
+        radius: <float> buffer radius
+        radius_col: <str> radius column name
+        dissolve_output: <bool> dissolve overlapping polygons or not.
+        analysis_id: <int> analysis_id
+        buffer_analysis_id: <int> buffer_analysis_id
 
-        Returns
-        -------
-        message : string
-        task_id : string
-        '''
+        Returns:
+        --------
+        json data with analysis_id, buffer_analysis_id, message_code, message, status_code
+
+        """
         try:
+            analysis_inst = None
             request_dict = request.data
-            check_list = ['analysis_id', 'layer_ids']
+            check_list = ['layer', 'analysis_id','name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'analysis_id, layer_ids are required!'}, status=400)
-            analysis_id = int(request_dict['analysis_id'])
-            layer_ids = json.loads(request_dict['layer_ids'])
+                    return Response(data={'message': 'layer, name, analysis_id are required!'}, status=400)
+            layer = request_dict['layer']
+            name = request_dict['name']
+            radius = float(request_dict['radius']) if request_dict.get('radius') else None
+            radius_col =  request_dict.get('radius_col', None)
+            if not radius and not radius_col:
+                return Response(data={'message': 'radius or radius_col params is required.'}, status=400)
+            dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
+            dissolve_output = True if dissolve_output == 'true' else False
+            analysis_id = request_dict.get('analysis_id',None)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+            else:
+                return Response(data={"message": "Analysis not found"},status=404)
+            if BufferAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, layer=layer, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
+            buffer_id = buffer_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
+                analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = BufferData(analysis_id, layer_ids)
-            return Response(status=200, data={'message': 'success', 'task_id': response})
+            response = CreateBuffer.delay(layer, radius, radius_col, dissolve_output, analysis_id, buffer_id)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
+            print('Error occured in ProximityAnalysisAPIView',str(e))
+            if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
+class BufferAreasCollection(viewsets.ModelViewSet):
+    '''
+    Viewset for BufferAreas objects
+    '''
+    queryset = BufferAreas.active.all()
+    http_method_names = ['get']
+    serializer_class = BufferAreasSerializer
+
+    def list(self, request, *args, **kwargs):
+        try:
+            paginator = CustomPageNumberPagination()
+            buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+            if not buffer_analysis_id:
+                return Response(data={'message': 'params buffer_analysis_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(buffer_analysis_id=buffer_analysis_id)
+            '''search_key'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                search_fields = list(queryset.first().attributes.keys())
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs['attributes__'+field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            ''''order_by'''
+            order_by = request.query_params.get('ordering', None)
+            if order_by:
+                if 'id' in order_by:
+                    queryset = queryset.order_by(order_by)
+                else:
+                    queryset = queryset.order_by('attributes__'+order_by)
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+class BufferAreaTileQuerySet(LayerMVTView, DetailView):
+    '''
+    VectorTile Generation for Buffer Regions
+    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=&buffer_analysis_id=",
+    '''
+    vector_tile_layer_name = 'buffer_area'
+    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id', 'attributes')
+
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
+        try:
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'area' in request_keys and request.GET['area'] != "":
+            area=request.GET['area']
+            queryset=BufferAreas.active.filter(id=area)
+        elif 'buffer_analysis_id' in request_keys and request.GET['buffer_analysis_id'] != "":
+            buffer_analysis_id=request.GET['buffer_analysis_id']
+            queryset=BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id)
+        else:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 @api_view(['GET'])
 def get_analysis_task_response(request):
