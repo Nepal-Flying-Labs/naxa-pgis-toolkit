@@ -48,6 +48,7 @@ from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
     BufferAnalysis,
+    BufferAreas,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -141,6 +142,7 @@ from pgis_toolkit.utils.vectortile import (
 from .serializers import (
     AnalysisListSerializer,
     AnalysisSerializer,
+    BufferAreasSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
@@ -3009,7 +3011,44 @@ class BufferAnalysisAPIView(APIView):
             if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
+class BufferAreasCollection(viewsets.ModelViewSet):
+    '''
+    Viewset for BufferAreas objects
+    '''
+    queryset = BufferAreas.active.all()
+    http_method_names = ['get']
+    serializer_class = BufferAreasSerializer
 
+    def list(self, request, *args, **kwargs):
+        try:
+            paginator = CustomPageNumberPagination()
+            buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+            if not buffer_analysis_id:
+                return Response(data={'message': 'params buffer_analysis_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(buffer_analysis_id=buffer_analysis_id)
+            '''search_key'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                search_fields = list(queryset.first().attributes.keys())
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs['attributes__'+field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            ''''order_by'''
+            order_by = request.query_params.get('ordering', None)
+            if order_by:
+                if 'id' in order_by:
+                    queryset = queryset.order_by(order_by)
+                else:
+                    queryset = queryset.order_by('attributes__'+order_by)
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            return paginator.get_paginated_response(data=serializer.data)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 @api_view(['GET'])
 def get_analysis_task_response(request):
     '''

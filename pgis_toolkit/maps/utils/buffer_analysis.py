@@ -64,7 +64,7 @@ def buffer_analysis(layer, radius,  radius_col, dissolve_output, analysis_id, bu
                 (SELECT
                 {analysis_id} AS analysis_id,
                 {buffer_analysis_id} as buffer_analysis_id,
-                attributes,
+                attributes[1],
                 geometry,
                 ST_Area(geometry)*(111139^2) AS area,
                 False,

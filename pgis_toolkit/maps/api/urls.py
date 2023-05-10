@@ -7,6 +7,7 @@ from pgis_toolkit.maps.api.views import (
     AdvanceQueryAPIView,
     AnalysisViewset,
     BufferAnalysisAPIView,
+    BufferAreasCollection,
     DataMergeUpdateAPIView,
     DropdownChoiceViewset,
     ErrorFeaturesVectorTileQuerySet,
@@ -128,6 +129,11 @@ router.register(r'network_route_collection', NetworkRoutesCollection, basename='
 #  ProximityAreas
 #==================
 router.register(r'proximity_area_collection', ProximityAreasCollection, basename='proximity_area_collection')
+
+#==================
+#  BufferAreas
+#==================
+router.register(r'buffer_area_collection', BufferAreasCollection, basename='buffer_area_collection')
 app_name = "projects"
 
 def trigger_error(request):
