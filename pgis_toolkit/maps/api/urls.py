@@ -6,6 +6,7 @@ from pgis_toolkit.maps.api.views import (
     AdvanceFilterVectorTileQuerySet,
     AdvanceQueryAPIView,
     AnalysisViewset,
+    BufferAnalysisAPIView,
     DataMergeUpdateAPIView,
     DropdownChoiceViewset,
     ErrorFeaturesVectorTileQuerySet,
@@ -31,7 +32,6 @@ from pgis_toolkit.maps.api.views import (
     ProjectsLayerTemplateDropdownChoiceViewset,
     ProjectStyleViewset,
     ProximityAnalysisAPIView,
-    ProximityAnalysisDataAPIView,
     ProximityAreasCollection,
     ProximityAreaTileQuerySet,
     QueryFeatureCollectionViewset,
@@ -115,9 +115,13 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
 
 #==================
-#  NetworkRoutes
+#  Analysis
 #==================
 router.register(r'analysis', AnalysisViewset, basename='analysis')
+
+#==================
+#  NetworkRoutes
+#==================
 router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
 
 #==================
@@ -178,6 +182,8 @@ urlpatterns = [
     path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
     path('export_proximity_analysis/',export_proximity_analysis,name='export_proximity_analysis'),
+    path('buffer_analysis/', BufferAnalysisAPIView.as_view(), name='buffer_analysis'),
+
     #==================
     #   Advance Query
     #==================

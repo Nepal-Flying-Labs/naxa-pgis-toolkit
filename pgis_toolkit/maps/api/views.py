@@ -47,6 +47,7 @@ from config.settings.base import MEDIA_ROOT, MONGO_DB, env
 from pgis_toolkit.celery_app import app, get_celery_worker_status
 from pgis_toolkit.maps.models import (
     Analysis,
+    BufferAnalysis,
     Category,
     CeleryTask,
     CleaningErrors,
@@ -101,6 +102,7 @@ from pgis_toolkit.maps.tasks import (
     CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
+    CreateProximity,
     FeatureImageFromURL,
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -2812,7 +2814,7 @@ class ProximityAnalysisAPIView(APIView):
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
+            response = CreateProximity.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
             print('Error occured in ProximityAnalysisAPIView',str(e))
@@ -2951,33 +2953,60 @@ class ProximityAreasCollection(viewsets.ModelViewSet):
     # def get_serializer_class(self):
     #     return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-class ProximityAnalysisDataAPIView(APIView):
+class BufferAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
-        '''Buffer Analysis
+        """
+        Description:
+        ------------
+        Logic to generate buffer areas
 
-        Parameters
-        ----------
-        distance : float
+        Parameters:
+        -----------
+        layer: <int> layer_id
+        radius: <float> buffer radius
+        radius_col: <str> radius column name
+        dissolve_output: <bool> dissolve overlapping polygons or not.
+        analysis_id: <int> analysis_id
+        buffer_analysis_id: <int> buffer_analysis_id
 
-        Returns
-        -------
-        message : string
-        task_id : string
-        '''
+        Returns:
+        --------
+        json data with analysis_id, buffer_analysis_id, message_code, message, status_code
+
+        """
         try:
+            analysis_inst = None
             request_dict = request.data
-            check_list = ['analysis_id', 'layer_ids']
+            check_list = ['layer', 'analysis_id','name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'analysis_id, layer_ids are required!'}, status=400)
-            analysis_id = int(request_dict['analysis_id'])
-            layer_ids = json.loads(request_dict['layer_ids'])
+                    return Response(data={'message': 'layer, name, analysis_id are required!'}, status=400)
+            layer = request_dict['layer']
+            name = request_dict['name']
+            radius = float(request_dict['radius']) if request_dict.get('radius') else None
+            radius_col =  request_dict.get('radius_col', None)
+            if not radius and not radius_col:
+                return Response(data={'message': 'radius or radius_col params is required.'}, status=400)
+            dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
+            dissolve_output = True if dissolve_output == 'true' else False
+            analysis_id = request_dict.get('analysis_id',None)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+            else:
+                return Response(data={"message": "Analysis not found"},status=404)
+            if BufferAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, layer=layer, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
+            buffer_id = buffer_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
+                analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = BufferData(analysis_id, layer_ids)
-            return Response(status=200, data={'message': 'success', 'task_id': response})
+            response = CreateBuffer.delay(layer, radius, radius_col, dissolve_output, analysis_id, buffer_id)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
+            print('Error occured in ProximityAnalysisAPIView',str(e))
+            if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
 
