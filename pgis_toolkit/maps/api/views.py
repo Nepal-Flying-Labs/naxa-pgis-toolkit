@@ -3319,6 +3319,16 @@ def analysis_result_list(request, *args, **kwargs):
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
+        elif analysis_type == 'buffer':
+            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+                if search_key:
+                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                else:
+                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
     except Exception as e:
