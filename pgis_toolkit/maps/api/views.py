@@ -3375,6 +3375,12 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict['proximity_areas'] = serializer.data
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
+        elif analysis_type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
+                if buffer_analysis_qs.exists():
+                    analysis_dict = buffer_analysis_qs.values('id', 'layer', 'radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                else:
+                    return Response(data={"message":"Analysis does not exists"},status=400)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
         return Response(analysis_dict, status=200)
