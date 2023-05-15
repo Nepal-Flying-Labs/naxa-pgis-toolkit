@@ -3319,6 +3319,16 @@ def analysis_result_list(request, *args, **kwargs):
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
+        elif analysis_type == 'buffer':
+            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+                if search_key:
+                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                else:
+                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis does not exists"},status=404)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
     except Exception as e:
@@ -3365,6 +3375,12 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict['proximity_areas'] = serializer.data
                 else:
                     return Response(data={"message":"Analysis does not exists"},status=400)
+        elif analysis_type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
+                if buffer_analysis_qs.exists():
+                    analysis_dict = buffer_analysis_qs.values('id', 'layer', 'radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                else:
+                    return Response(data={"message":"Analysis does not exists"},status=400)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
         return Response(analysis_dict, status=200)
@@ -3377,31 +3393,41 @@ def analysis_type_list(request, *args, **kwargs):
     '''
     Returns list of analysis objects.
     '''
-    paginator = CustomPageNumberPagination()
-    project_id = request.query_params.get('project_id', None)
-    type = request.query_params.get('type', None)
-    if  project_id is None:
-        return Response(data={"message":"project_id is required parmas"},status=400)
-    if not Project.objects.filter(id=project_id).exists():
-        return Response(data={"message":"Project does not exist"},status=404)
-    if type not in ('optimum_route','proximity'):
-        return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
-    '''search_key'''
-    search_key = request.query_params.get('search', None)
-    if type == 'optimum_route':
-        if search_key:
-            optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
-        else:
-            optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
-        paginated_qs = paginator.paginate_queryset(optimum_qs, request)
-        return paginator.get_paginated_response(paginated_qs)
-    elif type == 'proximity':
-        if search_key:
-            buffer_qs  = Analysis.objects.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
-        else:
-            buffer_qs  = Analysis.objects.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
-        paginated_qs = paginator.paginate_queryset(buffer_qs, request)
-        return paginator.get_paginated_response(paginated_qs)
+    try:
+        paginator = CustomPageNumberPagination()
+        project_id = request.query_params.get('project_id', None)
+        type = request.query_params.get('type', None)
+        if  project_id is None:
+            return Response(data={"message":"project_id is required parmas"},status=400)
+        if not Project.objects.filter(id=project_id).exists():
+            return Response(data={"message":"Project does not exist"},status=404)
+        if type not in ('optimum_route','proximity', 'buffer'):
+            return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
+        '''search_key'''
+        search_key = request.query_params.get('search', None)
+        if type == 'optimum_route':
+            if search_key:
+                optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(optimum_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+        elif type == 'proximity':
+            if search_key:
+                proximity_qs  = Analysis.objects.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                proximity_qs  = Analysis.objects.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(proximity_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+        elif type == 'buffer':
+            if search_key:
+                buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
