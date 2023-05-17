@@ -172,13 +172,56 @@ def check_self_intersection(layer):
     content = {"error_data": len(self_intersection_rows), "total_data": total_data}
     return content
 
+# def check_snapping(layer):
+#     """Check for isolated points
+
+#     Parameters
+#     ----------
+#     data : GeoDataFrame
+#         The data to check
+
+#     Returns
+#     -------
+#     content: dict
+#         message: str
+#             The message to display
+#         data : GeoDataFrame
+#     """
+#     gdf = get_all_layer(layer)
+#     total_data = len(gdf)
+#     sql = f'''WITH segments AS (
+#         SELECT id as id, (
+#         ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
+#         FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
+#         )
+#         SELECT * FROM segments WHERE geometry IS NOT NULL;'''
+#     data = gpd.read_postgis(sql, con, geom_col="geometry")
+#     graph = momepy.gdf_to_nx(data, approach='primal')
+#     components = list(nx.connected_components(graph))
+#     components.sort(key=len, reverse=True)
+#     largest = components.pop(0)
+#     isolated = list( g for cc in components for g in cc )
+#     points = [Point(xy) for xy in isolated]
+#     gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
+#     try:
+#         gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
+#         s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+#             INNER JOIN snap_points b ON
+#             (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
+#         f_data = gpd.read_postgis(s, con, geom_col="geometry")
+#         con.execute('''DROP TABLE IF EXISTS snap_points;''')
+#         CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": list(f_data['id'])})
+#         content = {"error_data": len(f_data), "total_data": total_data}
+#         return content
+#     except Exception as e:
+#         return {"message": str(e)}
+
 def check_snapping(layer):
     """Check for isolated points
 
     Parameters
     ----------
-    data : GeoDataFrame
-        The data to check
+    layer : The layer to check for isolated road features
 
     Returns
     -------
@@ -187,34 +230,53 @@ def check_snapping(layer):
             The message to display
         data : GeoDataFrame
     """
-    gdf = get_all_layer(layer)
-    total_data = len(gdf)
-    sql = f'''WITH segments AS (
-        SELECT id as id, (
-        ST_MakeLine(lag((pt).geom, 1, NULL) OVER (PARTITION BY id ORDER BY id, (pt).path), (pt).geom)) AS geometry
-        FROM (SELECT id, ST_DumpPoints(geometry) AS pt FROM maps_featurecollectionmirror WHERE layer_id={layer}) as dumps
-        )
-        SELECT * FROM segments WHERE geometry IS NOT NULL;'''
-    data = gpd.read_postgis(sql, con, geom_col="geometry")
-    graph = momepy.gdf_to_nx(data, approach='primal')
-    components = list(nx.connected_components(graph))
-    components.sort(key=len, reverse=True)
-    largest = components.pop(0)
-    isolated = list( g for cc in components for g in cc )
-    points = [Point(xy) for xy in isolated]
-    gdf = gpd.GeoDataFrame(crs=4326, geometry=points)
+    from django.db import connection
+    sql = f"""
+            WITH connected_counts AS (
+                SELECT a.id, a.geometry,
+                    COUNT(b.id) AS connected_count,
+                    ARRAY_AGG(b.id) AS connected_ids
+                FROM maps_featurecollectionmirror a
+                LEFT JOIN maps_featurecollectionmirror b ON
+                    a.layer_id = b.layer_id AND b.is_deleted=False AND a.id <= b.id AND (
+                        ST_Intersects(a.geometry, b.geometry)
+                        OR ST_StartPoint(a.geometry) = ST_EndPoint(b.geometry)
+                        OR ST_EndPoint(a.geometry) = ST_StartPoint(b.geometry)
+                        OR ST_Contains(a.geometry, ST_StartPoint(b.geometry))
+                        OR ST_Contains(a.geometry, ST_EndPoint(b.geometry))
+                        OR ST_Contains(b.geometry, ST_StartPoint(a.geometry))
+                        OR ST_Contains(b.geometry, ST_EndPoint(a.geometry))
+                    )
+                WHERE a.layer_id = {layer} AND a.is_deleted = False
+                GROUP BY a.id, a.geometry
+            ), connected_ids_first AS (
+                SELECT connected_ids
+                FROM connected_counts
+                ORDER BY connected_count DESC
+                LIMIT 1
+            )
+            SELECT id
+            FROM maps_featurecollectionmirror
+            WHERE layer_id={layer} AND is_deleted=False AND id NOT IN
+                (SELECT unnest(connected_ids) AS connected_ids
+                FROM connected_ids_first);
+            """
     try:
-        gdf.to_postgis(con=con, name="snap_points", if_exists='replace', schema='public')
-        s = f'''SELECT DISTINCT a.* from (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-            INNER JOIN snap_points b ON
-            (a.geometry && b.geometry AND ST_Contains(a.geometry, b.geometry));'''
-        f_data = gpd.read_postgis(s, con, geom_col="geometry")
-        con.execute('''DROP TABLE IF EXISTS snap_points;''')
-        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": list(f_data['id'])})
-        content = {"error_data": len(f_data), "total_data": total_data}
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            result = cursor.fetchall()
+        if result:
+            isolated_ids = []
+            for res in result:
+                isolated_ids.append(res[0])
+            CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": isolated_ids})
+            content = {"error_data": len(isolated_ids), "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
+        else:
+            content = {"error_data": 0, "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
         return content
     except Exception as e:
-        return {"message": str(e)}
+        print('Isolated geometries check failed. Details:', str(e))
+        return Response(data={'message': 'Isolated geometries check failed. Please try again.'}, status=400)
 
 #===================
 # Cleaning data
