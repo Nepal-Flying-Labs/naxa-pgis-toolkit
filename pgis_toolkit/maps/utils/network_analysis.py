@@ -204,10 +204,15 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
             raise Exception('No features mirror found')
         # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
+        print(segments,"is segments")
         G = convert_shp2graph(segments)
         orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
         dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
-        routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
+        # routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
+        routes_list = [p for p in nx.all_shortest_paths(G,source=orig_node_id,target=dest_node_id,weight='length')]
+        print(orig_node_id, "is origin node")
+        print(dest_node_id, "is destination node")
+        print(routes_list, "is routes_list")
         road_max_speed = 50 #kmph
         if mode == "walk":
             average_velocity = 3.6

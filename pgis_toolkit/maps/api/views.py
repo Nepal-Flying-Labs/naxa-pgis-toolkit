@@ -1725,7 +1725,7 @@ def layer_download(request):
         root_dir = f'{MEDIA_ROOT}/layer_download/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
-        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
         number_df = pandas.DataFrame(gdf['id'])
         attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
