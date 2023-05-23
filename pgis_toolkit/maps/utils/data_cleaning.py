@@ -76,7 +76,7 @@ def check_null(layer):
             clean_logs_inst.save(update_fields=['null'])
         return content,200
     except Exception as e:
-        return str(e), 400
+        return {"message": str(e)}, 400
 
 def check_multipart(layer):
     """Check if the data is multipart or not
@@ -294,6 +294,7 @@ def check_snapping(layer):
 #===================
 # Cleaning data
 #===================
+@shared_task(max_retries=1, soft_time_limit=8000)
 def fix_null(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
@@ -309,10 +310,13 @@ def fix_null(layer):
                 features = tuple(nulls)
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
-        content = check_null(layer)
-        return {"new_error": content["error_data"], "prev_error": len(nulls)}
+        content, status = check_null(layer)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(nulls)}, status
+        else:
+            return content, 400
     except Exception as e:
-        return {'message': str(e)}
+        return {"message": str(e)}, 400
 
 def fix_multipart(layer):
     try:
