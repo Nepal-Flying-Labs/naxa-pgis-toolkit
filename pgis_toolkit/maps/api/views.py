@@ -3615,6 +3615,27 @@ def layer_check_logs(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['GET'])
+def data_clean_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data cleaning processes.
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                content, code = result.get()
+                if code == 200:
+                    return Response(data=content, status=code)
+                else:
+                    return Response(data=content, status=code)
+            except Exception as e:
+                return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 # @api_view(['GET'])
 # @permission_classes([IsAuthenticated])
 # def get_error_data(request, *args, **kwargs):
