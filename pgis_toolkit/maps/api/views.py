@@ -78,7 +78,7 @@ from pgis_toolkit.maps.models import (
     SubLayerStyle,
     Theme,
     Vectorlayer,
-    WMSLayer,
+    WMSLayer, CleaningCheckLogs
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
@@ -3578,6 +3578,39 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(content)
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def layer_check_logs(request, *args, **kwargs):
+    """
+    Description
+    -----------
+    After data cleaning processes are run, this api can be used to retrieve the check logs for the layer.
+
+    Parameters
+    ----------
+    layer : <int> layer id
+
+    Returns
+    -------
+    Json of Cleaning Check logs.
+    """
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            check_logs = CleaningCheckLogs.objects.filter(layer_id=layer)
+            if check_logs.exists():
+                check_log = check_logs.values('layer_id', 'null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping')[0]
+                return Response(data=check_log)
+            else:
+                return Response(data={'message': "Cleaning Check Logs not found for the layer."}, status=404)
+        else:
+            return Response(data={'message': "Layer not found."}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

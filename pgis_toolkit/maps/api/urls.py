@@ -82,7 +82,7 @@ from pgis_toolkit.maps.api.views import (
     sync_features,
     sync_mirror_to_mongo,
     sync_template,
-    update_template_attributes,
+    update_template_attributes, layer_check_logs
 )
 
 router = DefaultRouter()
@@ -227,6 +227,7 @@ urlpatterns = [
     path('check_overlapping_geometry/', check_overlapping_geometry, name='check_overlapping_geometry'),
     path('check_self_intersecting_geometry/', check_self_intersecting_geometry, name='check_self_intersecting_geometry'),
     path('check_isolated_geometry/', check_isolated_geometry, name='check_isolated_geometry'),
+    path('check_layer_logs/', layer_check_logs, name='check_layer_logs'),
     # path('get_error_data/', get_error_data, name="get_error_data"),
 
     # Fix Layers api

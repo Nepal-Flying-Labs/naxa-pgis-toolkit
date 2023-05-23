@@ -158,6 +158,10 @@ class CleaningErrorsAdmin(admin.ModelAdmin):
     list_display = ('id', 'layer_id', 'null')
     search_fields = ('id', 'layer_id')
 
+class CleaningCheckLogsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'layer_id', 'null')
+    search_fields = ('id', 'layer_id')
+
 class FeatureImageAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_cover_image', 'feature_id', 'image', 'url')
     search_fields = ('id', 'feature_id')
@@ -192,5 +196,6 @@ admin.site.register(CeleryTask, CeleryTaskAdmin)
 admin.site.register(QueryLayer, QueryLayerAdmin)
 admin.site.register(QueryFeatureCollection, QueryFeatureCollectionAdmin)
 admin.site.register(CleaningErrors, CleaningErrorsAdmin)
+admin.site.register(CleaningCheckLogs, CleaningCheckLogsAdmin)
 admin.site.register(DropdownChoice, DropdownChoiceAdmin)
 admin.site.register(FeatureImage, FeatureImageAdmin)
