@@ -651,3 +651,25 @@ class CleaningErrors(DateTimeStamp):
 
     class Meta:
         app_label = 'maps'
+
+
+def check_default_dict():
+    """
+    Default json format for data cleaning errors model fields.
+    """
+    return {"error_data": None, "total_data": None}
+
+class CleaningCheckLogs(DateTimeStamp):
+    """
+    Stores data cleaning check logs.
+    """
+    layer_id = models.IntegerField(db_index=True, unique=True, blank=True, null=True)
+    null = models.JSONField(default=check_default_dict, blank=True, null=True)
+    multipart = models.JSONField(default=check_default_dict, blank=True, null=True)
+    duplicate= models.JSONField(default=check_default_dict, blank=True, null=True)
+    overlap= models.JSONField(default=check_default_dict, blank=True, null=True)
+    self_instersect = models.JSONField(default=check_default_dict, blank=True, null=True)
+    snapping = models.JSONField(default=check_default_dict, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
