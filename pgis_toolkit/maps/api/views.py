@@ -3494,10 +3494,11 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_null(layer)
-            return Response(content)
+            response = check_null.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

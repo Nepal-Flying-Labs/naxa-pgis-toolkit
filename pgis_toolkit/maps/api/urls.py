@@ -82,7 +82,7 @@ from pgis_toolkit.maps.api.views import (
     sync_features,
     sync_mirror_to_mongo,
     sync_template,
-    update_template_attributes, layer_check_logs
+    update_template_attributes, layer_check_logs, data_clean_task_response
 )
 
 router = DefaultRouter()
@@ -241,5 +241,7 @@ urlpatterns = [
     path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
     #sync features to feature_collection table after data clean
     path('sync_features/', sync_features, name='sync_features'),
+
+    path('data_clean_task_response/', data_clean_task_response, name ='data_clean_task_response'),
 
 ]

@@ -12,8 +12,10 @@ from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint, Point
 from sqlalchemy import create_engine
 
+from celery import Celery, shared_task
+
 from config.settings.base import env
-from pgis_toolkit.maps.models import CleaningErrors, FeatureCollectionMirror
+from pgis_toolkit.maps.models import CleaningErrors, FeatureCollectionMirror, CleaningCheckLogs
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -40,6 +42,7 @@ def get_layers(ids):
 #===================
 # Checking data
 #===================
+@shared_task(max_retries=1, soft_time_limit=8000)
 def check_null(layer):
     """Check if the geometry is null or not
 
@@ -55,15 +58,19 @@ def check_null(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    null_rows = []
-    for i, row in data.iterrows():
-        if row.geom.is_empty:
-            null_rows.append(row['id'])
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
-    content = {"error_data": len(null_rows), "total_data": total_data}
-    return content
+    try:
+        data = get_all_layer(layer)
+        total_data = len(data)
+        null_rows = []
+        for i, row in data.iterrows():
+            if row.geom.is_empty:
+                null_rows.append(row['id'])
+        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+        CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+        content = {"error_data": len(null_rows), "total_data": total_data}
+        return content,200
+    except Exception as e:
+        return str(e), 400
 
 def check_multipart(layer):
     """Check if the data is multipart or not
