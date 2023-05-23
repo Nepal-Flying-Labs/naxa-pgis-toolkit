@@ -42,7 +42,7 @@ def get_layers(ids):
 #===================
 # Checking data
 #===================
-@shared_task(max_retries=1, soft_time_limit=8000)
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_null(layer):
     """Check if the geometry is null or not
 
@@ -294,7 +294,7 @@ def check_snapping(layer):
 #===================
 # Cleaning data
 #===================
-@shared_task(max_retries=1, soft_time_limit=8000)
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_null(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
