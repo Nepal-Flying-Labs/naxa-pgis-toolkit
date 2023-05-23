@@ -65,9 +65,15 @@ def check_null(layer):
         for i, row in data.iterrows():
             if row.geom.is_empty:
                 null_rows.append(row['id'])
-        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
-        CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+        if created:
+            clean_error_inst.null = null_rows
+            clean_error_inst.save(update_fields=['null'])
         content = {"error_data": len(null_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"null": content})
+        if logs_created:
+            clean_logs_inst.null = content
+            clean_logs_inst.save(update_fields=['null'])
         return content,200
     except Exception as e:
         return str(e), 400
