@@ -154,6 +154,8 @@ def check_duplicate(layer):
     except Exception as e:
         return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_overlapping(layer):
     """Check if the geometry has overlapping geometries
 
@@ -169,21 +171,29 @@ def check_overlapping(layer):
             The message to display
         data : GeoDataFrame
     """
-    gdf = get_all_layer(layer)
-    total_data = len(gdf)
-    sql = f'''SELECT DISTINCT a.* From
-            (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-            INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
-            (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
-            WHERE a.id != b.id'''
     try:
+        gdf = get_all_layer(layer)
+        total_data = len(gdf)
+        sql = f'''SELECT DISTINCT a.* From
+                (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
+                (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
+                WHERE a.id != b.id'''
         data = gpd.read_postgis(sql, con, geom_col="geometry")
         error_data = len(data)
-        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap": list(data['id'])})
+        overlap_list = list(data['id']) 
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap": overlap_list})
+        if created:
+            clean_error_inst.overlap = overlap_list
+            clean_error_inst.save(update_fields=['overlap'])
         content = {"error_data": error_data, "total_data": total_data}
-        return content
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"overlap": content})
+        if logs_created:
+            clean_logs_inst.overlap = content
+            clean_logs_inst.save(update_fields=['overlap'])
+        return content,200
     except:
-        return {"message": "Query failed"}
+        return {"message": "Check Overlap Query failed"},400
 
 def check_self_intersection(layer):
     """Check if the geometry has self intersection or not
