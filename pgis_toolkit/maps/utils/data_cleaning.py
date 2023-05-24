@@ -370,10 +370,12 @@ def fix_null(layer):
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(nulls)}, status
         else:
-            return content, 400
+            return content, status
     except Exception as e:
         return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_multipart(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
@@ -433,10 +435,13 @@ def fix_multipart(layer):
                                         FeatureCollectionMirror.objects.create(**obj_dict)
                         except:
                             pass
-        content = check_multipart(layer)
-        return {"new_error": content["error_data"], "prev_error": len(multiparts)}
+        content, status = check_multipart(layer)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(multiparts)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        return {'message': str(e)}, 400
 
 def fix_duplicate(layer):
     try:
