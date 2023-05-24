@@ -118,6 +118,7 @@ def check_multipart(layer):
         return {"message": str(e)}, 400
 
 
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_duplicate(layer):
     """Check if the geometry is duplicate or not
 
@@ -133,14 +134,25 @@ def check_duplicate(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    data = data.drop(axis=1, columns=["attributes"])
-    sum = data.duplicated().sum()
-    gdf = data.loc[data.duplicated(), :]
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate": list(gdf['id'])})
-    content = {"error_data": sum, "total_data": total_data}
-    return content
+    try:
+        data = get_all_layer(layer)
+        total_data = len(data)
+        data = data.drop(axis=1, columns=["attributes"])
+        sum = data.duplicated().sum()
+        gdf = data.loc[data.duplicated(), :]
+        duplicates_list = list(gdf['id'])
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate": duplicates_list})
+        if created:
+            clean_error_inst.duplicate = duplicates_list
+            clean_error_inst.save(update_fields=['duplicate'])
+        content = {"error_data": int(sum), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"duplicate": content})
+        if logs_created:
+            clean_logs_inst.duplicate = content
+            clean_logs_inst.save(update_fields=['duplicate'])
+        return content,200
+    except Exception as e:
+        return {"message": str(e)}, 400
 
 def check_overlapping(layer):
     """Check if the geometry has overlapping geometries
