@@ -550,6 +550,8 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_self_intersection(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
@@ -582,10 +584,13 @@ def fix_self_intersection(layer):
                                     FeatureCollectionMirror.objects.create(**obj_dict)
                 except:
                     pass
-        content = check_self_intersection(layer)
-        return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}
+        content, status = check_self_intersection(layer)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        return {'message': str(e)}, 400
 
 def fix_snapping(layer):
     try:
