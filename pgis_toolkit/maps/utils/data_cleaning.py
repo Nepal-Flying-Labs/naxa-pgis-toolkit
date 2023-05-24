@@ -78,6 +78,8 @@ def check_null(layer):
     except Exception as e:
         return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_multipart(layer):
     """Check if the data is multipart or not
 
@@ -93,17 +95,28 @@ def check_multipart(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    multipart_rows = []
-    for i, row in data.iterrows():
-        if row.geom.geom_type.startswith("Multi"):
-            multipart_rows.append(row['id'])
-        else:
-            data.at[i,'is_multipart'] = False
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": multipart_rows})
-    content = {"error_data": len(multipart_rows), "total_data": total_data}
-    return content
+    try:
+        data = get_all_layer(layer)
+        total_data = len(data)
+        multipart_rows = []
+        for i, row in data.iterrows():
+            if row.geom.geom_type.startswith("Multi"):
+                multipart_rows.append(row['id'])
+            else:
+                data.at[i,'is_multipart'] = False
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": multipart_rows})
+        if created:
+            clean_error_inst.multipart = multipart_rows
+            clean_error_inst.save(update_fields=['multipart'])
+        content = {"error_data": len(multipart_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"multipart": content})
+        if logs_created:
+            clean_logs_inst.multipart = content
+            clean_logs_inst.save(update_fields=['multipart'])
+        return content,200
+    except Exception as e:
+        return {"message": str(e)}, 400
+
 
 def check_duplicate(layer):
     """Check if the geometry is duplicate or not
