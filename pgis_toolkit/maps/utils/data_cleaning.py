@@ -277,6 +277,7 @@ def check_self_intersection(layer):
 #     except Exception as e:
 #         return {"message": str(e)}
 
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_snapping(layer):
     """Check for isolated points
 
@@ -330,14 +331,21 @@ def check_snapping(layer):
             isolated_ids = []
             for res in result:
                 isolated_ids.append(res[0])
-            CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": isolated_ids})
+            clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": isolated_ids})
+            if created:
+                clean_error_inst.snapping = isolated_ids
+                clean_error_inst.save(update_fields=['snapping'])
             content = {"error_data": len(isolated_ids), "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
         else:
             content = {"error_data": 0, "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
-        return content
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"snapping": content})
+        if logs_created:
+            clean_logs_inst.snapping = content
+            clean_logs_inst.save(update_fields=['snapping'])
+        return content,200
     except Exception as e:
         print('Isolated geometries check failed. Details:', str(e))
-        return Response(data={'message': 'Isolated geometries check failed. Please try again.'}, status=400)
+        return {'message': 'Isolated geometries check failed. Please try again.'},400
 
 #===================
 # Cleaning data

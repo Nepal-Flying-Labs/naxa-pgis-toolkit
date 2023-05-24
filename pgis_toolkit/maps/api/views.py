@@ -3579,8 +3579,9 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_snapping(layer)
-            return Response(content)
+            response = check_snapping.delay(layer)
+            # return Response(content
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
