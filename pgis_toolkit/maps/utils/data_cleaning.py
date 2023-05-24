@@ -442,7 +442,9 @@ def fix_multipart(layer):
             return content, status
     except Exception as e:
         return {'message': str(e)}, 400
+    
 
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_duplicate(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
@@ -458,10 +460,13 @@ def fix_duplicate(layer):
                 features = tuple(duplicates)
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
-        content = check_duplicate(layer)
-        return {"new_error": content["error_data"], "prev_error": len(duplicates)}
+        content, status = check_duplicate(layer)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(duplicates)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        return {'message': str(e)}, 400
 
 def fix_overlapping(layer):
     try:
