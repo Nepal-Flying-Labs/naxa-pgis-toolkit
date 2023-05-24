@@ -195,6 +195,8 @@ def check_overlapping(layer):
     except:
         return {"message": "Check Overlap Query failed"},400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_self_intersection(layer):
     """Check if the geometry has self intersection or not
 
@@ -210,15 +212,26 @@ def check_self_intersection(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    self_intersection_rows = []
-    for i, row in data.iterrows():
-        if not row['geom'].is_simple:
-            self_intersection_rows.append(row['id'])
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect": self_intersection_rows})
-    content = {"error_data": len(self_intersection_rows), "total_data": total_data}
-    return content
+    try:
+        data = get_all_layer(layer)
+        total_data = len(data)
+        self_intersection_rows = []
+        for i, row in data.iterrows():
+            if not row['geom'].is_simple:
+                self_intersection_rows.append(row['id'])
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect": self_intersection_rows})
+        if created:
+            clean_error_inst.self_instersect = self_intersection_rows
+            clean_error_inst.save(update_fields=['self_instersect'])
+        content = {"error_data": len(self_intersection_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"self_instersect": content})
+        if logs_created:
+            clean_logs_inst.self_instersect = content
+            clean_logs_inst.save(update_fields=['self_instersect'])
+        return content,200
+    except Exception as e:
+        return {"message": str(e)}, 400
+
 
 # def check_snapping(layer):
 #     """Check for isolated points
