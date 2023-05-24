@@ -592,6 +592,8 @@ def fix_self_intersection(layer):
     except Exception as e:
         return {'message': str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_snapping(layer):
     try:
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
@@ -633,10 +635,13 @@ def fix_snapping(layer):
                                 WHERE id = {row.id};'''
                         db = con.connect()
                         db.execute(update_sql)
-        content = check_snapping(layer)
-        return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
+        content, status = check_snapping(layer)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        return {'message': str(e)}, 400
 
 '''used to remove id from clean instance'''
 def del_id_from_clean_instance(instance, pk):
