@@ -3485,6 +3485,26 @@ def check_layer(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+def check_on_processing_status(layer:int):
+    """
+    Description
+    -----------
+    This function determines whether a layer has already been under data cleaning processing.
+
+    Parameters
+    ----------
+    layer: <int> layer_id 
+
+    Returns
+    -------
+    True or False
+    """
+    logs_qs = CleaningCheckLogs.objects.filter(layer_id=layer)
+    if logs_qs.exists():
+        if logs_qs[0].on_processing == True:
+            return True
+    return False
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_null_geometry(request, *args, **kwargs):
@@ -3494,6 +3514,8 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = check_null.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
