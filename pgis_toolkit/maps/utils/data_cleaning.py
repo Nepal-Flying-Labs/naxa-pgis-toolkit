@@ -120,6 +120,8 @@ def check_multipart(layer):
         data : GeoDataFrame
     """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         data = get_all_layer(layer)
         total_data = len(data)
         multipart_rows = []
@@ -137,8 +139,12 @@ def check_multipart(layer):
         if logs_created:
             clean_logs_inst.multipart = content
             clean_logs_inst.save(update_fields=['multipart'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {"message": str(e)}, 400
 
 
