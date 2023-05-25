@@ -3,7 +3,9 @@ from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from rest_framework import status
 from rest_framework.response import Response
-
+from celery import signals
+from django.core.cache import cache
+from .models import CleaningCheckLogs
 from config.settings.local import geoserver
 from pgis_toolkit.maps.models import (
     FeatureCollection,
@@ -13,6 +15,39 @@ from pgis_toolkit.maps.models import (
     Vectorlayer,
     WMSLayer,
 )
+
+'''cache name for recognizing the first ever worker instance'''
+WORKER_INITIALIZED_CACHE_KEY = "worker_initialized"
+
+@receiver(signals.worker_process_init)
+def on_worker_init(**kwargs):
+    """
+    Description
+    -----------
+    This function is exectued when first ever instance of worker runs so as to set all on_processing flags of CleaningCheckLogs objects to False in order to make them available for data cleaning processing tasks.
+    
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
+    # print('Worker has just started and this is the first task to do')
+    '''create cache so as to check if worker was initialized for the first time or not'''
+    try:
+        if cache.add(WORKER_INITIALIZED_CACHE_KEY, "true"):
+            # print('Runned only for one time-----------------------------------')
+            '''set all on_processing_flags to False'''
+            CleaningCheckLogs.objects.filter(on_processing=True).update(on_processing=False)
+            '''delete the cache'''
+            import time
+            time.sleep(5)
+            cache.delete(WORKER_INITIALIZED_CACHE_KEY)
+    except Exception as e:
+        print("Error occuring in executing on_worker init task. Details:", str(e))
+        pass
 
 
 @receiver(post_save, sender=Layer)
