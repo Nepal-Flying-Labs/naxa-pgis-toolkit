@@ -38,6 +38,24 @@ def get_layers(ids):
     data = gpd.read_postgis(raw_query, con, geom_col='geometry')
     return data
 
+def change_on_processing_status(
+        layer: int,
+        status: bool):
+    """
+    Description
+    -----------
+    This function changes on_processing field value of CleaningCheckLogs object. This status is set to true so as to restrict the user from running data cleaning processes and when false user can run those processes.
+
+    Parameters
+    ----------
+    layer: <int> layer id
+    status: <bool> True or False
+
+    Returns
+    -------
+    None
+    """
+    CleaningCheckLogs.objects.filter(layer_id=layer).update(on_processing=status)
 
 #===================
 # Checking data
@@ -59,6 +77,8 @@ def check_null(layer):
         data : GeoDataFrame
     """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         data = get_all_layer(layer)
         total_data = len(data)
         null_rows = []
@@ -74,8 +94,12 @@ def check_null(layer):
         if logs_created:
             clean_logs_inst.null = content
             clean_logs_inst.save(update_fields=['null'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {"message": str(e)}, 400
 
 

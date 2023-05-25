@@ -664,6 +664,7 @@ class CleaningCheckLogs(DateTimeStamp):
     Stores data cleaning check logs.
     """
     layer_id = models.IntegerField(db_index=True, unique=True, blank=True, null=True)
+    on_processing = models.BooleanField(default=False)
     null = models.JSONField(default=check_default_dict, blank=True, null=True)
     multipart = models.JSONField(default=check_default_dict, blank=True, null=True)
     duplicate= models.JSONField(default=check_default_dict, blank=True, null=True)
