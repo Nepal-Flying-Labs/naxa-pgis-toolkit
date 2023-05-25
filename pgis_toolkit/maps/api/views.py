@@ -3533,6 +3533,8 @@ def check_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = check_multipart.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3550,6 +3552,8 @@ def check_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = check_duplicate.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3567,6 +3571,8 @@ def check_overlapping_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)            
             response = check_overlapping.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3584,6 +3590,8 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = check_self_intersection.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3601,6 +3609,8 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = check_snapping.delay(layer)
             # return Response(content
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3705,6 +3715,8 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_null.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3722,6 +3734,8 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_multipart.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3739,6 +3753,8 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_duplicate.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3756,6 +3772,8 @@ def fix_overlay_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_overlapping.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3773,6 +3791,8 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_self_intersection.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
@@ -3790,6 +3810,8 @@ def fix_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
             response = fix_snapping.delay(layer)
             # return Response(content)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})

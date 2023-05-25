@@ -165,6 +165,8 @@ def check_duplicate(layer):
         data : GeoDataFrame
     """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         data = get_all_layer(layer)
         total_data = len(data)
         data = data.drop(axis=1, columns=["attributes"])
@@ -180,8 +182,12 @@ def check_duplicate(layer):
         if logs_created:
             clean_logs_inst.duplicate = content
             clean_logs_inst.save(update_fields=['duplicate'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {"message": str(e)}, 400
 
 
@@ -202,6 +208,8 @@ def check_overlapping(layer):
         data : GeoDataFrame
     """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         gdf = get_all_layer(layer)
         total_data = len(gdf)
         sql = f'''SELECT DISTINCT a.* From
@@ -221,9 +229,13 @@ def check_overlapping(layer):
         if logs_created:
             clean_logs_inst.overlap = content
             clean_logs_inst.save(update_fields=['overlap'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
-    except:
-        return {"message": "Check Overlap Query failed"},400
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
 
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
@@ -243,6 +255,8 @@ def check_self_intersection(layer):
         data : GeoDataFrame
     """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         data = get_all_layer(layer)
         total_data = len(data)
         self_intersection_rows = []
@@ -258,8 +272,12 @@ def check_self_intersection(layer):
         if logs_created:
             clean_logs_inst.self_instersect = content
             clean_logs_inst.save(update_fields=['self_instersect'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {"message": str(e)}, 400
 
 
@@ -354,6 +372,8 @@ def check_snapping(layer):
                 FROM connected_ids_first);
             """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         with connection.cursor() as cursor:
             cursor.execute(sql)
             result = cursor.fetchall()
@@ -372,9 +392,13 @@ def check_snapping(layer):
         if logs_created:
             clean_logs_inst.snapping = content
             clean_logs_inst.save(update_fields=['snapping'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return content,200
     except Exception as e:
         print('Isolated geometries check failed. Details:', str(e))
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {'message': 'Isolated geometries check failed. Please try again.'},400
 
 #===================
@@ -383,6 +407,8 @@ def check_snapping(layer):
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_null(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
@@ -397,17 +423,23 @@ def fix_null(layer):
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
         content, status = check_null(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(nulls)}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {"message": str(e)}, 400
 
 
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_multipart(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             multipart_error = cleaning_error_qs.values('multipart')[0]
@@ -466,17 +498,23 @@ def fix_multipart(layer):
                         except:
                             pass
         content, status = check_multipart(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(multiparts)}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {'message': str(e)}, 400
     
 
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_duplicate(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             duplicate_error = cleaning_error_qs.values('duplicate')[0]
@@ -491,17 +529,23 @@ def fix_duplicate(layer):
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
         content, status = check_duplicate(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(duplicates)}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)        
         return {'message': str(e)}, 400
 
 
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_overlapping(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
@@ -560,11 +604,15 @@ def fix_overlapping(layer):
                 except:
                     pass
         content, status = check_overlapping(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(overlaps)}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {'message': str(e)}, 400
 
 def convert_distance_to_4326(distance: float) -> float:
@@ -584,6 +632,8 @@ def convert_distance_to_4326(distance: float) -> float:
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_self_intersection(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             self_intersect_error = cleaning_error_qs.values('self_instersect')[0]
@@ -615,17 +665,23 @@ def fix_self_intersection(layer):
                 except:
                     pass
         content, status = check_self_intersection(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {'message': str(e)}, 400
 
 
 @shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_snapping(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
@@ -666,11 +722,15 @@ def fix_snapping(layer):
                         db = con.connect()
                         db.execute(update_sql)
         content, status = check_snapping(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         if status == 200:
             return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}, status
         else:
             return content, status
     except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
         return {'message': str(e)}, 400
 
 '''used to remove id from clean instance'''
