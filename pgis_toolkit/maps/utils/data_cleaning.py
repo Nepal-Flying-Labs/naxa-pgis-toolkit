@@ -12,8 +12,10 @@ from shapely import ops
 from shapely.geometry import MultiLineString, MultiPoint, Point
 from sqlalchemy import create_engine
 
+from celery import Celery, shared_task
+
 from config.settings.base import env
-from pgis_toolkit.maps.models import CleaningErrors, FeatureCollectionMirror
+from pgis_toolkit.maps.models import CleaningErrors, FeatureCollectionMirror, CleaningCheckLogs
 
 db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
 con = create_engine(db_connection_url)
@@ -36,10 +38,29 @@ def get_layers(ids):
     data = gpd.read_postgis(raw_query, con, geom_col='geometry')
     return data
 
+def change_on_processing_status(
+        layer: int,
+        status: bool):
+    """
+    Description
+    -----------
+    This function changes on_processing field value of CleaningCheckLogs object. This status is set to true so as to restrict the user from running data cleaning processes and when false user can run those processes.
+
+    Parameters
+    ----------
+    layer: <int> layer id
+    status: <bool> True or False
+
+    Returns
+    -------
+    None
+    """
+    CleaningCheckLogs.objects.filter(layer_id=layer).update(on_processing=status)
 
 #===================
 # Checking data
 #===================
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_null(layer):
     """Check if the geometry is null or not
 
@@ -55,16 +76,34 @@ def check_null(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    null_rows = []
-    for i, row in data.iterrows():
-        if row.geom.is_empty:
-            null_rows.append(row['id'])
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
-    content = {"error_data": len(null_rows), "total_data": total_data}
-    return content
+    try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
+        data = get_all_layer(layer)
+        total_data = len(data)
+        null_rows = []
+        for i, row in data.iterrows():
+            if row.geom.is_empty:
+                null_rows.append(row['id'])
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"null": null_rows})
+        if created:
+            clean_error_inst.null = null_rows
+            clean_error_inst.save(update_fields=['null'])
+        content = {"error_data": len(null_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"null": content})
+        if logs_created:
+            clean_logs_inst.null = content
+            clean_logs_inst.save(update_fields=['null'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_multipart(layer):
     """Check if the data is multipart or not
 
@@ -80,18 +119,36 @@ def check_multipart(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    multipart_rows = []
-    for i, row in data.iterrows():
-        if row.geom.geom_type.startswith("Multi"):
-            multipart_rows.append(row['id'])
-        else:
-            data.at[i,'is_multipart'] = False
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": multipart_rows})
-    content = {"error_data": len(multipart_rows), "total_data": total_data}
-    return content
+    try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
+        data = get_all_layer(layer)
+        total_data = len(data)
+        multipart_rows = []
+        for i, row in data.iterrows():
+            if row.geom.geom_type.startswith("Multi"):
+                multipart_rows.append(row['id'])
+            else:
+                data.at[i,'is_multipart'] = False
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"multipart": multipart_rows})
+        if created:
+            clean_error_inst.multipart = multipart_rows
+            clean_error_inst.save(update_fields=['multipart'])
+        content = {"error_data": len(multipart_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"multipart": content})
+        if logs_created:
+            clean_logs_inst.multipart = content
+            clean_logs_inst.save(update_fields=['multipart'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_duplicate(layer):
     """Check if the geometry is duplicate or not
 
@@ -107,15 +164,34 @@ def check_duplicate(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    data = data.drop(axis=1, columns=["attributes"])
-    sum = data.duplicated().sum()
-    gdf = data.loc[data.duplicated(), :]
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate": list(gdf['id'])})
-    content = {"error_data": sum, "total_data": total_data}
-    return content
+    try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
+        data = get_all_layer(layer)
+        total_data = len(data)
+        data = data.drop(axis=1, columns=["attributes"])
+        sum = data.duplicated().sum()
+        gdf = data.loc[data.duplicated(), :]
+        duplicates_list = list(gdf['id'])
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"duplicate": duplicates_list})
+        if created:
+            clean_error_inst.duplicate = duplicates_list
+            clean_error_inst.save(update_fields=['duplicate'])
+        content = {"error_data": int(sum), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"duplicate": content})
+        if logs_created:
+            clean_logs_inst.duplicate = content
+            clean_logs_inst.save(update_fields=['duplicate'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_overlapping(layer):
     """Check if the geometry has overlapping geometries
 
@@ -131,22 +207,38 @@ def check_overlapping(layer):
             The message to display
         data : GeoDataFrame
     """
-    gdf = get_all_layer(layer)
-    total_data = len(gdf)
-    sql = f'''SELECT DISTINCT a.* From
-            (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
-            INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
-            (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
-            WHERE a.id != b.id'''
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
+        gdf = get_all_layer(layer)
+        total_data = len(gdf)
+        sql = f'''SELECT DISTINCT a.* From
+                (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) a
+                INNER JOIN (SELECT * FROM maps_featurecollectionmirror WHERE layer_id={layer}) b ON
+                (a.geometry && b.geometry AND ST_Overlaps(a.geometry, b.geometry))
+                WHERE a.id != b.id'''
         data = gpd.read_postgis(sql, con, geom_col="geometry")
         error_data = len(data)
-        CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap": list(data['id'])})
+        overlap_list = list(data['id']) 
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"overlap": overlap_list})
+        if created:
+            clean_error_inst.overlap = overlap_list
+            clean_error_inst.save(update_fields=['overlap'])
         content = {"error_data": error_data, "total_data": total_data}
-        return content
-    except:
-        return {"message": "Query failed"}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"overlap": content})
+        if logs_created:
+            clean_logs_inst.overlap = content
+            clean_logs_inst.save(update_fields=['overlap'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_self_intersection(layer):
     """Check if the geometry has self intersection or not
 
@@ -162,15 +254,32 @@ def check_self_intersection(layer):
             The message to display
         data : GeoDataFrame
     """
-    data = get_all_layer(layer)
-    total_data = len(data)
-    self_intersection_rows = []
-    for i, row in data.iterrows():
-        if not row['geom'].is_simple:
-            self_intersection_rows.append(row['id'])
-    CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect": self_intersection_rows})
-    content = {"error_data": len(self_intersection_rows), "total_data": total_data}
-    return content
+    try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
+        data = get_all_layer(layer)
+        total_data = len(data)
+        self_intersection_rows = []
+        for i, row in data.iterrows():
+            if not row['geom'].is_simple:
+                self_intersection_rows.append(row['id'])
+        clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"self_instersect": self_intersection_rows})
+        if created:
+            clean_error_inst.self_instersect = self_intersection_rows
+            clean_error_inst.save(update_fields=['self_instersect'])
+        content = {"error_data": len(self_intersection_rows), "total_data": total_data}
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"self_instersect": content})
+        if logs_created:
+            clean_logs_inst.self_instersect = content
+            clean_logs_inst.save(update_fields=['self_instersect'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
+    except Exception as e:
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
+
 
 # def check_snapping(layer):
 #     """Check for isolated points
@@ -216,6 +325,7 @@ def check_self_intersection(layer):
 #     except Exception as e:
 #         return {"message": str(e)}
 
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_check', priority=9)
 def check_snapping(layer):
     """Check for isolated points
 
@@ -262,6 +372,8 @@ def check_snapping(layer):
                 FROM connected_ids_first);
             """
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         with connection.cursor() as cursor:
             cursor.execute(sql)
             result = cursor.fetchall()
@@ -269,20 +381,34 @@ def check_snapping(layer):
             isolated_ids = []
             for res in result:
                 isolated_ids.append(res[0])
-            CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": isolated_ids})
+            clean_error_inst, created = CleaningErrors.objects.update_or_create(layer_id=layer, defaults={"snapping": isolated_ids})
+            if created:
+                clean_error_inst.snapping = isolated_ids
+                clean_error_inst.save(update_fields=['snapping'])
             content = {"error_data": len(isolated_ids), "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
         else:
             content = {"error_data": 0, "total_data": FeatureCollectionMirror.active.filter(layer=layer).count()}
-        return content
+        clean_logs_inst, logs_created = CleaningCheckLogs.objects.update_or_create(layer_id=layer, defaults={"snapping": content})
+        if logs_created:
+            clean_logs_inst.snapping = content
+            clean_logs_inst.save(update_fields=['snapping'])
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return content,200
     except Exception as e:
         print('Isolated geometries check failed. Details:', str(e))
-        return Response(data={'message': 'Isolated geometries check failed. Please try again.'}, status=400)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {'message': 'Isolated geometries check failed. Please try again.'},400
 
 #===================
 # Cleaning data
 #===================
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_null(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             null_error = cleaning_error_qs.values('null')[0]
@@ -296,13 +422,24 @@ def fix_null(layer):
                 features = tuple(nulls)
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
-        content = check_null(layer)
-        return {"new_error": content["error_data"], "prev_error": len(nulls)}
+        content, status = check_null(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(nulls)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {"message": str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_multipart(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             multipart_error = cleaning_error_qs.values('multipart')[0]
@@ -360,13 +497,24 @@ def fix_multipart(layer):
                                         FeatureCollectionMirror.objects.create(**obj_dict)
                         except:
                             pass
-        content = check_multipart(layer)
-        return {"new_error": content["error_data"], "prev_error": len(multiparts)}
+        content, status = check_multipart(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(multiparts)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {'message': str(e)}, 400
+    
 
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_duplicate(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             duplicate_error = cleaning_error_qs.values('duplicate')[0]
@@ -380,13 +528,24 @@ def fix_duplicate(layer):
                 features = tuple(duplicates)
                 db = con.connect()
                 db.execute(f"UPDATE maps_featurecollectionmirror SET is_deleted=true WHERE id IN {features}")
-        content = check_duplicate(layer)
-        return {"new_error": content["error_data"], "prev_error": len(duplicates)}
+        content, status = check_duplicate(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(duplicates)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)        
+        return {'message': str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_overlapping(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             overlap_error = cleaning_error_qs.values('overlap')[0]
@@ -444,10 +603,17 @@ def fix_overlapping(layer):
                                     pass
                 except:
                     pass
-        content = check_overlapping(layer)
-        return {"new_error": content["error_data"], "prev_error": len(overlaps)}
+        content, status = check_overlapping(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(overlaps)}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {'message': str(e)}, 400
 
 def convert_distance_to_4326(distance: float) -> float:
     """Convert the distance to WGS 1984 (epsg: 4326)
@@ -462,8 +628,12 @@ def convert_distance_to_4326(distance: float) -> float:
     """
     return (0.001/111.12)*float(distance)
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_self_intersection(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             self_intersect_error = cleaning_error_qs.values('self_instersect')[0]
@@ -494,13 +664,24 @@ def fix_self_intersection(layer):
                                     FeatureCollectionMirror.objects.create(**obj_dict)
                 except:
                     pass
-        content = check_self_intersection(layer)
-        return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}
+        content, status = check_self_intersection(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(self_intersect_error["self_instersect"])}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {'message': str(e)}, 400
 
+
+@shared_task(max_retries=1, soft_time_limit=8000, queue='data_fix', priority=6)
 def fix_snapping(layer):
     try:
+        '''change on_processing status to True'''
+        change_on_processing_status(layer, True)
         cleaning_error_qs = CleaningErrors.objects.filter(layer_id=layer)
         if cleaning_error_qs.exists():
             snapping_error = cleaning_error_qs.values('snapping')[0]
@@ -540,10 +721,17 @@ def fix_snapping(layer):
                                 WHERE id = {row.id};'''
                         db = con.connect()
                         db.execute(update_sql)
-        content = check_snapping(layer)
-        return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}
+        content, status = check_snapping(layer)
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        if status == 200:
+            return {"new_error": content["error_data"], "prev_error": len(snapping_error["snapping"])}, status
+        else:
+            return content, status
     except Exception as e:
-        return {'message': str(e)}
+        '''change on_processing status to False'''
+        change_on_processing_status(layer, False)
+        return {'message': str(e)}, 400
 
 '''used to remove id from clean instance'''
 def del_id_from_clean_instance(instance, pk):

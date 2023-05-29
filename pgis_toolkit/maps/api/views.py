@@ -78,7 +78,7 @@ from pgis_toolkit.maps.models import (
     SubLayerStyle,
     Theme,
     Vectorlayer,
-    WMSLayer,
+    WMSLayer, CleaningCheckLogs
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
@@ -1725,7 +1725,7 @@ def layer_download(request):
         root_dir = f'{MEDIA_ROOT}/layer_download/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
-        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
         number_df = pandas.DataFrame(gdf['id'])
         attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
@@ -3485,6 +3485,26 @@ def check_layer(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+def check_on_processing_status(layer:int):
+    """
+    Description
+    -----------
+    This function determines whether a layer has already been under data cleaning processing.
+
+    Parameters
+    ----------
+    layer: <int> layer_id 
+
+    Returns
+    -------
+    True or False
+    """
+    logs_qs = CleaningCheckLogs.objects.filter(layer_id=layer)
+    if logs_qs.exists():
+        if logs_qs[0].on_processing == True:
+            return True
+    return False
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_null_geometry(request, *args, **kwargs):
@@ -3494,10 +3514,13 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_null(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_null.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3510,10 +3533,13 @@ def check_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_multipart(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_multipart.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3526,10 +3552,13 @@ def check_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_duplicate(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_duplicate.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3542,8 +3571,11 @@ def check_overlapping_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_overlapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)            
+            response = check_overlapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3558,8 +3590,11 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_self_intersection(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_self_intersection.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'messages': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3574,10 +3609,67 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_snapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_snapping.delay(layer)
+            # return Response(content
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def layer_check_logs(request, *args, **kwargs):
+    """
+    Description
+    -----------
+    After data cleaning processes are run, this api can be used to retrieve the check logs for the layer.
+
+    Parameters
+    ----------
+    layer : <int> layer id
+
+    Returns
+    -------
+    Json of Cleaning Check logs.
+    """
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            check_logs = CleaningCheckLogs.objects.filter(layer_id=layer)
+            if check_logs.exists():
+                check_log = check_logs.values('layer_id', 'null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping')[0]
+                return Response(data=check_log)
+            else:
+                return Response(data={'message': "Cleaning Check Logs not found for the layer."}, status=404)
+        else:
+            return Response(data={'message': "Layer not found."}, status=404)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def data_clean_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data cleaning processes.
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                content, code = result.get()
+                if code == 200:
+                    return Response(data=content, status=code)
+                else:
+                    return Response(data=content, status=code)
+            except Exception as e:
+                return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3623,8 +3715,11 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_null(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_null.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3639,8 +3734,11 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_multipart(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_multipart.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3655,8 +3753,11 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_duplicate(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_duplicate.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3671,8 +3772,11 @@ def fix_overlay_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_overlapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_overlapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3687,8 +3791,11 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_self_intersection(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_self_intersection.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3703,8 +3810,11 @@ def fix_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_snapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_snapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
