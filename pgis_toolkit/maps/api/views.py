@@ -3300,31 +3300,31 @@ def analysis_result_list(request, *args, **kwargs):
         '''search_key'''
         search_key = request.query_params.get('search', None)
         if analysis_type== 'optimum_route':
-            if OptimumRoute.objects.filter(analysis_id=analysis_id).exists():
+            if OptimumRoute.active.filter(analysis_id=analysis_id).exists():
                 if search_key:
-                    optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                    optimum_qs=OptimumRoute.active.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
                 else:
-                    optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                    optimum_qs=OptimumRoute.active.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
                 paginated_qs = paginator.paginate_queryset(optimum_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
         elif analysis_type == 'proximity':
-            if ProximityAnalysis.objects.filter(analysis_id=analysis_id).exists():
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id).exists():
                 if search_key:
-                    proximity_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                    proximity_qs=ProximityAnalysis.active.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
                 else:
-                    proximity_qs=ProximityAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                    proximity_qs=ProximityAnalysis.active.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
                 paginated_qs = paginator.paginate_queryset(proximity_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
                 return Response(data={'message':"Analysis does not exists"},status=404)
         elif analysis_type == 'buffer':
-            if BufferAnalysis.objects.filter(analysis_id=analysis_id).exists():
+            if BufferAnalysis.active.filter(analysis_id=analysis_id).exists():
                 if search_key:
-                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                    buffer_qs=BufferAnalysis.active.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
                 else:
-                    buffer_qs=BufferAnalysis.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                    buffer_qs=BufferAnalysis.active.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
                 paginated_qs = paginator.paginate_queryset(buffer_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
@@ -3407,23 +3407,23 @@ def analysis_type_list(request, *args, **kwargs):
         search_key = request.query_params.get('search', None)
         if type == 'optimum_route':
             if search_key:
-                optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+                optimum_qs=Analysis.active.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
             else:
-                optimum_qs=Analysis.objects.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
+                optimum_qs=Analysis.active.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
             paginated_qs = paginator.paginate_queryset(optimum_qs, request)
             return paginator.get_paginated_response(paginated_qs)
         elif type == 'proximity':
             if search_key:
-                proximity_qs  = Analysis.objects.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+                proximity_qs  = Analysis.active.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
             else:
-                proximity_qs  = Analysis.objects.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
+                proximity_qs  = Analysis.active.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
             paginated_qs = paginator.paginate_queryset(proximity_qs, request)
             return paginator.get_paginated_response(paginated_qs)
         elif type == 'buffer':
             if search_key:
-                buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+                buffer_qs  = Analysis.active.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
             else:
-                buffer_qs  = Analysis.objects.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+                buffer_qs  = Analysis.active.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
             paginated_qs = paginator.paginate_queryset(buffer_qs, request)
             return paginator.get_paginated_response(paginated_qs)
     except Exception as e:
