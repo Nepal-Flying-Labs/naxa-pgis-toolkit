@@ -217,7 +217,7 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
     mirror_id = models.IntegerField(db_index=True, blank=True, null=True)
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature")
-    attributes=models.JSONField(blank=True, null=True)
+    attributes=models.JSONField(default=dict,blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
     synced = models.BooleanField(default=False, verbose_name='synced to mirror')
 
@@ -304,7 +304,7 @@ class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
     feature = models.ForeignKey(FeatureCollection, on_delete=models.CASCADE, blank=True, null=True, related_name="feature")
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature_mirror")
-    attributes=models.JSONField(blank=True, null=True)
+    attributes=models.JSONField(default=dict,blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
     synced = models.BooleanField(default=False, verbose_name='synced to feature')
 
@@ -566,7 +566,7 @@ class BufferAreas(DateTimeStamp, IsDeleted):
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
     bbox = models.JSONField(default=list, blank=True, null=True)
-    attributes = models.JSONField(blank=True, null=True)
+    attributes = models.JSONField(default=dict,blank=True, null=True)
     class Meta:
         app_label = 'maps'
 

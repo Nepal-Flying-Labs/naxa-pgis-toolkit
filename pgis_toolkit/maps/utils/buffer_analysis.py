@@ -88,7 +88,6 @@ def buffer_analysis(layer, radius,  radius_col, dissolve_output, analysis_id, bu
                                   WHERE buffer_analysis_id = {buffer_analysis_id})
                 WHERE id = {buffer_analysis_id};
         '''
-        print(sql, "is sql")
         try:
             with connection.cursor() as cursor:
                 cursor.execute(sql)
