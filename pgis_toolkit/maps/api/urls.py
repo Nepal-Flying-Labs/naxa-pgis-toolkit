@@ -188,6 +188,7 @@ urlpatterns = [
     path('layer_from_optimum_path/', LayerFromOptimumPathAnalysis.as_view(), name='LayerFromOptimumPathAnalysis'),
     path('export_optimum_route_analysis/',export_optimum_route_analysis,name='export_optimum_route_analysis'),
     path('proximity_analysis/', ProximityAnalysisAPIView.as_view(), name='proximity_analysis'),
+    path('proximity_analysis/<int:pk>/', ProximityAnalysisAPIView.as_view(), name='proximity_analysis'),
     path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
     path('export_proximity_analysis/',export_proximity_analysis,name='export_proximity_analysis'),

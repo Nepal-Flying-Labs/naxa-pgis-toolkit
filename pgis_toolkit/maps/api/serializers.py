@@ -382,3 +382,7 @@ class OptimumRouteSerializer(serializers.ModelSerializer):
         model = OptimumRoute
         fields = '__all__'
 
+class ProximityAnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProximityAnalysis
+        fields = '__all__'

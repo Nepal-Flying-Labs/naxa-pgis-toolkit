@@ -179,7 +179,7 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer,OptimumRouteSerializer
+    WMSLayerSerializer,OptimumRouteSerializer, ProximityAnalysisSerializer
 )
 
 User = get_user_model()
@@ -3002,7 +3002,23 @@ class ProximityAnalysisAPIView(APIView):
                 return Response(data={'message': 'view params is missing!'}, status=400)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
-
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            proximity_analysis_id=request.resolver_match.kwargs.get('pk')
+            instance = ProximityAnalysis.active.get(id=proximity_analysis_id)
+            serializer = ProximityAnalysisSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 '''Proximity Areas Table'''
 class ProximityAreasCollection(viewsets.ModelViewSet):
     '''
