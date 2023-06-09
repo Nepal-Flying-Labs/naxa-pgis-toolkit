@@ -179,7 +179,7 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer,OptimumRouteSerializer, ProximityAnalysisSerializer
+    WMSLayerSerializer,OptimumRouteSerializer, ProximityAnalysisSerializer,BufferAnalysisSerializer
 )
 
 User = get_user_model()
@@ -3104,7 +3104,23 @@ class BufferAnalysisAPIView(APIView):
             print('Error occured in ProximityAnalysisAPIView',str(e))
             if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
-
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            buffer_analysis_id=request.resolver_match.kwargs.get('pk')
+            instance = BufferAnalysis.active.get(id=buffer_analysis_id)
+            serializer = BufferAnalysisSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 class BufferAreasCollection(viewsets.ModelViewSet):
     '''
     Viewset for BufferAreas objects
@@ -3341,7 +3357,7 @@ def analysis_result_list(request, *args, **kwargs):
                 paginated_qs = paginator.paginate_queryset(optimum_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
-                return Response(data={'message':"Analysis does not exists"},status=404)
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
         elif analysis_type == 'proximity':
             if ProximityAnalysis.active.filter(analysis_id=analysis_id).exists():
                 if search_key:
@@ -3351,7 +3367,7 @@ def analysis_result_list(request, *args, **kwargs):
                 paginated_qs = paginator.paginate_queryset(proximity_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
-                return Response(data={'message':"Analysis does not exists"},status=404)
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
         elif analysis_type == 'buffer':
             if BufferAnalysis.active.filter(analysis_id=analysis_id).exists():
                 if search_key:
@@ -3361,7 +3377,7 @@ def analysis_result_list(request, *args, **kwargs):
                 paginated_qs = paginator.paginate_queryset(buffer_qs, request)
                 return paginator.get_paginated_response(paginated_qs)
             else:
-                return Response(data={'message':"Analysis does not exists"},status=404)
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
     except Exception as e:
@@ -3395,7 +3411,7 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
                     analysis_dict['routes'] = serializer.data
                 else:
-                    return Response(data={"message":"Analysis does not exists"},status=400)
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
         elif analysis_type == 'proximity':
                 proximity_analysis_qs = ProximityAnalysis.active.filter(id=id)
                 if proximity_analysis_qs.exists():
@@ -3407,13 +3423,13 @@ def analysis_result_detail(request, *args, **kwargs):
                     analysis_dict = proximity_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                     analysis_dict['proximity_areas'] = serializer.data
                 else:
-                    return Response(data={"message":"Analysis does not exists"},status=400)
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
         elif analysis_type == 'buffer':
                 buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
                 if buffer_analysis_qs.exists():
                     analysis_dict = buffer_analysis_qs.values('id', 'layer', 'radius','dissolve_output','total_area','name','geom_type','bbox')[0]
                 else:
-                    return Response(data={"message":"Analysis does not exists"},status=400)
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
         else:
             return Response(data={'message': 'type params invalid.'}, status=400)
         return Response(analysis_dict, status=200)

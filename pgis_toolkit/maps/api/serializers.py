@@ -386,3 +386,8 @@ class ProximityAnalysisSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProximityAnalysis
         fields = '__all__'
+
+class BufferAnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAnalysis
+        fields = '__all__'
