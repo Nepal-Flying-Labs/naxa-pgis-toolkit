@@ -376,3 +376,9 @@ class BufferAreasSerializer(serializers.ModelSerializer):
         if attributes:
             representation |= attributes
         return representation
+
+class OptimumRouteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OptimumRoute
+        fields = '__all__'
+

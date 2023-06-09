@@ -179,7 +179,7 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer,
+    WMSLayerSerializer,OptimumRouteSerializer
 )
 
 User = get_user_model()
@@ -2808,6 +2808,23 @@ class OptimumRouteAnalysisAPIView(APIView):
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            optimum_route_id=request.resolver_match.kwargs.get('pk')
+            instance = OptimumRoute.active.get(id=optimum_route_id)
+            serializer = OptimumRouteSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 class ServiceAreaAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
