@@ -22,7 +22,7 @@ def buffer_analysis(layer, radius,  radius_col, dissolve_output, analysis_id, bu
 
     Parameters:
     -----------
-    layer: <int> layer_id
+    layer: <int> layer_idProximityAnalysisAPIView
     radius: <float> buffer radius
     radius_col: <str> radius column name
     dissolve_output: <bool> dissolve overlapping polygons or not.
@@ -64,7 +64,7 @@ def buffer_analysis(layer, radius,  radius_col, dissolve_output, analysis_id, bu
                 (SELECT
                 {analysis_id} AS analysis_id,
                 {buffer_analysis_id} as buffer_analysis_id,
-                attributes[1],
+                attributes[0],
                 geometry,
                 ST_Area(geometry)*(111139^2) AS area,
                 False,
