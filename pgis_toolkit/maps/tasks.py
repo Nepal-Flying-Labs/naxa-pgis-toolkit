@@ -78,17 +78,22 @@ def UploadVectorLayer(layer_id,request_data):
             if not lat_field or not lon_field:
                 return "error occured: lat_field and lon_field are required" ,None
             response = handleCSV(layer_id,lat_field,lon_field)
-        elif file_extension == ".geojson":
+        elif file_extension == ".geojson" or file_extension == ".GEOJSON":
             response = handleGeoJSON(layer_id)
         elif file_extension == ".kml":
             response = handleKML(layer_id)
         elif file_extension == ".gpx":
             response = handleGPX(layer_id)
+        elif file_extension == ".shp":
+            clear_dir(dir)
+            layer_inst.upload_status='failed'
+            layer_inst.save()
+            return "The system does not support '.shp' file format alone. Please include '.shp','.shx','.prj' and '.dbf' in a single zip file", None
         else:
             clear_dir(dir)
             layer_inst.upload_status='failed'
             layer_inst.save()
-            return 'Error Occured: Invalid file extension', None
+            return "Invalid file extension. The system currently supports`: '.zip','.csv','.geojson', '.kml', and '.gpx'.", None
 
         clear_dir(dir)
         if response=="successful":
