@@ -70,21 +70,21 @@ def UploadVectorLayer(layer_id,request_data):
         '''Knowing file extension'''
         path_split = os.path.splitext(layer_file_instance.file.name)
         file_extension = path_split[1]
-        if file_extension == ".zip":
+        if file_extension.lower() == ".zip":
             response = handleShapeFile(layer_id)
-        elif file_extension == ".csv":
+        elif file_extension.lower() == ".csv":
             lat_field = request_data.get('lat_field')
             lon_field = request_data.get('lon_field')
             if not lat_field or not lon_field:
                 return "error occured: lat_field and lon_field are required" ,None
             response = handleCSV(layer_id,lat_field,lon_field)
-        elif file_extension == ".geojson" or file_extension == ".GEOJSON":
+        elif file_extension.lower() == ".geojson":
             response = handleGeoJSON(layer_id)
-        elif file_extension == ".kml":
+        elif file_extension.lower() == ".kml":
             response = handleKML(layer_id)
-        elif file_extension == ".gpx":
+        elif file_extension.lower() == ".gpx":
             response = handleGPX(layer_id)
-        elif file_extension == ".shp":
+        elif file_extension.lower() == ".shp":
             clear_dir(dir)
             layer_inst.upload_status='failed'
             layer_inst.save()
