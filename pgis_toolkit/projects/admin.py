@@ -67,6 +67,9 @@ class ContactPersonAdmin(admin.ModelAdmin):
     list_display = ('id', 'is_deleted', 'name', 'email', 'organization', 'project')
     list_filter = ('organization', 'project')
 
+class UsafiriContentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'image', 'url')
+
 
 # Register your models here.
 admin.site.register(OrganizationCategory, OrganizationCategoryAdmin)
@@ -83,3 +86,4 @@ admin.site.register(Image, ImageAdmin)
 admin.site.register(RequestDemo, RequestDemoAdmin)
 admin.site.register(RequestDemoAlert, RequestDemoAlertAdmin)
 admin.site.register(ContactPerson, ContactPersonAdmin)
+admin.site.register(UsafiriContent, UsafiriContentAdmin)

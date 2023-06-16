@@ -217,7 +217,7 @@ class FeatureCollection(DateTimeStamp,IsDeleted):
     mirror_id = models.IntegerField(db_index=True, blank=True, null=True)
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature")
-    attributes=models.JSONField(blank=True, null=True)
+    attributes=models.JSONField(default=dict,blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
     synced = models.BooleanField(default=False, verbose_name='synced to mirror')
 
@@ -304,7 +304,7 @@ class FeatureCollectionMirror(DateTimeStamp,IsDeleted):
     feature = models.ForeignKey(FeatureCollection, on_delete=models.CASCADE, blank=True, null=True, related_name="feature")
     layer=models.ForeignKey(Layer,on_delete=models.CASCADE,related_name="layer_feature_mirror")
     sub_layer=models.ForeignKey(SubLayer,on_delete=models.SET_NULL,blank=True,null=True,related_name="sublayer_feature_mirror")
-    attributes=models.JSONField(blank=True, null=True)
+    attributes=models.JSONField(default=dict,blank=True, null=True)
     geometry=md.GeometryField(srid=4326, blank=True, null=True)
     synced = models.BooleanField(default=False, verbose_name='synced to feature')
 
@@ -321,6 +321,7 @@ class LayerAttribute(DateTimeStamp):
     unit=models.CharField(max_length=20,choices=UNIT_CHOICES,blank=True,null=True)
     mandatory = models.BooleanField(default=True)
     dropdown_field = models.BooleanField(default=False)
+    editable=models.BooleanField(default=True)
     # dropdown_choices = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
@@ -441,6 +442,7 @@ class ProjectMapConfig(DateTimeStamp,IsDeleted):
 class Analysis(DateTimeStamp,IsDeleted):
     name = models.CharField(max_length=254)
     project = models.IntegerField(db_index=True)
+    description = models.TextField(blank=True, null=True)
     display = models.BooleanField(default=False)
     type = models.CharField(max_length=100, choices=ANALYSIS_TYPE_CHOICES)
     geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
@@ -460,6 +462,11 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
     destination_lat = models.FloatField(max_length=20, null=True, blank=True)
     route_origin = models.JSONField(default=list, blank=True, null=True)
     route_destination = models.JSONField(default=list, blank=True, null=True)
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
+
 
     class Meta:
         app_label = 'maps'
@@ -467,6 +474,7 @@ class OptimumRoute(DateTimeStamp,IsDeleted):
 '''Shortest Paths'''
 class NetworkRoutes(DateTimeStamp,IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    optimum_id=models.IntegerField(db_index=True,blank=True, null=True)
     route_no = models.IntegerField(blank=True, null=True)
     geometry=md.GeometryField(srid=4326)
     length = models.FloatField(max_length=10, verbose_name='Length in meters')
@@ -508,29 +516,66 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     #     except Exception as e:
     #         print(f'error in def save of NetworkRoutes: {str(e)}')
     #     super(NetworkRoutes, self).save(*args, **kwargs)
-
+    
+    @property
+    def obstacles_count(self):
+        obstacles = self.obstacles
+        count = 0
+        if obstacles:
+            for layer in obstacles:
+                count = count + len(obstacles[layer])
+        return count
+    
 class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     class Meta:
         app_label = 'maps'
 
-class BufferAnalysis(DateTimeStamp, IsDeleted):
+class ProximityAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     origins = models.JSONField(default=list, blank=True, null=True)
     radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
     dissolve_output = models.BooleanField(default=False)
     total_area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
+
+
+    class Meta:
+        app_label = 'maps'
+
+class ProximityAreas(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    proximity_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
+    origin = models.JSONField(default=list, blank=True, null=True)
+    geometry=md.GeometryField(srid=4326)
+    area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    bbox = models.JSONField(default=list, blank=True, null=True)
+    pois = models.JSONField(default=dict, blank=True, null=True) # json of layer and feature ids
+    class Meta:
+        app_label = 'maps'
+
+class BufferAnalysis(DateTimeStamp, IsDeleted):
+    analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
+    layer = models.IntegerField(blank=True, null=True)
+    radius = models.FloatField(max_length=10, blank=True, null=True, verbose_name='Length in meters')
+    dissolve_output = models.BooleanField(default=False)
+    total_area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
+    name=models.CharField(max_length=254)
+    geom_type = models.CharField(max_length=20, choices=GEOMETRY_TYPE_CHOICES, blank=True, null=True)
+    bbox = models.JSONField(default=list, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'
 
 class BufferAreas(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
-    origin = models.JSONField(default=list, blank=True, null=True)
+    buffer_analysis_id=models.IntegerField(db_index=True,blank=True,null=True)
     geometry=md.GeometryField(srid=4326)
     area = models.FloatField(null=True, blank=True, verbose_name='Area in meter square')
     bbox = models.JSONField(default=list, blank=True, null=True)
-    pois = models.JSONField(default=dict, blank=True, null=True) # json of layer and feature ids
+    attributes = models.JSONField(default=dict,blank=True, null=True)
     class Meta:
         app_label = 'maps'
 
@@ -612,6 +657,29 @@ class CleaningErrors(DateTimeStamp):
     overlap=ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
     self_instersect =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
     snapping =ArrayField(models.IntegerField(blank=True, null=True), default=list, size=2000, blank=True, null=True)
+
+    class Meta:
+        app_label = 'maps'
+
+
+def check_default_dict():
+    """
+    Default json format for data cleaning errors model fields.
+    """
+    return {"error_data": None, "total_data": None}
+
+class CleaningCheckLogs(DateTimeStamp):
+    """
+    Stores data cleaning check logs.
+    """
+    layer_id = models.IntegerField(db_index=True, unique=True, blank=True, null=True)
+    on_processing = models.BooleanField(default=False)
+    null = models.JSONField(default=check_default_dict, blank=True, null=True)
+    multipart = models.JSONField(default=check_default_dict, blank=True, null=True)
+    duplicate= models.JSONField(default=check_default_dict, blank=True, null=True)
+    overlap= models.JSONField(default=check_default_dict, blank=True, null=True)
+    self_instersect = models.JSONField(default=check_default_dict, blank=True, null=True)
+    snapping = models.JSONField(default=check_default_dict, blank=True, null=True)
 
     class Meta:
         app_label = 'maps'

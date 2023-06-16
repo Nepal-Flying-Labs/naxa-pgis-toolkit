@@ -464,6 +464,12 @@ def handleShapeFile(layer_id):
         geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
         print('completed removing nan values')
 
+        '''determine datetime columns and convert to string type'''
+        datetime_columns = list(geodataframe.select_dtypes(include=["datetime64"]).columns)
+        if datetime_columns:
+            geodataframe[datetime_columns] = geodataframe[datetime_columns].astype(str)
+            print('convert datetime datatype columns to str completed')
+
         '''set null geometry properly'''
         if geom_type == 'Point' or geom_type == 'MultiPoint':
             value_to_set = 'POINT EMPTY'
@@ -520,6 +526,12 @@ def handleCSV(layer_id,lat_field,lon_field):
         geodataframe[[lon_field, lat_field]]=geodataframe[[lon_field, lat_field]].replace('', None)
         geodataframe['geometry'] = gpd.points_from_xy(geodataframe[lon_field], geodataframe[lat_field])
 
+        '''determine datetime columns and convert to string type'''
+        datetime_columns = list(geodataframe.select_dtypes(include=["datetime64"]).columns)
+        if datetime_columns:
+            geodataframe[datetime_columns] = geodataframe[datetime_columns].astype(str)
+            print('convert datetime datatype columns to str completed')
+        
         '''extracting extent'''
         total_bounds = geodataframe.total_bounds
 
@@ -668,14 +680,22 @@ def handleGeoJSON(layer_id):
         '''reomve id column if it exists'''
         if 'id' in geodataframe.columns:
             geodataframe.drop('id', inplace=True, axis=1)
-            print('reomve id column completed')
+            print('remove id column completed')
+
 
         '''remove z dimension if exists'''
         geodataframe['geometry'] = geodataframe.geometry.apply(lambda x: force_2d(x))
         print('completed z dimension')
+
         '''set nan values to None'''
         geodataframe = geodataframe.replace(['NaN', 'nan', np.nan], None)
         print('completed removing nan values')
+
+        '''determine datetime columns and convert to string type'''
+        datetime_columns = list(geodataframe.select_dtypes(include=["datetime64"]).columns)
+        if datetime_columns:
+            geodataframe[datetime_columns] = geodataframe[datetime_columns].astype(str)
+            print('convert datetime datatype columns to str completed')
 
         '''set null geometry properly'''
         if geom_type == 'Point' or geom_type == 'MultiPoint':

@@ -71,12 +71,13 @@ ANALYSIS_TYPE_CHOICES = (
     ('optimum_route', _('Optimum Route Analysis')),
     ('service_area', _('Service Area Analysis')),
     ('buffer', _('Buffer Analysis')),
+    ('proximity', _('Proximity Analysis'))
 )
 
 NETWORK_MODE = (
-    ('Drive', _('Drive')),
-    ('Cycle', _('Cycle')),
-    ('Walk', _('Walk')),
+    ('drive', _('Drive')),
+    ('cycle', _('Cycle')),
+    ('walk', _('Walk')),
 )
 
 LAYER_STATUS_CHOICES = (

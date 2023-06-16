@@ -19,10 +19,17 @@ ALLOWED_HOSTS = ["*"]
 # CACHES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#caches
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+#         "LOCATION": "",
+#     }
+# }
+
 CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "",
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': str(ROOT_DIR / "cache"),
     }
 }
 
@@ -74,7 +81,7 @@ CELERY_TIMEZONE = 'CET'
 CELERY_TASK_ROUTES = {
     # 'core.tasks.add': {'queue': 'pccims'},
     'pgis_toolkit.users.tasks.check_token_expiration': {'queue': 'default'},
-    'pgis_toolkit.maps.tasks.delete_query_layers': {'queue': 'default'},
+    # 'pgis_toolkit.maps.tasks.delete_query_layers': {'queue': 'default'},
 
 }
 
@@ -84,9 +91,9 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
         'options': {'queue': 'default'}
     },
-    'delete_query_layers': {
-        'task': 'pgis_toolkit.maps.tasks.delete_query_layers',
-        'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
-        'options': {'queue': 'default'}
-    },
+#     'delete_query_layers': {
+#         'task': 'pgis_toolkit.maps.tasks.delete_query_layers',
+#         'schedule': crontab(minute=0, hour=0),  # Execute daily at midnight.
+#         'options': {'queue': 'default'}
+#     },
 }

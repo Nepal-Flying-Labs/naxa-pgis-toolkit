@@ -202,13 +202,12 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                     SELECT * FROM segments WHERE geometry IS NOT NULL'''
         else:
             raise Exception('No features mirror found')
-        print(sql, "is sql")
-        # sql = f'''SELECT * FROM maps_featurecollectionmirror WHERE layer_id={road_network}'''
         segments = gpd.read_postgis(sql, con=con, geom_col="geometry", crs="epsg:4326")
         G = convert_shp2graph(segments)
         orig_node_id, dist_to_orig = ox.distance.nearest_nodes(G, X=origin_long, Y=origin_lat, return_dist=True)
         dest_node_id, dist_to_dest = ox.distance.nearest_nodes(G, X=destination_long, Y=destination_lat, return_dist=True)
         routes_list = ox.distance.k_shortest_paths(G=G, orig=orig_node_id, dest=dest_node_id, k=k, weight='length')
+        # routes_list = [p for p in nx.all_shortest_paths(G,source=orig_node_id,target=dest_node_id,weight='length')]
         road_max_speed = 50 #kmph
         if mode == "walk":
             average_velocity = 3.6
@@ -232,7 +231,7 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                 total_length = round(final_df['length'].sum(),2)
                 # total_time_secs = round(total_length/(road_max_speed/average_velocity),2)
                 total_time_secs = round(total_length/average_velocity,2)
-                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id}
+                result_dict = {'geometry': merged_geom.wkt, 'length':total_length, 'travel_time':total_time_secs, 'bbox': bbox, 'analysis_id': analysis_id,'optimum_id':optimum_route_id}
                 serializer = NetworkRoutesSerializer(data=result_dict)
                 if serializer.is_valid():
                     network_routes_objs.append(NetworkRoutes(**result_dict))
@@ -241,16 +240,11 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                         errors.append(
                             {'errorName': er, 'details': serializer._errors[er][0]})
                     return str(errors),400
-            network_routes_objs.sort(key = lambda x: x.length)
-            route_index=1
-            for nr in network_routes_objs:
-                nr.route_no = route_index
-                nr.is_optimum = True if route_index == 1 else False
-                route_index+=1
             network_list = NetworkRoutes.active.bulk_create(network_routes_objs)
             iterate = True
             while iterate:
-                if NetworkRoutes.active.filter(analysis_id=analysis_id).exists():
+                routes_qs = NetworkRoutes.active.filter(optimum_id=optimum_route_id)
+                if routes_qs.exists():
                     iterate=False
             buffer_distance = 0.00004499640028797696 # 5m in degree
             if obstacles is not None:
@@ -268,35 +262,41 @@ def optimum_path_analysis(road_network, mode, origin_long, origin_lat, destinati
                         # route_inst.obstacles = json.dumps(obs_dict)
                         route_inst.obstacles = obs_dict
                         route_inst.save()
-                except:
+                    '''sort the routes based on the obstacles first and if same no of obstacles, sort based on length'''
+                    sorted_routes = sorted(routes_qs, key = lambda route: (route.obstacles_count, route.length))
+                    route_index=1
+                    for nr in sorted_routes:
+                        nr.route_no = route_index
+                        nr.is_optimum = True if route_index == 1 else False
+                        route_index+=1
+                        nr.save()
+                except Exception as e:
+                    print("Error:", str(e))
                     pass
-            '''update Analysis object bbox'''
-            analysis_bbox = bbox_list[0]
-            for bbox in bbox_list:
-                if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
-                if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
-                if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
-                if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
-            analysis_inst = Analysis.active.get(id=analysis_id)
-            analysis_inst.bbox=analysis_bbox
-            analysis_inst.save()
+            # '''update Analysis object bbox'''
+            # analysis_bbox = bbox_list[0]
+            # for bbox in bbox_list:
+            #     if bbox[0] < analysis_bbox[0]: analysis_bbox[0]=bbox[0]
+            #     if bbox[1] < analysis_bbox[1]: analysis_bbox[1]=bbox[1]
+            #     if bbox[2] > analysis_bbox[2]: analysis_bbox[2]=bbox[2]
+            #     if bbox[3] > analysis_bbox[3]: analysis_bbox[3]=bbox[3]
+            # analysis_inst = Analysis.active.get(id=analysis_id)
+            # analysis_inst.bbox=analysis_bbox
+            # analysis_inst.save()
             optimum_route_inst = OptimumRoute.active.get(id=optimum_route_id)
+            optimum_route_inst.bbox = bbox_list[0]
             optimum_route_inst.route_origin = [G.nodes[orig_node_id]['y'], G.nodes[orig_node_id]['x']]
             optimum_route_inst.route_destination = [G.nodes[dest_node_id]['y'], G.nodes[dest_node_id]['x']]
             optimum_route_inst.save()
-            return analysis_id, "success", "", 200
+            return analysis_id, optimum_route_id, "success", "", 200
         except Exception as e:
-            if Analysis.objects.filter(id=analysis_id).exists():
-                Analysis.objects.get(id=analysis_id).delete()
             if OptimumRoute.objects.filter(id=optimum_route_id).exists():
                 OptimumRoute.objects.get(id=optimum_route_id).delete()
-            return None, "route_not_found", str(e), 200
+            return None, None, "route_not_found", str(e), 200
     except Exception as e:
-        if Analysis.objects.filter(id=analysis_id).exists():
-            Analysis.objects.get(id=analysis_id).delete()
         if OptimumRoute.objects.filter(id=optimum_route_id).exists():
             OptimumRoute.objects.get(id=optimum_route_id).delete()
-        return None, "error", str(e), 400
+        return None, None, "error", str(e), 400
 
 def service_area_analysis(road_network, analysis_id, optimum_route_id):
     errors=[]
