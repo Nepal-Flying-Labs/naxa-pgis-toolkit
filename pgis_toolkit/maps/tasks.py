@@ -70,25 +70,30 @@ def UploadVectorLayer(layer_id,request_data):
         '''Knowing file extension'''
         path_split = os.path.splitext(layer_file_instance.file.name)
         file_extension = path_split[1]
-        if file_extension == ".zip":
+        if file_extension.lower() == ".zip":
             response = handleShapeFile(layer_id)
-        elif file_extension == ".csv":
+        elif file_extension.lower() == ".csv":
             lat_field = request_data.get('lat_field')
             lon_field = request_data.get('lon_field')
             if not lat_field or not lon_field:
                 return "error occured: lat_field and lon_field are required" ,None
             response = handleCSV(layer_id,lat_field,lon_field)
-        elif file_extension == ".geojson":
+        elif file_extension.lower() == ".geojson":
             response = handleGeoJSON(layer_id)
-        elif file_extension == ".kml":
+        elif file_extension.lower() == ".kml":
             response = handleKML(layer_id)
-        elif file_extension == ".gpx":
+        elif file_extension.lower() == ".gpx":
             response = handleGPX(layer_id)
+        elif file_extension.lower() == ".shp":
+            clear_dir(dir)
+            layer_inst.upload_status='failed'
+            layer_inst.save()
+            return "The system does not support '.shp' file format alone. Please include '.shp','.shx','.prj' and '.dbf' in a single zip file", None
         else:
             clear_dir(dir)
             layer_inst.upload_status='failed'
             layer_inst.save()
-            return 'Error Occured: Invalid file extension', None
+            return "Invalid file extension. The system currently supports`: '.zip','.csv','.geojson', '.kml', and '.gpx'.", None
 
         clear_dir(dir)
         if response=="successful":
@@ -157,7 +162,9 @@ def UpdateVectorLayer(layer_instance, request_data):
                 errors.append(
                     {'errorName11': er, 'details': vector_layer_serializer._errors[er][0]})
             return errors, update_dict
-
+        '''append show_label and label_field'''
+        update_dict['show_label'] = vector_layer_instance.show_label
+        update_dict['label_field'] = vector_layer_instance.label_field
         '''Save vector layer style'''
         project_style=None if request_data['project_style']=="default" else request_data['project_style']
         style_qs=LayerStyle.objects.filter(layer=layer_instance.id,project_style=project_style)
@@ -484,7 +491,7 @@ def CreateNetworkGraph(origin_long, origin_lat, destination_long, destination_la
         response, status = generate_routes(origin_long, origin_lat, destination_long, destination_lat, k, G, analysis_id)
         return response, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
+        print("error occured in CreateNetworkGraph: " + str(e))
         return (str(e), 400)
 
 @shared_task(max_retries=1, soft_time_limit=8000)
@@ -492,29 +499,40 @@ def CreateNetworkGraphSystem(roadnetwork, mode, origin_long, origin_lat, destina
 
     from pgis_toolkit.maps.utils.network_analysis import optimum_path_analysis
     try:
-        response, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
-        return response, stat, message, status
+        analysis_id, optimum_route_id, stat, message, status = optimum_path_analysis(roadnetwork, mode, origin_long, origin_lat, destination_long, destination_lat, k, obstacles, analysis_id, optimum_route_id)
+        return analysis_id, optimum_route_id, stat, message, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
-        return None, "error", str(e), 400
+        print("error occured in CreateNetworkGraphSystem: " + str(e))
+        return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
-def CreateBuffer(origins, radius, dissolve_output, analysis_id, buffer_id, pois):
+def CreateProximity(origins, radius, dissolve_output, analysis_id, proximity_id, pois):
+
+    from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis
+    try:
+        analysis_id, proximity_id, stat, message, status = proximity_analysis(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
+        return analysis_id, proximity_id, stat, message, status
+    except Exception as e:
+        print("error occured in CreateProximity: " + str(e))
+        return None, None, "error", str(e), 400
+
+@shared_task(max_retries=1, soft_time_limit=8000)
+def CreateBuffer(layer, radius, radius_col, dissolve_output, analysis_id, buffer_id):
 
     from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis
     try:
-        response, stat, message, status = buffer_analysis(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
-        return response, stat, message, status
+        analysis_id, buffer_id, stat, message, status = buffer_analysis(layer, radius, radius_col, dissolve_output, analysis_id, buffer_id)
+        return analysis_id, buffer_id, stat, message, status
     except Exception as e:
-        print("error occured in handleDataMergeUpdate: " + str(e))
-        return None, "error", str(e), 400
+        print("error occured in CreateBuffer: " + str(e))
+        return None, None, "error", str(e), 400
 
 @shared_task(max_retries=1, soft_time_limit=8000)
 def BufferData(analysis_id, layer_ids):
 
-    from pgis_toolkit.maps.utils.buffer_analysis import buffer_analysis_data
+    from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis_data
     try:
-        response, stat, message, status = buffer_analysis_data(analysis_id, layer_ids)
+        response, stat, message, status = proximity_analysis_data(analysis_id, layer_ids)
         return response, stat, message, status
     except Exception as e:
         print("error occured in handleDataMergeUpdate: " + str(e))

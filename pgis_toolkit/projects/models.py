@@ -328,3 +328,11 @@ class RequestDemoAlert(models.Model):
 
     class Meta:
         app_label = 'projects'
+
+class UsafiriContent(models.Model):
+    name = models.CharField(max_length=254, blank=True, null=True)
+    image = models.ImageField(upload_to='usafiri_content/', blank=True, null=True)
+    url = models.URLField(blank=True, null=True)
+
+    class Meta:
+        app_label = 'projects'

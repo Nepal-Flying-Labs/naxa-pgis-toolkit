@@ -7,7 +7,6 @@ from pgis_toolkit.maps.api.views import (
     AdvanceQueryAPIView,
     AnalysisViewset,
     BufferAnalysisAPIView,
-    BufferAnalysisDataAPIView,
     BufferAreasCollection,
     BufferAreaTileQuerySet,
     DataMergeUpdateAPIView,
@@ -19,8 +18,8 @@ from pgis_toolkit.maps.api.views import (
     FeatureImageViewset,
     FeatureMirrorGeoJSONAPIView,
     LayerAttributeViewset,
-    LayerFromBufferAnalysis,
     LayerFromOptimumPathAnalysis,
+    LayerFromProximityAnalysis,
     LayerFromQueryAPIView,
     LayerGroupViewset,
     LayerVectorTileQuerySet,
@@ -34,15 +33,17 @@ from pgis_toolkit.maps.api.views import (
     ProjectMapConfigAPIView,
     ProjectsLayerTemplateDropdownChoiceViewset,
     ProjectStyleViewset,
+    ProximityAnalysisAPIView,
+    ProximityAreasCollection,
+    ProximityAreaTileQuerySet,
     QueryFeatureCollectionViewset,
     ServiceAreaAnalysisAPIView,
     StandardIconViewset,
     SubLayerViewset,
     ThemeViewset,
-    analysis_layer,
-    analysis_layers,
-    buffer_column,
-    buffer_distance,
+    analysis_result_detail,
+    analysis_result_list,
+    analysis_type_list,
     bulk_create_image_from_urls,
     bulk_del_null_geom,
     bulk_template_download,
@@ -58,8 +59,10 @@ from pgis_toolkit.maps.api.views import (
     check_self_intersecting_geometry,
     cleaning_error_features,
     copy_features,
-    data_buffer,
     delete_sequence,
+    export_buffer_analysis,
+    export_optimum_route_analysis,
+    export_proximity_analysis,
     feature_popup,
     fix_duplicate_geometry,
     fix_isolated_geometry,
@@ -79,7 +82,7 @@ from pgis_toolkit.maps.api.views import (
     sync_features,
     sync_mirror_to_mongo,
     sync_template,
-    update_template_attributes,
+    update_template_attributes, layer_check_logs, data_clean_task_response
 )
 
 router = DefaultRouter()
@@ -115,47 +118,25 @@ router.register(r'query_feature_collection', QueryFeatureCollectionViewset, base
 router.register(r'feature_collection_mirror', FeatureCollectionMirrorViewset, basename='feature_collection_mirror')
 
 #==================
-#  NetworkRoutes
+#  Analysis
 #==================
 router.register(r'analysis', AnalysisViewset, basename='analysis')
+
+#==================
+#  NetworkRoutes
+#==================
 router.register(r'network_route_collection', NetworkRoutesCollection, basename='network_route_collection')
+
+#==================
+#  ProximityAreas
+#==================
+router.register(r'proximity_area_collection', ProximityAreasCollection, basename='proximity_area_collection')
 
 #==================
 #  BufferAreas
 #==================
 router.register(r'buffer_area_collection', BufferAreasCollection, basename='buffer_area_collection')
 app_name = "projects"
-
-data_clean_urls = [
-
-    # Check Layers api
-    path('copy_features/', copy_features, name='copy_features'),
-    path('check_layer/', check_layer, name='check_layer'),
-    path('check_null_geometry/', check_null_geometry, name='check_null_geometry'),
-    path('check_multipart_geometry/', check_multipart_geometry, name='check_multipart_geometry'),
-    path('check_duplicate_geometry/', check_duplicate_geometry, name='check_duplicate_geometry'),
-    path('check_overlapping_geometry/', check_overlapping_geometry, name='check_overlapping_geometry'),
-    path('check_self_intersecting_geometry/', check_self_intersecting_geometry, name='check_self_intersecting_geometry'),
-    path('check_isolated_geometry/', check_isolated_geometry, name='check_isolated_geometry'),
-    # path('get_error_data/', get_error_data, name="get_error_data"),
-    # Fix Layers api
-    path('fix_layer/', fix_layer, name='fix_layer'),
-    path('fix_null_geometry/', fix_null_geometry, name='fix_null_geometry'),
-    path('fix_multipart_geometry/', fix_multipart_geometry, name='fix_multipart_geometry'),
-    path('fix_duplicate_geometry/', fix_duplicate_geometry, name='fix_duplicate_geometry'),
-    path('fix_overlapping_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
-    path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
-    path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
-    path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
-    #sync features to feature_collection table after data clean
-    path('sync_features/', sync_features, name='sync_features'),
-]
-
-data_analysis_urls = [
-    path('buffer_by_distance/', buffer_distance, name="buffer_by_distance"),
-    path('buffer_by_column/', buffer_column, name="buffer_by_column"),
-    path('data_inside_buffer/', data_buffer, name="data_inside_buffer"),
-]
 
 def trigger_error(request):
     division_by_zero = 1 / 0
@@ -197,16 +178,24 @@ urlpatterns = [
     #     Analysis
     #==================
     path('sync_mirror_to_mongo/',sync_mirror_to_mongo, name='sync_mirror_to_mongo'),
-    path('analysis_layers/', analysis_layers, name='analysis_layers'),
-    path('analysis_layer/', analysis_layer, name='analysis_layers'),
+    path('analysis_type_list/',analysis_type_list,name="analysis_type_list"),
+    path('analysis_result_list/', analysis_result_list, name='analysis_layers'),
+    path('analysis_result_detail/', analysis_result_detail, name='analysis_layers'),
     path('get_analysis_task_response/', get_analysis_task_response),
     path('optimum_route_analysis/', OptimumRouteAnalysisAPIView.as_view(), name='shortest_distance_analysis'),
+    path('optimum_route_analysis/<int:pk>/', OptimumRouteAnalysisAPIView.as_view(), name='update_optimum_route'),
     path('optimum_route_vectortile/<int:z>/<int:x>/<int:y>/', OptimumRouteAnalysisTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
     path('layer_from_optimum_path/', LayerFromOptimumPathAnalysis.as_view(), name='LayerFromOptimumPathAnalysis'),
+    path('export_optimum_route_analysis/',export_optimum_route_analysis,name='export_optimum_route_analysis'),
+    path('proximity_analysis/', ProximityAnalysisAPIView.as_view(), name='proximity_analysis'),
+    path('proximity_analysis/<int:pk>/', ProximityAnalysisAPIView.as_view(), name='update_proximity_analysis'),
+    path('proximity_area_vectortile/<int:z>/<int:x>/<int:y>/', ProximityAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
+    path('layer_from_buffer/',LayerFromProximityAnalysis.as_view(), name='layer_from_buffer'),
+    path('export_proximity_analysis/',export_proximity_analysis,name='export_proximity_analysis'),
     path('buffer_analysis/', BufferAnalysisAPIView.as_view(), name='buffer_analysis'),
-    # path('buffer_analysis_data/', BufferAnalysisDataAPIView.as_view(), name='buffer_analysis_data'),
+    path('buffer_analysis/<int:pk>/', BufferAnalysisAPIView.as_view(), name='update_buffer_analysis'),
     path('buffer_area_vectortile/<int:z>/<int:x>/<int:y>/', BufferAreaTileQuerySet.as_view(), name='NetworkRoutesTileQuerySet'),
-    path('layer_from_buffer/',LayerFromBufferAnalysis.as_view(), name='layer_from_buffer'),
+    path('export_buffer_analysis/',export_buffer_analysis,name='export_buffer_analysis'),
 
     #==================
     #   Advance Query
@@ -227,5 +216,35 @@ urlpatterns = [
     #==================
     path('category/', category, name='category'),
     path('delete_sequence/', delete_sequence, name='delete_sequence'),
-    path('cancel_layer_upload/', cancel_layer_upload, name='cancel_layer_upload')
-] + data_clean_urls + data_analysis_urls
+    path('cancel_layer_upload/', cancel_layer_upload, name='cancel_layer_upload'),
+
+    #==================
+    #   Data Cleaning
+    #==================
+    # Check Layers api
+    path('copy_features/', copy_features, name='copy_features'),
+    path('check_layer/', check_layer, name='check_layer'),
+    path('check_null_geometry/', check_null_geometry, name='check_null_geometry'),
+    path('check_multipart_geometry/', check_multipart_geometry, name='check_multipart_geometry'),
+    path('check_duplicate_geometry/', check_duplicate_geometry, name='check_duplicate_geometry'),
+    path('check_overlapping_geometry/', check_overlapping_geometry, name='check_overlapping_geometry'),
+    path('check_self_intersecting_geometry/', check_self_intersecting_geometry, name='check_self_intersecting_geometry'),
+    path('check_isolated_geometry/', check_isolated_geometry, name='check_isolated_geometry'),
+    path('check_layer_logs/', layer_check_logs, name='check_layer_logs'),
+    # path('get_error_data/', get_error_data, name="get_error_data"),
+
+    # Fix Layers api
+    path('fix_layer/', fix_layer, name='fix_layer'),
+    path('fix_null_geometry/', fix_null_geometry, name='fix_null_geometry'),
+    path('fix_multipart_geometry/', fix_multipart_geometry, name='fix_multipart_geometry'),
+    path('fix_duplicate_geometry/', fix_duplicate_geometry, name='fix_duplicate_geometry'),
+    path('fix_overlapping_geometry/', fix_overlay_geometry, name='fix_overlay_geometry'),
+    path('fix_self_intersecting_geometry/', fix_self_intersecting_geometry, name='fix_self_intersecting_geometry'),
+    path('fix_isolated_geometry/', fix_isolated_geometry, name='fix_isolated_geometry'),
+    path('bulk_del_null_geom/', bulk_del_null_geom, name='bulk_del_null_geom'),
+    #sync features to feature_collection table after data clean
+    path('sync_features/', sync_features, name='sync_features'),
+
+    path('data_clean_task_response/', data_clean_task_response, name ='data_clean_task_response'),
+
+]

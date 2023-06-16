@@ -24,6 +24,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import URLValidator
 from django.db import connection
 from django.db.models import Count, F, Func, IntegerField, Q, Value
+from django.db.models.fields.json import KeyTextTransform
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import DetailView, ListView
@@ -67,6 +68,8 @@ from pgis_toolkit.maps.models import (
     ProjectsLayerTemplateAttribute,
     ProjectsLayerTemplateDropdownChoice,
     ProjectStyle,
+    ProximityAnalysis,
+    ProximityAreas,
     QueryFeatureCollection,
     QueryLayer,
     RasterLayer,
@@ -75,7 +78,7 @@ from pgis_toolkit.maps.models import (
     SubLayerStyle,
     Theme,
     Vectorlayer,
-    WMSLayer,
+    WMSLayer, CleaningCheckLogs
 )
 from pgis_toolkit.maps.permissions import (
     FeatureCollectionPermission,
@@ -100,6 +103,7 @@ from pgis_toolkit.maps.tasks import (
     CreateBuffer,
     CreateNetworkGraph,
     CreateNetworkGraphSystem,
+    CreateProximity,
     FeatureImageFromURL,
     UpdateRasterLayer,
     UpdateVectorLayer,
@@ -109,11 +113,6 @@ from pgis_toolkit.maps.tasks import (
     handleDataMergeUpdate,
 )
 from pgis_toolkit.maps.utils.advance_filter import advance_filter_data
-from pgis_toolkit.maps.utils.buffer_analysis import (
-    buffer_by_column_value,
-    buffer_by_distance,
-    find_data_within_buffer,
-)
 from pgis_toolkit.maps.utils.data_cleaning import (
     check_duplicate,
     check_multipart,
@@ -131,6 +130,7 @@ from pgis_toolkit.maps.utils.data_cleaning import (
 )
 from pgis_toolkit.maps.utils.functions import clear_dir
 from pgis_toolkit.maps.utils.project_style import get_style_detail
+from pgis_toolkit.maps.utils.proximity_analysis import proximity_analysis
 from pgis_toolkit.projects.models import LayerTemplate, LayerTemplateAttribute, Project
 from pgis_toolkit.utils.pagination import CustomPageNumberPagination
 from pgis_toolkit.utils.vectortile import (
@@ -140,12 +140,13 @@ from pgis_toolkit.utils.vectortile import (
 )
 
 from .serializers import (
+    AnalysisListSerializer,
     AnalysisSerializer,
-    BufferAreasMapSerializer,
     BufferAreasSerializer,
     CleaningErrorsSerializer,
     DropdownChoiceSerializer,
     FeatureCollectionListSerializer,
+    FeatureCollectionMirrorListSerializer,
     FeatureCollectionMirrorSerializer,
     FeatureCollectionRetrieveSerializer,
     FeatureCollectionSerializer,
@@ -167,6 +168,8 @@ from .serializers import (
     ProjectsLayerTemplateDropdownChoiceSerializer,
     ProjectStyleListSerializer,
     ProjectStyleSerializer,
+    ProximityAreasMapSerializer,
+    ProximityAreasSerializer,
     QueryFeatureCollectionListSerializer,
     QueryFeatureCollectionSerializer,
     StandardIconListSerializer,
@@ -176,7 +179,7 @@ from .serializers import (
     SubLayerUpdateSerializer,
     ThemeListSerializer,
     ThemeSerializer,
-    WMSLayerSerializer,
+    WMSLayerSerializer,OptimumRouteSerializer, ProximityAnalysisSerializer,BufferAnalysisSerializer
 )
 
 User = get_user_model()
@@ -245,7 +248,7 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             # check_mandatory = request.query_params.get('check_mandatory', False)
             if not layer:
                 return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory', 'dropdown_field')
+            queryset = self.queryset.filter(layer=layer).values('id', 'name', 'alias', 'data_type', 'mandatory', 'dropdown_field', 'editable')
             # if check_mandatory == True or check_mandatory == 'True':
             #     mandatory_fields = Vectorlayer.objects.get(layer=layer).mandatory_fields
             #     if mandatory_fields:
@@ -256,6 +259,39 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
             #             data['mandatory'] = True
             # serializer = self.get_serializer(self.queryset, many=True)
             return Response(data=queryset, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            errors =[]
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                attr_name = serializer.validated_data.get('name')
+                layer = serializer.validated_data.get('layer').id
+                mod_attr_name = '{'+attr_name+'}'
+                value = ""
+                try:
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""'), synced = false
+                                WHERE layer_id={layer} AND is_deleted = false
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Creating layer attribute failed:', str(e))
+                    return Response(data={'message': 'Creating layer attribute failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
@@ -293,12 +329,37 @@ class LayerAttributeViewset(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         try:
-            instance = self.get_object()
-            '''delete layer attribute'''
-            self.perform_destroy(instance)
-            return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
-        except Http404:
-            return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
+            attribute_inst = self.get_object()
+            attr_name = attribute_inst.name
+            layer = attribute_inst.layer.id
+            # mod_attr_name = '{'+attr_name+'}'
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    update_sql = f'''
+                            UPDATE maps_featurecollection
+                            SET attributes = attributes - '{attr_name}', synced = false
+                            WHERE layer_id={layer} AND is_deleted = false
+                        '''
+                    cursor.execute(update_sql)
+                '''update in mongo'''
+                feature_coll.update_many({"layer":layer},{"$unset": {f"attributes.{attr_name}": ""}}, upsert=False)
+                '''delete layer attribute'''
+                self.perform_destroy(attribute_inst)
+                return Response(data={'message': 'Layer Attribute delete successful.'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Layer Attribute delete failed:', str(e))
+                return Response(data={'message': 'Layer Attribute delete failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+        # try:
+        #     instance = self.get_object()
+        #     '''delete layer attribute'''
+        #     self.perform_destroy(instance)
+        #     return Response(status=status.HTTP_200_OK, data={'message': 'Layer Attribute delete successful'})
+        # except Http404:
+        #     return Response(status=status.HTTP_204_NO_CONTENT, data={'message': 'Not Found'})
 
 '''Bulk create FeatureImage from feature attributes when a image field is set.'''
 @api_view(['POST'])
@@ -332,7 +393,7 @@ def bulk_create_image_from_urls(request, *args, **kwargs):
             return Response(data={'message': 'Bulk Feature Image create successful'}, status=200)
         except Exception as e:
             print('pool error')
-            return Response(data={'message': str(e)}, status=400)
+            return Response(data={'message': str(e)}, status=500)
     except Exception as e:
         return Response(data={'message': str(e)}, status=400)
 
@@ -394,7 +455,7 @@ def get_bulk_upload_image_response(request):
 
 class DropdownChoiceViewset(viewsets.ModelViewSet):
     queryset = DropdownChoice.objects.all()
-    http_method_names = ('get', 'patch', 'post')
+    http_method_names = ('get', 'patch', 'post', 'delete')
     permission_classes = [IsAuthenticated]
     serializer_class = DropdownChoiceSerializer
 
@@ -414,22 +475,70 @@ class DropdownChoiceViewset(viewsets.ModelViewSet):
             errors =[]
             choice_inst = self.get_object()
             attr_name = choice_inst.attribute.name
+            mod_attr_name = '{'+choice_inst.attribute.name+'}'
             prev_value = choice_inst.name
+            data_type = choice_inst.attribute.data_type
             serializer = self.get_serializer(choice_inst, request.data, partial=True)
             if serializer.is_valid():
                 value = serializer.validated_data.get('name', None)
-                layer = choice_inst.attribute.layer.id
-                feature_qs = FeatureCollection.active.filter(layer=layer, attributes__contains={attr_name: prev_value})
-                for feature in feature_qs:
-                    feature.attributes[attr_name] = value
-                FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
-                serializer.save()
-                return Response(data=serializer.data, status=status.HTTP_200_OK)
+                try:
+                    if data_type == 'str':
+                        mod_value = '"'+value+'"'
+                    else:
+                        mod_value = value
+                    layer = choice_inst.attribute.layer.id
+                    # for feature in feature_qs:
+                    #     feature.attributes[attr_name] = value
+                    # FeatureCollection.active.bulk_update(feature_qs, ['attributes'])
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        update_sql = f'''
+                                UPDATE maps_featurecollection
+                                SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '{mod_value}'), synced = false
+                                WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
+                            '''
+                        cursor.execute(update_sql)
+                    '''update in mongo'''
+                    feature_coll.update_many({"layer":layer, f"attributes.{attr_name}":prev_value},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                    serializer.save()
+                    return Response(data=serializer.data, status=status.HTTP_200_OK)
+                except Exception as e:
+                    print('Updating the feature attriutes value failed:', str(e))
+                    return Response(data={'message': 'Updating the feature attriutes value failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 for er in serializer._errors:
                     errors.append(
                         {'errorName': er, 'details': serializer._errors[er][0]})
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            choice_inst = self.get_object()
+            attr_name = choice_inst.attribute.name
+            mod_attr_name = '{'+choice_inst.attribute.name+'}'
+            prev_value = choice_inst.name
+            value = ""
+            try:
+
+                layer = choice_inst.attribute.layer.id
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    update_sql = f'''
+                            UPDATE maps_featurecollection
+                            SET attributes = JSONB_SET(attributes, '{mod_attr_name}', '""'), synced = false
+                            WHERE layer_id={layer} AND id IN (SELECT id FROM maps_featurecollection WHERE layer_id={layer} AND is_deleted = false AND (attributes ->> '{attr_name}' = '{prev_value}'))
+                        '''
+                    cursor.execute(update_sql)
+                '''update in mongo'''
+                feature_coll.update_many({"layer":layer, f"attributes.{attr_name}":prev_value},{"$set": {f"attributes.{attr_name}":value}}, upsert=False)
+                '''delete attribute dropdown object'''
+                self.perform_destroy(choice_inst)
+                return Response(data={'message': 'Dropdown value delete successful.'}, status=status.HTTP_200_OK)
+            except Exception as e:
+                print('Dropdown value delete failed:', str(e))
+                return Response(data={'message': 'Dropdown value delete failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
 
@@ -569,9 +678,13 @@ def project_theme_layers(request):
                     if vector_layer.exists():
                         layer_item['bbox'] = vector_layer[0].bbox
                         layer_item['geom_type'] = vector_layer[0].geom_type
+                        layer_item['show_label'] = vector_layer[0].show_label
+                        layer_item['label_field'] = vector_layer[0].label_field
                     else:
                         layer_item['bbox'] = []
                         layer_item['geom'] = ''
+                        layer_item['show_label'] = ''
+                        layer_item['label_field'] = ''
                     # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 elif layer['layer_type']=='Raster':
                     raster_layer = RasterLayer.objects.filter(layer=layer['id'])
@@ -622,9 +735,13 @@ def project_theme_layers(request):
                 if vector_layer.exists():
                     layer_item['bbox'] = vector_layer[0].bbox
                     layer_item['geom_type'] = vector_layer[0].geom_type
+                    layer_item['show_label'] = vector_layer[0].show_label
+                    layer_item['label_field'] = vector_layer[0].label_field
                 else:
                     layer_item['bbox'] = []
                     layer_item['geom_type'] = ''
+                    layer_item['show_label'] = ''
+                    layer_item['label_field'] = ''
                 # layer_item['feature_count']=len(FeatureCollection.active.filter(layer=layer['id']))
                 layer_item['sub_layer']=sub_layer_list
             elif layer['layer_type']=='Raster':
@@ -1240,8 +1357,7 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/layer_vectortile/{z}/{x}/{y}/?layer=&sub_layer=",
     '''
     vector_tile_layer_name = None
-    vector_tile_fields = ('pk','layer')
-
+    # vector_tile_fields = ('pk','layer','label')
     def get(self, request, *args, **kwargs):
         '''Authentication'''
         auth = request.headers['Authorization']
@@ -1255,18 +1371,29 @@ class LayerVectorTileQuerySet(LayerMVTView, DetailView):
             user_id = auth_token.user_id
         if not User.active.filter(id=user_id).exists():
             return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
-        queryset=FeatureCollection.active.all()
+
         request_keys = request.GET.keys()
         '''filter by layer id'''
         if 'layer' not in request_keys or request.GET['layer'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         layer_id=request.GET['layer']
-        queryset=queryset.filter(layer=layer_id)
+        # Retrieve label feild from vectorlayer
+        vectorlayer=Vectorlayer.objects.get(layer=layer_id)
+        label_field=vectorlayer.label_field
+        show_label=vectorlayer.show_label
+        #add the retrieved label feild into queryset
+        if label_field and show_label:
+            queryset=FeatureCollection.active.filter(layer=layer_id).annotate(label=KeyTextTransform(label_field, 'attributes'))
+            self.vector_tile_fields = ('pk','layer','label')
+        else:
+            queryset=FeatureCollection.active.filter(layer=layer_id)
+            self.vector_tile_fields = ('pk','layer')
 
         if 'sub_layer' in request_keys and request.GET['sub_layer'] != "":
             sub_layer_id=request.GET['sub_layer']
             queryset=queryset.filter(sub_layer=sub_layer_id)
         self.vector_tile_queryset = queryset.distinct()
+
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''{{baseURL}}api/maps/advance_query/
@@ -1399,6 +1526,16 @@ class AdvanceQueryAPIView(APIView):
                 QueryFeatureCollection.active.filter(id__in=feature_ids).delete()
             return Response(data={'message': str(e)}, status=400)
 
+    def delete(self, request, *args, **kwargs):
+        try:
+            layer = request.data.get('layer', None)
+            if not layer:
+                return Response(data={'message': 'layer params is missing'}, status=400)
+            QueryLayer.active.get(id=layer).delete()
+            return Response(data={'message': 'Query Layer delete successful'}, status=200)
+        except Exception as e:
+            print("Query Layer Delete Task fail, error: " + str(e))
+            return Response(data={'message': str(e)}, status=400)
 
 class AdvanceFilterVectorTileQuerySet(LayerMVTView, DetailView):
     '''
@@ -1588,7 +1725,7 @@ def layer_download(request):
         root_dir = f'{MEDIA_ROOT}/layer_download/'
         db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
         con = create_engine(db_connection_url)
-        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollection WHERE layer_id=" + layer_id
+        sql = "SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE layer_id=" + layer_id
         gdf = geopandas.read_postgis(sql, con)
         number_df = pandas.DataFrame(gdf['id'])
         attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
@@ -1643,11 +1780,248 @@ def layer_download(request):
             response['Content-Disposition'] = 'attachment; filename="%s"' % f'{layer_instance.name}.gpx'
         '''clearing the directory'''
         # clear_dir(root_dir)
-        if os.path.exists(root_dir): shutil.rmtree(root_dir)
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
         return response
     except Exception as e:
         # clear_dir(root_dir)
-        if os.path.exists(root_dir): shutil.rmtree(root_dir)
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
+
+@api_view(['GET'])
+def export_optimum_route_analysis(request):
+    '''
+    API to export Optimum Route Analysis
+    http://localhost:8000/api/maps/export_optimum_route_analysis/?optimum_route_id=113
+
+    Input args: optimum_route_id <int>
+
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        dir, file_url = None, None
+        optimum_route_id = request.query_params.get('optimum_route_id', None)
+        if not optimum_route_id :
+            return Response(data={"message":"optimum_route_id is required params"},status=200)
+        optimum_route_qs = OptimumRoute.active.filter(id=optimum_route_id)
+        if optimum_route_qs.exists():
+            optimum_route_instance =  optimum_route_qs[0]
+        else:
+            return Response(data={'message':"Optimum Route Analysis does not exists"},status=404)
+
+        '''retrieve all obstacles layer aggregrated from network routes'''
+        combined_obstacles={}
+        network_qs=NetworkRoutes.active.filter(optimum_id=optimum_route_instance.id)
+        for network in network_qs:
+            for layer, feature_ids in network.obstacles.items():
+                if layer not in combined_obstacles:
+                    combined_obstacles[layer] = feature_ids
+                else:
+                    for id in feature_ids:
+                        if id not in combined_obstacles[layer]:
+                            combined_obstacles[layer].append(id)
+
+        '''export these obstacles as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{optimum_route_instance.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        for layer_id, feature_ids in combined_obstacles.items():
+            if feature_ids:
+                if len(feature_ids) == 1:
+                    obstacle_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id = {feature_ids[0]}"
+                else:
+                    obstacle_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id IN {tuple(feature_ids)}"
+                gdf = geopandas.read_postgis(obstacle_sql, con)
+                number_df = pandas.DataFrame(gdf['id'])
+                attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+                '''remove the attributes dictionary now'''
+                gdf = gdf.drop(columns=['attributes'])
+                attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+                gdf=gdf.merge(attribute_number_df, on='id')
+                # gdf.set_crs(4326, allow_override=True)
+                layer_name = Layer.active.get(id=layer_id).name
+                gdf.to_file(dir+layer_name+".shp")
+
+        '''export proximity areas as a single layer'''
+        routes_sql = f"SELECT id, geometry AS geom,route_no,length,travel_time,is_optimum FROM maps_networkroutes WHERE optimum_id={optimum_route_instance.id}"
+        gdf = geopandas.read_postgis(routes_sql, con)
+        # gdf.set_crs(4326, allow_override=True)
+        gdf.to_file(dir+"routes.shp")
+
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{optimum_route_instance.name}'
+        base_dir = f'{optimum_route_instance.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{optimum_route_instance.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{optimum_route_instance.name}.zip'
+
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if dir and os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
+
+@api_view(['GET'])
+def export_proximity_analysis(request):
+    '''
+    Description:
+
+    API to export Proximity Analysis
+    http://localhost:8000/api/maps/export_proximity_analysis/?proximity_analysis_id=38
+
+    Input args: proximity_analysis_id <int>
+
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        from shapely.geometry import Point as SPoint
+        dir, file_url = None, None
+        proximity_analysis_id = request.query_params.get('proximity_analysis_id', None)
+        if not proximity_analysis_id :
+            return Response(data={"message":"proximity_analysis_id is required params"},status=200)
+            #  get the bufferanalysis instance
+        proximity_analysis_qs = ProximityAnalysis.active.filter(id=proximity_analysis_id)
+        if proximity_analysis_qs.exists():
+            proximity_analysis_inst = proximity_analysis_qs[0]
+        else:
+            return Response(data={'message':"Proximity Analysis does not exists"},status=404)
+
+        '''retrieve all pois layer aggregrated from proximity areas'''
+        proximity_area_qs=ProximityAreas.active.filter(proximity_analysis_id=proximity_analysis_id)
+        combined_pois={}
+        for area in proximity_area_qs:
+            for layer, feature_ids in area.pois.items():
+                if layer not in combined_pois:
+                    combined_pois[layer] = feature_ids
+                else:
+                    for id in feature_ids:
+                        if id not in combined_pois[layer]:
+                            combined_pois[layer].append(id)
+
+        '''export these pois as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{proximity_analysis_inst.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        for layer_id, feature_ids in combined_pois.items():
+            if feature_ids:
+                if len(feature_ids) == 1:
+                    pois_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id = {feature_ids[0]}"
+                else:
+                    pois_sql= f"SELECT id, geometry AS geom, attributes FROM maps_featurecollectionmirror WHERE id IN {tuple(feature_ids)}"
+                gdf = geopandas.read_postgis(pois_sql, con)
+                number_df = pandas.DataFrame(gdf['id'])
+                attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+                '''remove the attributes dictionary now'''
+                gdf = gdf.drop(columns=['attributes'])
+                attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+                gdf=gdf.merge(attribute_number_df, on='id')
+                # gdf.set_crs(4326, allow_override=True)
+                layer_name = Layer.active.get(id=layer_id).name
+                gdf.to_file(dir+layer_name+".shp")
+
+        '''export proximity areas as a single layer'''
+        areas_sql = f"SELECT id, geometry AS geom, area FROM maps_proximityareas WHERE proximity_analysis_id={proximity_analysis_inst.id}"
+        gdf = geopandas.read_postgis(areas_sql, con)
+        # gdf.set_crs(4326, allow_override=True)
+        gdf.to_file(dir+"proximityareas.shp")
+
+        '''export all origin points as a single layer'''
+        points = []
+        for origin in proximity_analysis_inst.origins:
+            point = SPoint(origin[0], origin[1])
+            points.append(point)
+        gdf = geopandas.GeoDataFrame(geometry=points, crs=4326)
+        gdf.to_file(dir+"origins.shp")
+
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{proximity_analysis_inst.name}'
+        base_dir = f'{proximity_analysis_inst.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{proximity_analysis_inst.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{proximity_analysis_inst.name}.zip'
+
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if file_url and os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=400, data={'message': str(e)})
+
+@api_view(['GET'])
+def export_buffer_analysis(request):
+    '''
+    Description:
+
+    API to export Buffer Analysis
+    http://localhost:8000/api/maps/export_buffer_analysis/?buffer_analysis_id=38
+
+    Input args: buffer_analysis_id <int>
+
+    Returns: Zipped Version of Analysis <File>
+    '''
+    try:
+        from shapely.geometry import Point as SPoint
+        dir, file_url = None, None
+        buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+        if not buffer_analysis_id :
+            return Response(data={"message":"buffer_analysis_id is required params"},status=200)
+            #  get the bufferanalysis instance
+        buffer_analysis_qs = BufferAnalysis.active.filter(id=buffer_analysis_id)
+        if buffer_analysis_qs.exists():
+            buffer_analysis_inst = buffer_analysis_qs[0]
+        else:
+            return Response(data={'message':"Buffer Analysis does not exists"},status=404)
+
+        '''export these pois as different layers'''
+        dir = f'{MEDIA_ROOT}/analysis_download/{buffer_analysis_inst.name}/'
+        root_dir = f'{MEDIA_ROOT}/analysis_download/'
+        db_connection_url = env("CONNECTION_DB", default="postgresql://xIDokAfQUYOjTGhErprxMHnjZTJXMloY:gn63GjyG9AOKLYgrvOcOZFrAeYgjLOA4IkjuTXzISZ3nnMaHxTX1rSxI0fdBSb52@postgres:5432/pgis_toolkit")
+        con = create_engine(db_connection_url)
+        os.makedirs(dir, exist_ok=True)
+        buffer_sql= f"SELECT id, geometry AS geom, area, attributes FROM maps_bufferareas WHERE buffer_analysis_id = {buffer_analysis_inst.id}"
+        gdf = geopandas.read_postgis(buffer_sql, con)
+        number_df = pandas.DataFrame(gdf['id'])
+        attribute_df = pandas.DataFrame(gdf['attributes'].to_list())
+        '''remove the attributes dictionary now'''
+        gdf = gdf.drop(columns=['attributes'])
+        attribute_number_df = pandas.concat([number_df, attribute_df], axis=1)
+        gdf=gdf.merge(attribute_number_df, on='id')
+        layer_name = buffer_analysis_inst.name
+        gdf.to_file(dir+layer_name+".shp")
+
+        '''zip exported files and create httpresponse content'''
+        zipfile_name = root_dir + f'{buffer_analysis_inst.name}'
+        base_dir = f'{buffer_analysis_inst.name}/' #relative dir of files to zip from the root dir
+        shutil.make_archive(base_name=zipfile_name, format='zip', root_dir=root_dir, base_dir=base_dir)
+        file_url = root_dir + f'{buffer_analysis_inst.name}.zip'
+        vector_file = open(file_url, 'rb')
+        response = HttpResponse(vector_file, content_type='application/force-download')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % f'{buffer_analysis_inst.name}.zip'
+
+        '''clear dir and zip file'''
+        if os.path.exists(dir): shutil.rmtree(dir)
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        '''clear dir and zip file'''
+        if dir and os.path.exists(dir): shutil.rmtree(dir)
+        if file_url and os.path.isfile(file_url): os.remove(file_url)
         return Response(status=400, data={'message': str(e)})
 
 class FeatureCollectionViewset(viewsets.ModelViewSet):
@@ -2389,10 +2763,10 @@ class OptimumRouteAnalysisAPIView(APIView):
         '''
         try:
             request_dict = request.data
-            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'project', 'name', 'type']
+            check_list = ['source', 'mode', 'origin_long', 'origin_lat', 'destination_long', 'destination_lat', 'analysis_id', 'name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, project, name, type are required!'}, status=400)
+                    return Response(data={'message': 'source, mode, origin_long, origin_lat, destination_long, destination_lat, name, ,analysis_id are required!'}, status=400)
             source = request_dict['source']
             origin_long = float(request_dict['origin_long'])
             origin_lat = float(request_dict['origin_lat'])
@@ -2404,16 +2778,17 @@ class OptimumRouteAnalysisAPIView(APIView):
             distance = int(request_dict['distance']) if 'distance' in request_dict and request_dict['distance'] != '' else 5000
             '''for analysis object'''
             name=request_dict['name']
-            type=request_dict['type']
             mode = request_dict['mode']
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
-            project = int(request_dict['project'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'Optimal Route Analysis with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='LineString', project=project)
-            analysis_id = analysis_inst.id
-            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat)
+            analysis_id = request_dict.get('analysis_id',None)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+                road_network = optimum_route_qs[0].road_network if optimum_route_qs else road_network
+            else:
+                return Response(data={"message": "Analysis not found"},status=404)
+            if OptimumRoute.active.filter(analysis_id=analysis_id, name=name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            optimum_route_inst = OptimumRoute.active.create(analysis_id=analysis_id, road_network=road_network, mode=mode, paths=k, origin_long=origin_long, origin_lat=origin_lat, destination_long=destination_long, destination_lat=destination_lat,geom_type='LineString',name=name)
             optimum_route_id = optimum_route_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
@@ -2433,6 +2808,23 @@ class OptimumRouteAnalysisAPIView(APIView):
         except Exception as e:
             analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            optimum_route_id=request.resolver_match.kwargs.get('pk')
+            instance = OptimumRoute.active.get(id=optimum_route_id)
+            serializer = OptimumRouteSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 
 class ServiceAreaAnalysisAPIView(APIView):
     # permission_classes = [IsAuthenticated]
@@ -2463,9 +2855,9 @@ class ServiceAreaAnalysisAPIView(APIView):
             # analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
-class BufferAnalysisAPIView(APIView):
+class ProximityAnalysisAPIView(APIView):
     def post(self, request, *args, **kwarggs):
-        '''Buffer Analysis
+        '''Proximity Analysis
 
         Parameters
         ----------
@@ -2479,88 +2871,108 @@ class BufferAnalysisAPIView(APIView):
         try:
             analysis_inst = None
             request_dict = request.data
-            check_list = ['origins', 'radius', 'project', 'name', 'type', 'pois']
+            check_list = ['origins', 'radius', 'analysis_id', 'pois','name']
             for key in check_list:
                 if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'origins, radius, project, name, type, pois are required!'}, status=400)
+                    return Response(data={'message': 'origins, radius, name, pois, analysis_id are required!'}, status=400)
             name = request_dict['name']
-            type = request_dict['type']
-            project = int(request_dict['project'])
             origins = json.loads(request_dict['origins'])
             radius = float(request_dict['radius'])
-            display=request_dict['display'] if 'display' in request_dict and request_dict['display'] != '' else False
             dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
             dissolve_output = True if dissolve_output == 'true' else False
             pois = json.loads(request_dict['pois'])
-            '''create analysis_instance'''
-            if Analysis.active.filter(name=name, type=type, project=project).exists():
-                return Response(data={'message': f'{type} with the name {name} for the project already exists!'}, status=400)
-            analysis_inst = Analysis.active.create(name=name, type=type, display=display, geom_type='Polygon', project=project)
-            analysis_id = analysis_inst.id
-            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output)
-            buffer_id = buffer_inst.id
+            analysis_id = request_dict.get('analysis_id',None)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+            else:
+                return Response(data={"message": "Analysis not found"},status=404)
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            proximity_inst = ProximityAnalysis.active.create(analysis_id=analysis_id, origins=origins, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
+            proximity_id = proximity_inst.id
             is_working=get_celery_worker_status()
             if is_working != "working":
                 analysis_inst.delete()
                 return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = CreateBuffer.delay(origins, radius, dissolve_output, analysis_id, buffer_id, pois)
+            response = CreateProximity.delay(origins, radius, dissolve_output, analysis_id, proximity_id, pois)
             return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         except Exception as e:
-            print('Error occured in BufferAnalysisAPIView',str(e))
+            print('Error occured in ProximityAnalysisAPIView',str(e))
             if analysis_inst: analysis_inst.delete()
             return Response(data={'message': 'error', 'details': str(e)}, status=400)
 
     def get(self, request, *args, **kwargs):
-        '''{{baseURL}}api/maps/buffer_analysis/?layer=1&field=DISTRICT&analysis=&view=list'''
+        '''{{baseURL}}api/maps/proximity_analysis/?layer=1&field=DISTRICT&analysis=&view=list'''
         try:
             layer_id = request.query_params.get('layer', None)
             field = request.query_params.get('field', None)
-            analysis_id = request.query_params.get('analysis', None)
+            proximity_analysis_id= request.query_params.get('proximity_analysis_id', None)
             view = request.query_params.get('view', None)
-            if layer_id and field:
-                if not analysis_id:
-                    return Response(data={'message': 'params analysis is missing.'}, status=400)
-                buff_qs = BufferAreas.active.filter(analysis_id=analysis_id).order_by('id')
-                pois_qs = buff_qs.values('pois')
-                feature_ids = []
+            if layer_id and not view:
+                layer = Layer.active.get(id=layer_id)
+                if LayerAttribute.objects.filter(layer=layer_id).exists():
+                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
+                    return Response (data=attribute_qs, status=200)
+                else:
+                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+            if not proximity_analysis_id:
+                return Response(data={'message': 'params proximity_analysis_id is missing.'}, status=400)
+            buff_qs = ProximityAreas.active.filter(proximity_analysis_id=proximity_analysis_id).order_by('id')
+            pois_qs = buff_qs.values('pois')
+            feature_ids = []
+            if view=='list':
                 for pois in pois_qs:
                     pois_json = pois['pois']
-                    if pois_json and layer_id in pois_json:
-                        feature_ids = feature_ids + pois_json[layer_id]
+                    if pois_json:
+                        feature_ids_list = pois_json.values()
+                        for ids_list in feature_ids_list:
+                            feature_ids = feature_ids + ids_list
                 if not feature_ids:
                     return Response(data={'message': 'No any POI features found inside the buffer for the layer'}, status=400)
-                if view=='list':
+                feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids).order_by('id')
+                attribute_keys = feature_qs[0].attributes.keys()
+                result = []
+                if 'name' in attribute_keys:
+                    for feature in feature_qs:
+                        attributes = feature.attributes
+                        feature_dict = {}
+                        feature_dict['id'] = feature.id
+                        feature_dict['name'] = attributes['name']
+                        layer = feature.layer
+                        feature_dict['layer_id'] = layer.id
+                        feature_dict['layer'] = layer.name
+                        for buff in buff_qs:
+                            if feature.geometry.within(buff.geometry):
+                                origin = buff.origin
+                                feature_dict['origin'] = origin
+                                feature_dict['proximity_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                        result.append(feature_dict)
+                else:
+                    for feature in feature_qs:
+                        attributes = feature.attributes
+                        feature_dict = {}
+                        feature_dict['id'] = feature.id
+                        feature_dict['name'] = ''
+                        layer = feature.layer
+                        feature_dict['layer_id'] = layer.id
+                        feature_dict['layer'] = layer.name
+                        for buff in buff_qs:
+                            if feature.geometry.within(buff.geometry):
+                                origin = buff.origin
+                                feature_dict['origin'] = origin
+                                feature_dict['proximity_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
+                        result.append(feature_dict)
+                return Response(data=result, status=200)
+            elif view =='chart':
+                if layer_id and field:
+                    for pois in pois_qs:
+                        pois_json = pois['pois']
+                        if pois_json and layer_id in pois_json:
+                            feature_ids = feature_ids + pois_json[layer_id]
+                    if not feature_ids:
+                        return Response(data={'message': 'No any POI features found inside the buffer for the layer'}, status=400)
                     feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids).order_by('id')
                     attribute_keys = feature_qs[0].attributes.keys()
-                    result = []
-                    if 'name' in attribute_keys:
-                        for feature in feature_qs:
-                            attributes = feature.attributes
-                            feature_dict = {}
-                            feature_dict['id'] = feature.id
-                            feature_dict['name'] = attributes['name']
-                            feature_dict[field] = attributes[field]
-                            for buff in buff_qs:
-                                if feature.geometry.within(buff.geometry):
-                                    origin = buff.origin
-                                    feature_dict['origin'] = origin
-                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1]))
-                            result.append(feature_dict)
-                    else:
-                        for feature in feature_qs:
-                            attributes = feature.attributes
-                            feature_dict = {}
-                            feature_dict['id'] = feature.id
-                            feature_dict['name'] = ''
-                            feature_dict[field] = attributes[field]
-                            for buff in buff_qs:
-                                if feature.geometry.within(buff.geometry):
-                                    origin = buff.origin
-                                    feature_dict['origin'] = origin
-                                    feature_dict['buffer_distance'] = feature.geometry.distance(Point(origin[0][0], origin[0][1])) * 111139 #in metres
-                            result.append(feature_dict)
-                    return Response(data=result, status=200)
-                elif view =='chart':
                     result = {}
                     mod_field = 'attributes__'+ field
                     feature_qs = FeatureCollectionMirror.active.filter(id__in=feature_ids)
@@ -2585,21 +2997,130 @@ class BufferAnalysisAPIView(APIView):
                     #     result[feat['_id']] = feat['count']
                     return Response(data=result, status=200)
                 else:
-                    return Response(data={'message': 'view params is missing!'}, status=400)
-
-            elif layer_id:
-                layer = Layer.active.get(id=layer_id)
-                if LayerAttribute.objects.filter(layer=layer_id).exists():
-                    attribute_qs=LayerAttribute.objects.filter(layer=layer_id).values('name', 'alias')
-                    return Response (data=attribute_qs, status=200)
-                else:
-                    return Response(data={'message': 'LayerAttributes not found for the layer'}, status=400)
+                    return Response(data={'message': 'layer or field params is missing!'}, status=400)
             else:
-                return Response(data={'message': 'layer or field params is missing!'}, status=400)
+                return Response(data={'message': 'view params is missing!'}, status=400)
         except Exception as e:
             return Response(data={'message': str(e)}, status=400)
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            proximity_analysis_id=request.resolver_match.kwargs.get('pk')
+            instance = ProximityAnalysis.active.get(id=proximity_analysis_id)
+            serializer = ProximityAnalysisSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
+'''Proximity Areas Table'''
+class ProximityAreasCollection(viewsets.ModelViewSet):
+    '''
+    Viewset for ProximityAreas objects
+    '''
+    queryset = ProximityAreas.active.all()
+    http_method_names = ['get']
+    serializer_class = ProximityAreasSerializer
 
-'''Buffer Areas Table'''
+    # default_serializer_class = ProximityAreasSerializer
+    # serializer_classes = {
+    #     'list': ProximityAreasSerializer,
+    #     'retrieve': ProximityAreasSerializer,
+    # }
+
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            proximity_analysis_id = self.request.query_params.get('proximity_analysis_id', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif proximity_analysis_id:
+                queryset=self.queryset.filter(proximity_analysis_id=proximity_analysis_id)
+            return queryset
+        except Exception as e:
+            return str(e)
+
+    # def get_serializer_class(self):
+    #     return self.serializer_classes.get(self.action,self.default_serializer_class)
+
+class BufferAnalysisAPIView(APIView):
+    def post(self, request, *args, **kwarggs):
+        """
+        Description:
+        ------------
+        Logic to generate buffer areas
+
+        Parameters:
+        -----------
+        layer: <int> layer_id
+        radius: <float> buffer radius
+        radius_col: <str> radius column name
+        dissolve_output: <bool> dissolve overlapping polygons or not.
+        analysis_id: <int> analysis_id
+        buffer_analysis_id: <int> buffer_analysis_id
+
+        Returns:
+        --------
+        json data with analysis_id, buffer_analysis_id, message_code, message, status_code
+
+        """
+        try:
+            analysis_inst = None
+            request_dict = request.data
+            check_list = ['layer', 'analysis_id','name']
+            for key in check_list:
+                if key not in request_dict or request_dict[key]=='':
+                    return Response(data={'message': 'layer, name, analysis_id are required!'}, status=400)
+            layer = request_dict['layer']
+            name = request_dict['name']
+            radius = float(request_dict['radius']) if request_dict.get('radius') else None
+            radius_col =  request_dict.get('radius_col', None)
+            if not radius and not radius_col:
+                return Response(data={'message': 'radius or radius_col params is required.'}, status=400)
+            dissolve_output = request_dict['dissolve_output'] if 'dissolve_output' in request_dict and request_dict['dissolve_output'] != '' else False
+            dissolve_output = True if dissolve_output == 'true' else False
+            analysis_id = request_dict.get('analysis_id',None)
+            if Analysis.active.filter(id=analysis_id).exists():
+                analysis_inst = Analysis.active.get(id=analysis_id)
+            else:
+                return Response(data={"message": "Analysis not found"},status=404)
+            if BufferAnalysis.active.filter(analysis_id=analysis_id, name=name).exists():
+                return Response(data={'message': 'Output result name cannot be duplicated under a same analysis name.'}, status=400)
+            buffer_inst = BufferAnalysis.active.create(analysis_id=analysis_id, layer=layer, radius=radius, dissolve_output=dissolve_output,name=name, geom_type='Polygon')
+            buffer_id = buffer_inst.id
+            is_working=get_celery_worker_status()
+            if is_working != "working":
+                analysis_inst.delete()
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
+            response = CreateBuffer.delay(layer, radius, radius_col, dissolve_output, analysis_id, buffer_id)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
+        except Exception as e:
+            print('Error occured in ProximityAnalysisAPIView',str(e))
+            if analysis_inst: analysis_inst.delete()
+            return Response(data={'message': 'error', 'details': str(e)}, status=400)
+        
+    def patch(self, request, *args, **kwargs):
+        try:
+            errors=[]
+            buffer_analysis_id=request.resolver_match.kwargs.get('pk')
+            instance = BufferAnalysis.active.get(id=buffer_analysis_id)
+            serializer = BufferAnalysisSerializer(instance, request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(data=serializer.data, status=200)
+            else:
+                for er in serializer._errors:
+                    errors.append(
+                        {'errorName': er, 'details': serializer._errors[er][0]})
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': 'Error Occured', 'Error': errors})
+        except Exception as e:
+            return Response(data={'message': str(e)}, status=400)
 class BufferAreasCollection(viewsets.ModelViewSet):
     '''
     Viewset for BufferAreas objects
@@ -2608,56 +3129,69 @@ class BufferAreasCollection(viewsets.ModelViewSet):
     http_method_names = ['get']
     serializer_class = BufferAreasSerializer
 
-    # default_serializer_class = BufferAreasSerializer
-    # serializer_classes = {
-    #     'list': BufferAreasSerializer,
-    #     'retrieve': BufferAreasSerializer,
-    # }
-
-    def get_queryset(self, pk=None, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         try:
-            id = self.request.resolver_match.kwargs.get('pk')
-            analysis_id = self.request.query_params.get('analysis', None)
-            if id:
-                queryset=self.queryset.filter(id=id)
-            elif analysis_id:
-                queryset=self.queryset.filter(analysis_id=analysis_id)
-            return queryset
+            paginator = CustomPageNumberPagination()
+            buffer_analysis_id = request.query_params.get('buffer_analysis_id', None)
+            if not buffer_analysis_id:
+                return Response(data={'message': 'params buffer_analysis_id is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = self.queryset.filter(buffer_analysis_id=buffer_analysis_id)
+            '''search_key'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                search_fields = list(queryset.first().attributes.keys())
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs['attributes__'+field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            ''''order_by'''
+            order_by = request.query_params.get('ordering', None)
+            if order_by:
+                if 'id' in order_by:
+                    queryset = queryset.order_by(order_by)
+                else:
+                    queryset = queryset.order_by('attributes__'+order_by)
+            paginated_queryset = paginator.paginate_queryset(queryset, request)
+            serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            return paginator.get_paginated_response(data=serializer.data)
         except Exception as e:
-            return str(e)
+            return Response(data={'message': str(e)}, status=400)
 
-    # def get_serializer_class(self):
-    #     return self.serializer_classes.get(self.action,self.default_serializer_class)
+class BufferAreaTileQuerySet(LayerMVTView, DetailView):
+    '''
+    VectorTile Generation for Buffer Regions
+    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=&buffer_analysis_id=",
+    '''
+    vector_tile_layer_name = 'buffer_area'
+    vector_tile_fields = ('id', 'analysis_id','buffer_analysis_id', 'attributes')
 
-class BufferAnalysisDataAPIView(APIView):
-    def post(self, request, *args, **kwarggs):
-        '''Buffer Analysis
-
-        Parameters
-        ----------
-        distance : float
-
-        Returns
-        -------
-        message : string
-        task_id : string
-        '''
+    def get(self, request, *args, **kwargs):
+        '''Authentication'''
+        auth = request.headers['Authorization']
+        token = auth.split()[1]
         try:
-            request_dict = request.data
-            check_list = ['analysis_id', 'layer_ids']
-            for key in check_list:
-                if key not in request_dict or request_dict[key]=='':
-                    return Response(data={'message': 'analysis_id, layer_ids are required!'}, status=400)
-            analysis_id = int(request_dict['analysis_id'])
-            layer_ids = json.loads(request_dict['layer_ids'])
-            is_working=get_celery_worker_status()
-            if is_working != "working":
-                return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': "server error: celery is not working"})
-            response = BufferData(analysis_id, layer_ids)
-            return Response(status=200, data={'message': 'success', 'task_id': response})
-        except Exception as e:
-            return Response(data={'message': 'error', 'details': str(e)}, status=400)
-
+            '''if JWT authentication'''
+            user_id = AccessToken(token)['user_id']
+        except:
+            '''if token authentication'''
+            auth_token = Token.objects.get(key=token)
+            user_id = auth_token.user_id
+        if not User.active.filter(id=user_id).exists():
+            return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+        request_keys = request.GET.keys()
+        if 'area' in request_keys and request.GET['area'] != "":
+            area=request.GET['area']
+            queryset=BufferAreas.active.filter(id=area)
+        elif 'buffer_analysis_id' in request_keys and request.GET['buffer_analysis_id'] != "":
+            buffer_analysis_id=request.GET['buffer_analysis_id']
+            queryset=BufferAreas.active.filter(buffer_analysis_id=buffer_analysis_id)
+        else:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+        self.vector_tile_queryset = queryset.distinct()
+        return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 @api_view(['GET'])
 def get_analysis_task_response(request):
@@ -2669,16 +3203,16 @@ def get_analysis_task_response(request):
         result = AsyncResult(task_id, app=app)
         if result.ready():   # check task state: true/false
             try:
-                response, stat, message, code = result.get()
+                analysis_id, sub_analysis_id, stat, message, code = result.get()
                 if code == 200:
-                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
+                    return Response(data={'analysis_id':analysis_id, 'sub_analysis_id': sub_analysis_id, 'status': stat, 'message': message}, status=status.HTTP_200_OK)
                 else:
-                    return Response(data={'analysis_id':response, 'status': stat, 'message': message}, status=code)
+                    return Response(data={'analysis_id':analysis_id, 'sub_analysis_id': sub_analysis_id, 'status': stat, 'message': message}, status=code)
             except Exception as e:
-                return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(data={'analysis_id': None, 'status': "processing", 'message': ""}, status=200)
+                return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "processing", 'message': ""}, status=200)
     except Exception as e:
-        return Response(data={'analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data={'analysis_id': None, 'sub_analysis_id': None, 'status': "error", 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
@@ -2687,7 +3221,7 @@ class OptimumRouteAnalysisTileQuerySet(NetworkRoutesMVTView, DetailView):
     url:"http://0.0.0.0:8000/api/maps/optimum_route_vectortile/{z}/{x}/{y}/?analysis_id=&route_no=",
     '''
     vector_tile_layer_name = 'route'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_fields = ('id', 'analysis_id','optimum_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -2722,7 +3256,13 @@ def feature_popup(request, *args, **kwargs):
         feature_qs = FeatureCollection.active.filter(id=feature_id)
         if feature_qs.exists():
             feature_inst = feature_qs[0]
+        else:
+            return Response(data={'message': 'feature not found'}, status=404)
         attributes = feature_inst.attributes
+        '''remove image field'''
+        image_field_qs = LayerAttribute.objects.filter(layer=feature_inst.layer, data_type='image')
+        if image_field_qs.exists():
+            attributes.pop(image_field_qs[0].name, None)
         vector_layer = Vectorlayer.objects.filter(layer=feature_inst.layer)
         if vector_layer.exists():
             popup_fields = vector_layer[0].popup_fields
@@ -2738,7 +3278,7 @@ def feature_popup(request, *args, **kwargs):
         attr_keys = result.keys()
         popup = {}
         attribute_qs = LayerAttribute.objects.filter(
-            layer=feature_inst.layer, name__in=attr_keys).exclude(alias=None).values_list('name', 'alias')
+            layer=feature_inst.layer, name__in=attr_keys).exclude(alias=None).exclude(alias='').values_list('name', 'alias')
         attribute_dict = {}
         for tup in attribute_qs:
             attribute_dict[tup[0]] = tup[1]
@@ -2760,85 +3300,183 @@ def feature_popup(request, *args, **kwargs):
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-def get_analysis_dict(analysis, optimum_route):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    analysis_dict['mode'] = optimum_route.mode
-    analysis_dict['origin_long'] = optimum_route.origin_long
-    analysis_dict['origin_lat'] = optimum_route.origin_lat
-    analysis_dict['destination_long'] = optimum_route.destination_long
-    analysis_dict['destination_lat'] = optimum_route.destination_lat
-    analysis_dict['route_origin'] = optimum_route.route_origin
-    analysis_dict['route_destination'] = optimum_route.route_destination
-    # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
-    queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
-    serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
-    analysis_dict['routes'] = serialize.data
-    return analysis_dict
+# def get_analysis_dict(analysis, optimum_route):
+#     analysis_dict={}
+#     analysis_dict['id'] = analysis.id
+#     analysis_dict['name'] = analysis.name
+#     analysis_dict['geom_type'] = analysis.geom_type
+#     analysis_dict['bbox'] = analysis.bbox
+#     analysis_dict['mode'] = optimum_route.mode
+#     analysis_dict['origin_long'] = optimum_route.origin_long
+#     analysis_dict['origin_lat'] = optimum_route.origin_lat
+#     analysis_dict['destination_long'] = optimum_route.destination_long
+#     analysis_dict['destination_lat'] = optimum_route.destination_lat
+#     analysis_dict['route_origin'] = optimum_route.route_origin
+#     analysis_dict['route_destination'] = optimum_route.route_destination
+#     # analysis_dict['routes'] = NetworkRoutes.active.filter(analysis_id=analysis.id).values('id', 'route_no', 'length', 'travel_time', 'is_optimum', 'obstacles', 'bbox')
+#     queryset = NetworkRoutes.active.filter(analysis_id=analysis.id)
+#     serialize = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+#     analysis_dict['routes'] = serialize.data
+#     return analysis_dict
 
-def get_buffer_dict(analysis, buffer_analysis):
-    analysis_dict={}
-    analysis_dict['id'] = analysis.id
-    analysis_dict['name'] = analysis.name
-    analysis_dict['geom_type'] = analysis.geom_type
-    analysis_dict['bbox'] = analysis.bbox
-    # analysis_dict['origins'] = buffer_analysis.origins
-    analysis_dict['total_area'] = buffer_analysis.total_area
-    queryset = BufferAreas.active.filter(analysis_id=analysis.id).order_by('id')
-    serializer = BufferAreasMapSerializer(queryset, many=True)
-    analysis_dict['buffer_areas'] = serializer.data
-    return analysis_dict
+# def get_buffer_dict(analysis, proximity_analysis):
+#     analysis_dict={}
+#     analysis_dict['id'] = analysis.id
+#     analysis_dict['name'] = analysis.name
+#     analysis_dict['geom_type'] = analysis.geom_type
+#     analysis_dict['bbox'] = analysis.bbox
+#     # analysis_dict['origins'] = proximity_analysis.origins
+#     analysis_dict['total_area'] = proximity_analysis.total_area
+#     queryset = ProximityAreas.active.filter(analysis_id=analysis.id).order_by('id')
+#     serializer = ProximityAreasMapSerializer(queryset, many=True)
+#     analysis_dict['proximity_areas'] = serializer.data
+#     return analysis_dict
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layers(request, *args, **kwargs):
+def analysis_result_list(request, *args, **kwargs):
+    paginator = CustomPageNumberPagination()
     try:
         project = request.query_params.get('project', None)
         analysis_type = request.query_params.get('analysis_type', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        ana_type_list=[]
-        analys_qs = Analysis.active.filter(project=project, type=analysis_type).order_by('-id')
-        for analysis in analys_qs:
-            optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis.id)
-            optimum_route = optimum_route_qs[0]
-            analysis_dict=get_analysis_dict(analysis, optimum_route)
-            ana_type_list.append(analysis_dict)
-        return Response(ana_type_list, status=200)
+        analysis_id=request.query_params.get('analysis_id', None)
+        if not project or not analysis_type or  not analysis_id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'Project   does not exists'}, status=404)
+        if not Analysis.objects.filter(project=project,id=analysis_id).exists():
+            return Response(data={'message': 'Analysis does not exist'}, status=404)
+        '''search_key'''
+        search_key = request.query_params.get('search', None)
+        if analysis_type== 'optimum_route':
+            if OptimumRoute.active.filter(analysis_id=analysis_id).exists():
+                if search_key:
+                    optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name', 'road_network', 'uploaded_date')
+                else:
+                    optimum_qs=OptimumRoute.objects.filter(analysis_id=analysis_id).order_by('-id').values('id','name', 'road_network', 'uploaded_date')
+                paginated_qs = paginator.paginate_queryset(optimum_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
+        elif analysis_type == 'proximity':
+            if ProximityAnalysis.active.filter(analysis_id=analysis_id).exists():
+                if search_key:
+                    proximity_qs=ProximityAnalysis.active.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                else:
+                    proximity_qs=ProximityAnalysis.active.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(proximity_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
+        elif analysis_type == 'buffer':
+            if BufferAnalysis.active.filter(analysis_id=analysis_id).exists():
+                if search_key:
+                    buffer_qs=BufferAnalysis.active.filter(analysis_id=analysis_id,name__icontains=search_key).order_by('-id').values('id','name','uploaded_date')
+                else:
+                    buffer_qs=BufferAnalysis.active.filter(analysis_id=analysis_id).order_by('-id').values('id','name','uploaded_date')
+                paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+                return paginator.get_paginated_response(paginated_qs)
+            else:
+                return Response(data={'message':"Analysis Result does not exists"},status=404)
+        else:
+            return Response(data={'message': 'type params invalid.'}, status=400)
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
 '''Analysis layers api for map page'''
 @api_view(['GET'])
-def analysis_layer(request, *args, **kwargs):
+def analysis_result_detail(request, *args, **kwargs):
     try:
         project = request.query_params.get('project', None)
-        analysis_id = request.query_params.get('analysis_id', None)
-        if not project or project == '':
-            return Response(data={'message': 'project params is missing!'}, status=400)
-        '''say network analysis'''
-        analys_qs = Analysis.active.filter(project=project, id=analysis_id)
-        if analys_qs.exists():
-            analysis = analys_qs[0]
-            if analysis.type == 'optimum_route':
-                optimum_route_qs = OptimumRoute.active.filter(analysis_id=analysis_id)
+        id = request.query_params.get('id', None)
+        analysis_type = request.query_params.get('analysis_type', None)
+
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project, analysis_type and id  params are required'}, status=400)
+        if not project or not analysis_type or  not id:
+            return Response(data={'message': 'project and analysis_type and analysis_id are required'}, status=400)
+        if not Project.objects.filter(id=project).exists():
+            return Response(data={'message': 'Project doeanalysis_dicts not exists'}, status=400)
+        analysis_dict={}
+        if analysis_type == 'optimum_route':
+                optimum_route_qs = OptimumRoute.active.filter(id=id)
+
                 if optimum_route_qs.exists():
-                    optimum_route = optimum_route_qs[0]
-                    analysis_dict=get_analysis_dict(analysis, optimum_route)
-            elif analysis.type == 'buffer':
-                buffer_analysis_qs = BufferAnalysis.active.filter(analysis_id=analysis_id)
-                buffer_analysis = buffer_analysis_qs[0]
-                analysis_dict = get_buffer_dict(analysis, buffer_analysis)
-            return Response(analysis_dict, status=200)
+                    optimal_route_instance=optimum_route_qs[0]
+                    optimal_id=optimal_route_instance.id
+                    analysis_id=optimal_route_instance.analysis_id
+                    queryset = NetworkRoutes.active.filter(analysis_id=analysis_id,optimum_id=optimal_id).order_by('-id')
+                    serializer = NetworkRoutesObstaclesMapSerializer(queryset, many=True)
+
+                    analysis_dict=optimum_route_qs.values('id','name','geom_type','bbox','mode','origin_long','origin_lat','destination_lat','destination_long','route_origin','route_destination')[0]
+                    analysis_dict['routes'] = serializer.data
+                else:
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
+        elif analysis_type == 'proximity':
+                proximity_analysis_qs = ProximityAnalysis.active.filter(id=id)
+                if proximity_analysis_qs.exists():
+                    proximity_analysis_instance=proximity_analysis_qs[0]
+                    analysis_id=proximity_analysis_instance.analysis_id
+                    proximity_analysis_id=proximity_analysis_instance.id
+                    queryset = ProximityAreas.active.filter(analysis_id=analysis_id,proximity_analysis_id=proximity_analysis_id).order_by('-id')
+                    serializer = ProximityAreasMapSerializer(queryset, many=True)
+                    analysis_dict = proximity_analysis_qs.values('id','origins','radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                    analysis_dict['proximity_areas'] = serializer.data
+                else:
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
+        elif analysis_type == 'buffer':
+                buffer_analysis_qs = BufferAnalysis.active.filter(id=id)
+                if buffer_analysis_qs.exists():
+                    analysis_dict = buffer_analysis_qs.values('id', 'layer', 'radius','dissolve_output','total_area','name','geom_type','bbox')[0]
+                else:
+                    return Response(data={"message":"Analysis Result does not exists"},status=400)
         else:
-            return Response(data={'message': 'Analysis object not found'}, status=400)
+            return Response(data={'message': 'type params invalid.'}, status=400)
+        return Response(analysis_dict, status=200)
+
     except Exception as e:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+@api_view(['GET'])
+def analysis_type_list(request, *args, **kwargs):
+    '''
+    Returns list of analysis objects.
+    '''
+    try:
+        paginator = CustomPageNumberPagination()
+        project_id = request.query_params.get('project_id', None)
+        type = request.query_params.get('type', None)
+        if  project_id is None:
+            return Response(data={"message":"project_id is required parmas"},status=400)
+        if not Project.objects.filter(id=project_id).exists():
+            return Response(data={"message":"Project does not exist"},status=404)
+        if type not in ('optimum_route','proximity', 'buffer'):
+            return Response(data={"message":"type must be optimum_route or service_area or buffer"},status=400)
+        '''search_key'''
+        search_key = request.query_params.get('search', None)
+        if type == 'optimum_route':
+            if search_key:
+                optimum_qs=Analysis.active.filter(project=project_id,type='optimum_route',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                optimum_qs=Analysis.active.filter(project=project_id,type='optimum_route').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(optimum_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+        elif type == 'proximity':
+            if search_key:
+                proximity_qs  = Analysis.active.filter(project=project_id,type='proximity',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                proximity_qs  = Analysis.active.filter(project=project_id,type='proximity').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(proximity_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+        elif type == 'buffer':
+            if search_key:
+                buffer_qs  = Analysis.active.filter(project=project_id,type='buffer',name__icontains=search_key).order_by('-id').values('name','uploaded_date','id')
+            else:
+                buffer_qs  = Analysis.active.filter(project=project_id,type='buffer').order_by('-id').values('name','uploaded_date','id')
+            paginated_qs = paginator.paginate_queryset(buffer_qs, request)
+            return paginator.get_paginated_response(paginated_qs)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=400)
 
 class ProjectMapConfigAPIView(APIView):
     permission_classes = [IsAuthenticated, ProjectMapConfigPermission]
@@ -2896,6 +3534,26 @@ def check_layer(request, *args, **kwargs):
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+def check_on_processing_status(layer:int):
+    """
+    Description
+    -----------
+    This function determines whether a layer has already been under data cleaning processing.
+
+    Parameters
+    ----------
+    layer: <int> layer_id 
+
+    Returns
+    -------
+    True or False
+    """
+    logs_qs = CleaningCheckLogs.objects.filter(layer_id=layer)
+    if logs_qs.exists():
+        if logs_qs[0].on_processing == True:
+            return True
+    return False
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_null_geometry(request, *args, **kwargs):
@@ -2905,10 +3563,13 @@ def check_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_null(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_null.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2921,10 +3582,13 @@ def check_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_multipart(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_multipart.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2937,10 +3601,13 @@ def check_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_duplicate(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_duplicate.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
-            return Response(data={'message': "Data does not exists"}, status=200)
+            return Response(data={'message': "Data does not exists"}, status=404)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2953,8 +3620,11 @@ def check_overlapping_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_overlapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)            
+            response = check_overlapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -2969,8 +3639,11 @@ def check_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_self_intersection(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_self_intersection.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'messages': "Data does not exists"}, status=200)
     except Exception as e:
@@ -2985,10 +3658,67 @@ def check_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = check_snapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = check_snapping.delay(layer)
+            # return Response(content
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def layer_check_logs(request, *args, **kwargs):
+    """
+    Description
+    -----------
+    After data cleaning processes are run, this api can be used to retrieve the check logs for the layer.
+
+    Parameters
+    ----------
+    layer : <int> layer id
+
+    Returns
+    -------
+    Json of Cleaning Check logs.
+    """
+    try:
+        layer = request.query_params.get('layer', None)
+        if not layer:
+            return Response(data={'message': 'layer params is missing!'}, status=400)
+        layer_qs = Vectorlayer.objects.filter(layer=layer)
+        if layer_qs.exists():
+            check_logs = CleaningCheckLogs.objects.filter(layer_id=layer)
+            if check_logs.exists():
+                check_log = check_logs.values('layer_id', 'null', 'multipart', 'duplicate', 'overlap', 'self_instersect', 'snapping')[0]
+                return Response(data=check_log)
+            else:
+                return Response(data={'message': "Cleaning Check Logs not found for the layer."}, status=404)
+        else:
+            return Response(data={'message': "Layer not found."}, status=404)
+    except Exception as e:
+        return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def data_clean_task_response(request):
+    '''
+    View to get the response of aynchronous task run for data cleaning processes.
+    '''
+    try:
+        task_id = request.query_params.get('task_id', None)
+        result = AsyncResult(task_id, app=app)
+        if result.ready():   # check task state: true/false
+            try:
+                content, code = result.get()
+                if code == 200:
+                    return Response(data=content, status=code)
+                else:
+                    return Response(data=content, status=code)
+            except Exception as e:
+                return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': "Please wait result"}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3034,8 +3764,11 @@ def fix_null_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_null(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_null.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3050,8 +3783,11 @@ def fix_multipart_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_multipart(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_multipart.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3066,8 +3802,11 @@ def fix_duplicate_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_duplicate(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_duplicate.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3082,8 +3821,11 @@ def fix_overlay_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_overlapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_overlapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3098,8 +3840,11 @@ def fix_self_intersecting_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_self_intersection(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_self_intersection.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
@@ -3114,81 +3859,84 @@ def fix_isolated_geometry(request, *args, **kwargs):
             return Response(data={'message': 'layer params is missing!'}, status=400)
         layer_qs = Vectorlayer.objects.filter(layer=layer)
         if layer_qs.exists():
-            content = fix_snapping(layer)
-            return Response(content)
+            if check_on_processing_status(layer) == True:
+                return Response(data={'message': 'Data cleaning process for this layer is already running. Please try again later.'}, status=200)
+            response = fix_snapping.delay(layer)
+            # return Response(content)
+            return Response(status=200, data={'message': 'success', 'task_id': response.task_id})
         else:
             return Response(data={'message': "Data does not exists"}, status=200)
     except Exception as e:
         return Response(data={'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def buffer_distance(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    distance = request.query_params.get('distance', None)
-    dissolve = request.query_params.get('dissolve', None)
-    if dissolve:
-        if dissolve == 'true':
-            dissolve = True
-        else:
-            dissolve = False
-    else:
-        dissolve = False
-    if not layer:
-        return Response(data={'message': 'layer params is missing!'}, status=400)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        data = buffer_by_distance(layer_qs, float(distance), dissolve)
-        return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def buffer_distance(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     distance = request.query_params.get('distance', None)
+#     dissolve = request.query_params.get('dissolve', None)
+#     if dissolve:
+#         if dissolve == 'true':
+#             dissolve = True
+#         else:
+#             dissolve = False
+#     else:
+#         dissolve = False
+#     if not layer:
+#         return Response(data={'message': 'layer params is missing!'}, status=400)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         data = buffer_by_distance(layer_qs, float(distance), dissolve)
+#         return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def buffer_column(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    column = request.query_params.get('column', None)
-    ratio = request.query_params.get('ratio', None)
-    dissolve = request.query_params.get('dissolve', None)
-    if dissolve:
-        if dissolve == 'true':
-            dissolve = True
-        else:
-            dissolve = False
-    else:
-        dissolve = False
-    if not layer or not column or not ratio or not dissolve:
-        return Response(data={'message': 'Params are missing!'}, status=400)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        data = buffer_by_column_value(layer_qs, column, float(ratio), dissolve)
-        return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def buffer_column(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     column = request.query_params.get('column', None)
+#     ratio = request.query_params.get('ratio', None)
+#     dissolve = request.query_params.get('dissolve', None)
+#     if dissolve:
+#         if dissolve == 'true':
+#             dissolve = True
+#         else:
+#             dissolve = False
+#     else:
+#         dissolve = False
+#     if not layer or not column or not ratio or not dissolve:
+#         return Response(data={'message': 'Params are missing!'}, status=400)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         data = buffer_by_column_value(layer_qs, column, float(ratio), dissolve)
+#         return Response(data={"message":"Buffered Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def data_buffer(request, *args, **kwargs):
-    layer = request.query_params.get('layer', None)
-    layers = request.query_params.get('layers', None)
-    distance = request.query_params.get('distance', None)
-    layer_qs = Vectorlayer.objects.filter(layer=layer)
-    if layer_qs.exists():
-        sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
-        layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
-        layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
-        layers_qs = []
-        for layer in json.loads(layers):
-            gdf = geopandas.read_postgis("SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + str(layer), con, geom_col="geometry")
-            gdf = gdf.join(pd.DataFrame(gdf.pop('attributes').values.tolist()))
-            layers_qs.append(gdf)
-        data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
-        return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
-    return Response(data={'message': "Data does not exists"}, status=400)
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def data_buffer(request, *args, **kwargs):
+#     layer = request.query_params.get('layer', None)
+#     layers = request.query_params.get('layers', None)
+#     distance = request.query_params.get('distance', None)
+#     layer_qs = Vectorlayer.objects.filter(layer=layer)
+#     if layer_qs.exists():
+#         sql = "SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + layer
+#         layer_qs = geopandas.read_postgis(sql, con, geom_col="geometry")
+#         layer_qs = layer_qs.join(pd.DataFrame(layer_qs.pop('attributes').values.tolist()))
+#         layers_qs = []
+#         for layer in json.loads(layers):
+#             gdf = geopandas.read_postgis("SELECT id, geometry, attributes FROM maps_featurecollection WHERE layer_id=" + str(layer), con, geom_col="geometry")
+#             gdf = gdf.join(pd.DataFrame(gdf.pop('attributes').values.tolist()))
+#             layers_qs.append(gdf)
+#         data = find_data_within_buffer(layer_qs, float(distance), layers_qs)
+#         return Response(data={"message":"Data fetched Successfully", "data": data.to_json()})
+#     return Response(data={'message': "Data does not exists"}, status=400)
 
 '''cleaning error map toogle bar api'''
 @api_view(['GET'])
@@ -3326,7 +4074,7 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
     http_method_names = ['get', 'patch', 'post']
     default_serializer_class = FeatureCollectionMirrorSerializer
     serializer_classes = {
-        # 'list': FeatureCollectionListSerializer,
+        'list': FeatureCollectionMirrorListSerializer,
         'retrieve': FeatureCollectionMirrorSerializer
     }
     # permission_classes=[FeatureCollectionPermission]
@@ -3334,6 +4082,44 @@ class FeatureCollectionMirrorViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
     pagination_class = CustomPageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        try:
+            # paginator = CustomPageNumberPagination()
+            layer_id = request.query_params.get('layer', None)
+            mirror_ids = request.query_params.get('ids', None)
+            if not layer_id:
+                return Response(data={'message': 'params layer is missing'}, status=status.HTTP_400_BAD_REQUEST)
+            if mirror_ids:
+                mirror_ids = [int(id) for id in mirror_ids.split(',')]
+                queryset = self.queryset.filter(layer__id=layer_id, id__in=mirror_ids)
+            else:
+                queryset = self.queryset.filter(layer__id=layer_id)
+            '''search_key'''
+            search_key = request.query_params.get('search', None)
+            if search_key:
+                search_fields = list(queryset.first().attributes.keys())
+                filter_kwargs = {}
+                for field in search_fields:
+                    filter_kwargs['attributes__'+field+'__icontains'] = search_key
+                list_of_Q = [Q(**{key: val})
+                                for key, val in filter_kwargs.items()]
+                queryset = queryset.filter(
+                    reduce(operator.or_, list_of_Q)) if search_fields else queryset
+            ''''order_by'''
+            order_by = request.query_params.get('ordering', None)
+            if order_by:
+                if 'id' in order_by:
+                    queryset = queryset.order_by(order_by)
+                else:
+                    queryset = queryset.order_by('attributes__'+order_by)
+            # paginated_queryset = paginator.paginate_queryset(queryset, request)
+            # serializer = self.get_serializer(paginated_queryset, many=True, context={})
+            # return paginator.get_paginated_response(data=serializer.data)
+            serializer = self.get_serializer(queryset, many=True, context={})
+            return Response(data=serializer.data, status=200)
+        except Exception as e:
+            return Response(data=str(e), status=400)
 
     def partial_update(self, request, pk=None, *args, **kwargs):
         try:
@@ -3579,6 +4365,7 @@ class LayerFromOptimumPathAnalysis(APIView):
                             'length': route.length,
                             'travel_time': route.travel_time,
                             'is_optimum': route.is_optimum,
+                            'obstacles': route.obstacles
                         }
                         feature_objs.append(FeatureCollection(geometry=route.geometry, layer=layer_instance, attributes=attributes_json))
                     FeatureCollection.active.bulk_create(feature_objs)
@@ -3612,11 +4399,11 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
     def get_queryset(self, pk=None, *args, **kwargs):
         try:
             id = self.request.resolver_match.kwargs.get('pk')
-            analysis_id = self.request.query_params.get('analysis', None)
+            optimum_id = self.request.query_params.get('optimum_id', None)
             if id:
                 queryset=self.queryset.filter(id=id)
-            elif analysis_id:
-                queryset=self.queryset.filter(analysis_id=analysis_id)
+            elif optimum_id:
+                queryset=self.queryset.filter(optimum_id=optimum_id)
             return queryset
         except Exception as e:
             return str(e)
@@ -3627,35 +4414,45 @@ class NetworkRoutesCollection(viewsets.ModelViewSet):
 class AnalysisViewset(viewsets.ModelViewSet):
     '''Analysis CRUD operations'''
     queryset = Analysis.active.all()
-    http_method_names = ['patch']
+    http_method_names = ['get', 'post', 'patch']
     default_serializer_class = AnalysisSerializer
     serializer_classes = {
-        'list': AnalysisSerializer,
+        'list': AnalysisListSerializer,
         'retrieve': AnalysisSerializer,
     }
 
-    # def get_queryset(self, pk=None, *args, **kwargs):
-    #     try:
-    #         id = self.request.resolver_match.kwargs.get('pk')
-    #         project = self.request.query_params.get('project', None)
-    #         if id:
-    #             queryset=self.queryset.filter(id=id)
-    #         elif project:
-    #             queryset=self.queryset.filter(project=project)
-    #         return queryset
-    #     except Exception as e:
-    #         return str(e)
+    def get_queryset(self, pk=None, *args, **kwargs):
+        try:
+            id = self.request.resolver_match.kwargs.get('pk')
+            project = self.request.query_params.get('project', None)
+            if id:
+                queryset=self.queryset.filter(id=id)
+            elif project:
+                queryset=self.queryset.filter(project=project).order_by('-id')
+            return queryset
+        except Exception as e:
+            return str(e)
 
     def get_serializer_class(self):
         return self.serializer_classes.get(self.action,self.default_serializer_class)
 
-class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
+    # def create (self, request, *args, **kwargs):
+        # try:
+        #     serializer = self.get_serialzer(data=request.data)
+        #     if serialzier.is_valid():
+        #         project = request.data.get('project', None)
+        #         name = request.data.get('name', None)
+        #         type = request.data.get('type', None)
+        #         serialzier
+        # except Exception as e:
+        #     return Response(data={'message': str(e)}, status=400)
+class ProximityAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
     '''
     VectorTile Generation for Buffer Regions
-    url:"http://0.0.0.0:8000/api/maps/buffer_area_vectortile/{z}/{x}/{y}/?area=",
+    url:"http://0.0.0.0:8000/api/maps/proximity_area_vectortile/{z}/{x}/{y}/?area=",
     '''
-    vector_tile_layer_name = 'buffer_area'
-    vector_tile_fields = ('id', 'analysis_id')
+    vector_tile_layer_name = 'proximity_area'
+    vector_tile_fields = ('id', 'analysis_id','proximity_analysis_id')
 
     def get(self, request, *args, **kwargs):
         '''Authentication'''
@@ -3674,12 +4471,12 @@ class BufferAreaTileQuerySet(NetworkRoutesMVTView, DetailView):
         if 'area' not in request_keys or request.GET['area'] == "":
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
         area=request.GET['area']
-        queryset=BufferAreas.active.filter(id=area)
+        queryset=ProximityAreas.active.filter(id=area)
         self.vector_tile_queryset = queryset.distinct()
         return BaseVectorTileView.get(self, request=request, z=kwargs.get('z'), x=kwargs.get('x'), y=kwargs.get('y'))
 
 '''Save Buffer Analysis Layer into main Layer Table'''
-class LayerFromBufferAnalysis(APIView):
+class LayerFromProximityAnalysis(APIView):
     def post(self, request, *args, **kwargs):
         try:
             analysis = request.data.get('analysis', None)
@@ -3698,8 +4495,8 @@ class LayerFromBufferAnalysis(APIView):
                 theme = Theme.objects.get(id=theme)
                 if Layer.active.filter(theme=theme, name=name).exists():
                     return Response(data={'message': 'Layer name cannot be duplicated!'}, status=400)
-                buffer_areas = BufferAreas.active.filter(analysis_id=analysis)
-                if buffer_areas:
+                proximity_areas = ProximityAreas.active.filter(analysis_id=analysis)
+                if proximity_areas:
                     try:
                         layer_instance = Layer.active.create(theme=theme, name=name, layer_type='Vector',display_on_map=True)
                     except Exception as e:
@@ -3710,21 +4507,21 @@ class LayerFromBufferAnalysis(APIView):
                     vector_layer_instance.save()
                     '''create features'''
                     feature_objs = []
-                    for buff_area in buffer_areas:
+                    for proximity_area in proximity_areas:
                         attributes_json = {
-                            'analysis_id': buff_area.analysis_id,
-                            'orgin': buff_area.origin,
-                            'area': buff_area.area,
-                            'pois': buff_area.pois,
+                            'analysis_id': proximity_area.analysis_id,
+                            'orgin': str(proximity_area.origin),
+                            'area': proximity_area.area,
+                            'pois': proximity_area.pois,
                         }
-                        feature_objs.append(FeatureCollection(geometry=buff_area.geometry, layer=layer_instance, attributes=attributes_json))
+                        feature_objs.append(FeatureCollection(geometry=proximity_area.geometry, layer=layer_instance, attributes=attributes_json))
                     FeatureCollection.active.bulk_create(feature_objs)
                     layer_instance.upload_status='successful'
                     layer_instance.is_clean = True
                     layer_instance.save()
                     return Response(data={'layer': layer_instance.id, 'theme': layer_instance.theme.id, 'name': layer_instance.name, 'display_on_map':True, 'bbox': vector_layer_instance.bbox, 'geom_type': vector_layer_instance.geom_type}, status=201)
                 else:
-                    return Response(data={'message': "Buffer Areas not found for the analysis"}, status=404)
+                    return Response(data={'message': "Proximity Areas not found for the analysis"}, status=404)
             else:
                 return Response(data={'message': "Analysis matching queryset does not exist!"}, status=404)
 

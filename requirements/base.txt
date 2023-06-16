@@ -75,6 +75,7 @@ django-sequences==2.7 #https://pypi.org/project/django-sequences/
 #network analysis
 # osmnx~=1.2
 osmnx==1.3.0
+momepy==0.5.4
 descartes==1.1.0
 # matplotlib==3.6.2
 mapclassify==2.4.3

@@ -2,6 +2,7 @@ import json
 
 from attr import fields
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from pgis_toolkit.maps.models import *
 from pgis_toolkit.maps.utils.project_style import get_style_detail
@@ -243,6 +244,16 @@ class FeatureCollectionMirrorSerializer(serializers.ModelSerializer):
         model = FeatureCollectionMirror
         fields= '__all__'
 
+class FeatureCollectionMirrorListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCollectionMirror
+        fields = ('id',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation |= instance.attributes
+        return representation
+
 class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkRoutes
@@ -250,7 +261,7 @@ class NetworkRoutesObstaclesSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        optimum_route_instance = OptimumRoute.active.get(analysis_id=instance.analysis_id)
+        optimum_route_instance = OptimumRoute.active.get(id=instance.optimum_id)
         representation['origin'] = f'({optimum_route_instance.origin_long}, {optimum_route_instance.origin_lat})'
         representation['destination'] = f'({optimum_route_instance.destination_long}, {optimum_route_instance.destination_lat})'
         '''obstacles'''
@@ -297,9 +308,21 @@ class AnalysisSerializer(serializers.ModelSerializer):
         model = Analysis
         fields = '__all__'
 
-class BufferAreasMapSerializer(serializers.ModelSerializer):
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Analysis.active.all(),
+                fields=['name', 'project', 'type'],
+                message='Analysis name should be unique for a project.',
+            )
+        ]
+class AnalysisListSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BufferAreas
+        model = Analysis
+        fields = ('id', 'name', 'project', 'description', 'uploaded_date', 'last_updated')
+
+class ProximityAreasMapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProximityAreas
         fields = ('id', 'area', 'bbox', 'origin')
 
     def to_representation(self, instance):
@@ -319,9 +342,9 @@ class BufferAreasMapSerializer(serializers.ModelSerializer):
         representation['poi'] = poi_list
         return representation
 
-class BufferAreasSerializer(serializers.ModelSerializer):
+class ProximityAreasSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BufferAreas
+        model = ProximityAreas
         fields = ('id', 'area', 'origin')
 
     def to_representation(self, instance):
@@ -341,3 +364,30 @@ class BufferAreasSerializer(serializers.ModelSerializer):
                 poi_json = {}
         representation['poi'] = poi_list
         return representation
+
+class BufferAreasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAreas
+        fields = ('id', 'area')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        attributes = instance.attributes
+        if attributes:
+            representation |= attributes
+        return representation
+
+class OptimumRouteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OptimumRoute
+        fields = '__all__'
+
+class ProximityAnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProximityAnalysis
+        fields = '__all__'
+
+class BufferAnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BufferAnalysis
+        fields = '__all__'
