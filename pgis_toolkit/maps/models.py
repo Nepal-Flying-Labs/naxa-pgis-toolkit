@@ -516,7 +516,16 @@ class NetworkRoutes(DateTimeStamp,IsDeleted):
     #     except Exception as e:
     #         print(f'error in def save of NetworkRoutes: {str(e)}')
     #     super(NetworkRoutes, self).save(*args, **kwargs)
-
+    
+    @property
+    def obstacles_count(self):
+        obstacles = self.obstacles
+        count = 0
+        if obstacles:
+            for layer in obstacles:
+                count = count + len(obstacles[layer])
+        return count
+    
 class ServiceAreaAnalysis(DateTimeStamp, IsDeleted):
     analysis_id = models.IntegerField(db_index=True, blank=True, null=True)
     class Meta:
