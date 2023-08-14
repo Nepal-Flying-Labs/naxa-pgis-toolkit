@@ -2645,6 +2645,75 @@ def bulk_template_download(request):
         if os.path.isfile(file_url): os.remove(file_url)
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
 
+'''bulk download base layer templates'''
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def bulk_base_template_download(request):
+    #creating directory to save shapefile
+    dir=MEDIA_ROOT + '/template_download/templates/'
+    os.makedirs(dir, exist_ok=True)
+    file_url=None
+    try:
+        format = request.query_params.get('output_format', 'shapefile')
+        if format not in ['shapefile', 'csv']:
+            return Response(data={'message': 'Only shapefile and csv formats are available.'}, status=400)
+        layer_template_qs=LayerTemplate.active.all()
+        if not layer_template_qs:
+            return Response(data={'message': 'No layer templates found!'}, status=400)
+        if format == 'shapefile':
+            for layer_template in layer_template_qs:
+                attributes=LayerTemplateAttribute.objects.filter(layer_template=layer_template)
+                properties={}
+                for attribute in attributes:
+                    print("attribute ko data type",attribute.data_type)
+                    property_name = attribute.alias if attribute.alias else attribute.name
+                    if attribute.data_type == "str":
+                        properties[property_name] = 'str'
+                    elif attribute.data_type == "int":
+                        properties[property_name] = f'int:{attribute.length}'
+                    elif attribute.data_type == "float":
+                        properties[property_name] = f'float:{attribute.length}.{attribute.precision}'
+                    elif attribute.data_type == "date":
+                        properties[property_name] = 'date'
+                schema={
+                    'geometry':layer_template.geometry_type,
+                    'properties':properties
+                }
+                shapefile_path = MEDIA_ROOT + \
+                                    f'/template_download/templates/{layer_template.name}.shp'
+                shapefile = fiona.open(shapefile_path, mode='w', driver='ESRI Shapefile',
+                schema = schema, crs = "EPSG:4326")
+                shapefile.close()
+        elif format == 'csv':
+            for layer_template in layer_template_qs:
+                attributes=list(LayerTemplateAttribute.objects.filter(layer_template=layer_template).values_list('name', flat=True))
+                df = pd.DataFrame(columns=attributes)
+                file_path = f'{dir}{layer_template.name}.csv'
+                df.to_csv(file_path)
+        # create a ZipFile
+        templates_zip_name = 'templates.zip'
+        zipfile_path = MEDIA_ROOT + f'/template_download/templates'
+        # files = MEDIA_ROOT + '/template_download/shapefiles/'
+        files = zipfile_path
+        shutil.make_archive(zipfile_path, 'zip', files)
+        # defining zip file path
+        file_url = MEDIA_ROOT + \
+            f'/template_download/{templates_zip_name}'
+        # downloading zip file
+        zip_file = open(file_url, 'rb')
+        response = HttpResponse(
+            zip_file, content_type='application/force-download')
+        response[
+            'Content-Disposition'] = 'attachment; filename="%s"' % f'{templates_zip_name}'
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return response
+    except Exception as e:
+        clear_dir(dir) #clearing directory
+        if os.path.isfile(file_url): os.remove(file_url)
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'message': str(e)})
+
+
 '''GeoJSON API for features.'''
 '''{{baseURL}}api/maps/feature/2/'''
 class FeatureGeoJSONAPIView(APIView):
