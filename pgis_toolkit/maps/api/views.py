@@ -2665,7 +2665,6 @@ def bulk_base_template_download(request):
                 attributes=LayerTemplateAttribute.objects.filter(layer_template=layer_template)
                 properties={}
                 for attribute in attributes:
-                    print("attribute ko data type",attribute.data_type)
                     property_name = attribute.alias if attribute.alias else attribute.name
                     if attribute.data_type == "str":
                         properties[property_name] = 'str'
