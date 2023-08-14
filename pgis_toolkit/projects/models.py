@@ -318,7 +318,7 @@ class RequestDemo(DateTimeStamp):
     phone = models.CharField(max_length=10, blank=True, null=True) #no validators since pgis_toolkit users are foreign.
     organization_name = models.CharField(max_length=254, blank=True, null=True)
     marketing_communications = models.BooleanField(default=False)
-
+    description=models.TextField(null=True, blank=True)
     class Meta:
         app_label = 'projects'
 
