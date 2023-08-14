@@ -75,7 +75,8 @@ def post_save_requestdemo(sender, created, instance, **kwargs):
                 \nEmail: {instance.email} \
                 \nPhone: {instance.phone} \
                 \nOrganization: {instance.organization_name} \
-                \nMarketing Communications: {instance.marketing_communications}',
+                \nMarketing Communications: {instance.marketing_communications} \
+                \nDescription: {instance.description}',
             }
             template = 'email/email_request_demo.html'
             html_message = render_to_string(template, data)
