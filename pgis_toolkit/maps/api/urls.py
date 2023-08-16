@@ -82,7 +82,10 @@ from pgis_toolkit.maps.api.views import (
     sync_features,
     sync_mirror_to_mongo,
     sync_template,
-    update_template_attributes, layer_check_logs, data_clean_task_response
+    update_template_attributes,
+    layer_check_logs,
+    data_clean_task_response,
+    bulk_base_template_download
 )
 
 router = DefaultRouter()
@@ -210,6 +213,7 @@ urlpatterns = [
     path('import_template/', import_template, name='import_template'),
     path('sync_template/', sync_template, name='sync_template'),
     path('bulk_template_download/', bulk_template_download, name='bulk_template_download'),
+    path('bulk_base_template_download/', bulk_base_template_download, name='bulk_base_template_download'),
 
     #==================
     #   Miscellaneous
