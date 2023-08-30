@@ -256,7 +256,7 @@ EMAIL_USE_TLS =  env("DJANGO_EMAIL_USE_TLS",default=True,)
 EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default='')
 EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default='')
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
-EMAIL_TIMEOUT = 5
+EMAIL_TIMEOUT = env("DJANGO_EMAIL_TIMEOUT", default=20)
 
 # ADMIN
 # ------------------------------------------------------------------------------
