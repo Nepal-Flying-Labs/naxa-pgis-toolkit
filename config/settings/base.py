@@ -255,6 +255,7 @@ EMAIL_USE_SSL = env("DJANGO_EMAIL_USE_SSL",default=False,)
 EMAIL_USE_TLS =  env("DJANGO_EMAIL_USE_TLS",default=True,)
 EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default='')
 EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default='')
+DEFAULT_FROM_EMAIL =  env("DJANGO_DEFAULT_FROM_EMAIL", default="USAFIRI <usafiritest@gmail.com>")
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
 EMAIL_TIMEOUT = env("DJANGO_EMAIL_TIMEOUT", default=20)
 
