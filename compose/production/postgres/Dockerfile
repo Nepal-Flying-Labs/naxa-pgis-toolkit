@@ -1,4 +1,4 @@
-FROM postgis/postgis:14-3.2
+FROM postgis/postgis:18-3.6
 
 COPY ./compose/production/postgres/maintenance /usr/local/bin/maintenance
 RUN chmod +x /usr/local/bin/maintenance/*
